@@ -406,13 +406,17 @@
     var cls = h("select", { id: "t_class" }); ["recon", "forensics", "defense", "pentest", "crypto", "mobile", "platform"].forEach(function (c) { cls.appendChild(h("option", { value: c, text: c })); }); f["class"] = cls;
     var vis = h("select", { id: "t_vis" }, h("option", { value: "public", text: "public" }), h("option", { value: "private", text: "private (subscribers)" })), st = h("select", { id: "t_status" }, h("option", { value: "published", text: "published" }), h("option", { value: "draft", text: "draft" }));
     var file = h("input", { type: "file", id: "t_file", accept: ".zip,.gz,.tar,.txt" }), tmsg = h("div", { "class": "msg" });
+    var tpChk = h("input", { type: "checkbox", id: "t_tp" });
+    var tpBox = h("div", { style: "display:none" }, inp("ocr", tr("Original creator (person or project)", "المطوّر الأصلي (شخص أو مشروع)"), { type: "text", maxlength: "80" }), inp("olic", tr("License (e.g. MIT, GPL-3.0, Apache-2.0)", "الرخصة (مثلا MIT, GPL-3.0, Apache-2.0)"), { type: "text", maxlength: "60" }), inp("orepo", tr("Original GitHub repository URL", "رابط الريبو الأصلي على GitHub"), { type: "text", placeholder: "https://github.com/owner/repo" }),
+      h("p", { "class": "hint", text: tr("Only open-source projects. Check the license allows linking. We link to the original and do not host or change their code.", "مشاريع اوبن سورس بس. اتأكد إن الرخصة بتسمح. بنحط لينك للأصلي ومش بنستضيف الكود ولا نعدله.") }));
+    tpChk.addEventListener("change", function () { tpBox.style.display = tpChk.checked ? "block" : "none"; });
     var tf = h("form", { "class": "auth", style: "max-width:none;margin:0" }, h("h2", { text: tr("Add a tool", "ضيف أداة") }),
       inp("name", tr("Name", "الاسم"), { maxlength: "40", required: "", type: "text" }), inp("slug", "Slug (a-z, 0-9, -)", { maxlength: "41", required: "", type: "text" }),
       h("label", { text: tr("Class", "التصنيف") }), cls, inp("den", tr("Description (English)", "الوصف (انجليزي)"), { maxlength: "600", rows: "3" }, "textarea"), inp("dar", tr("Description (Arabic)", "الوصف (عربي)"), { maxlength: "600", rows: "3" }, "textarea"),
       inp("cmds", tr("Commands, one per line (max 10)", "الأوامر، واحد في السطر (10 كحد أقصى)"), { rows: "3" }, "textarea"), h("label", { text: tr("Visibility", "الظهور") }), vis, h("label", { text: tr("Status", "الحالة") }), st,
       inp("price", tr("Price (optional, e.g. 49.00)", "السعر (اختياري، مثلا 49.00)"), { type: "text", inputmode: "decimal", maxlength: "12" }), inp("cur", tr("Currency", "العملة"), { type: "text", maxlength: "3", value: "EGP" }),
       inp("video", tr("Video URL (https)", "رابط الفيديو (https)"), { type: "text" }), inp("repo", tr("GitHub repo URL", "رابط الريبو"), { type: "text" }), h("label", { "for": "t_file", text: tr("File (zip, max 50 MB)", "ملف (zip حتى 50MB)") }), file,
-      h("div", { "class": "row" }, h("button", { "class": "btn f", type: "submit", text: tr("Publish", "نشر") })), tmsg);
+      h("label", { "for": "t_tp" }, tpChk, " " + tr("Third-party open-source tool from GitHub (not made by us)", "أداة اوبن سورس من GitHub (مش من عملنا)")), tpBox, h("div", { "class": "row" }, h("button", { "class": "btn f", type: "submit", text: tr("Publish", "نشر") })), tmsg);
     tf.addEventListener("submit", async function (e) {
       e.preventDefault(); var slug = f.slug.value.trim();
       if (!/^[a-z0-9][a-z0-9-]{1,40}$/.test(slug)) return say(tmsg, "slug?", "err");
@@ -420,7 +424,12 @@
       var pm_ = null, cur_ = (f.cur.value.trim() || "EGP").toUpperCase();
       if (f.price.value.trim()) { pm_ = Math.round(parseFloat(f.price.value) * 100); if (!(pm_ >= 0 && pm_ <= 100000000)) return say(tmsg, tr("Price?", "السعر؟"), "err"); }
       if (!/^[A-Z]{3}$/.test(cur_)) return say(tmsg, tr("Currency?", "العملة؟"), "err");
-      var ins = await sb.from("tools").insert(Object.assign({ slug: slug, name: f.name.value.trim(), class: cls.value, description_en: f.den.value.trim(), description_ar: f.dar.value.trim() || null, commands: cmds, visibility: vis.value, status: st.value, created_by: me.id }, pm_ != null ? { price_minor: pm_, currency: cur_ } : {})).select("id").single();
+      var tp_ = {};
+      if (tpChk.checked) { var oc = f.ocr.value.trim(), ol = f.olic.value.trim(), orr = f.orepo.value.trim();
+        if (oc.length < 2 || ol.length < 2) return say(tmsg, tr("Third-party tools need the original creator and the license.", "الأدوات التانية لازم المطوّر الأصلي والرخصة."), "err");
+        if (!/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(orr)) return say(tmsg, tr("Original repository must look like https://github.com/owner/repo", "رابط الريبو لازم يبقى https://github.com/owner/repo"), "err");
+        tp_ = { third_party: true, orig_creator: oc, orig_license: ol, orig_repo: orr }; }
+      var ins = await sb.from("tools").insert(Object.assign({ slug: slug, name: f.name.value.trim(), class: cls.value, description_en: f.den.value.trim(), description_ar: f.dar.value.trim() || null, commands: cmds, visibility: vis.value, status: st.value, created_by: me.id }, tp_, pm_ != null ? { price_minor: pm_, currency: cur_ } : {})).select("id").single();
       if (ins.error) return say(tmsg, ins.error.message, "err");
       var path = null;
       if (file.files[0]) { if (file.files[0].size > 52428800) return say(tmsg, "file > 50 MB", "err"); path = slug + "/" + file.files[0].name.replace(/[^A-Za-z0-9._-]/g, "_").toLowerCase(); var up = await sb.storage.from("tool-files").upload(path, file.files[0], { upsert: false }); if (up.error) return say(tmsg, up.error.message, "err"); }
@@ -581,8 +590,9 @@
   }
 
   /* ---------- published tools on tools.html ---------- */
+  function creditEl(t) { return h("div", { "class": "credit" }, h("b", { text: tr("Not created by Zenoth.", "مش من عمل Zenoth.") }), " " + tr("Created by ", "المطوّر الأصلي: ") + t.orig_creator + ". " + tr("License: ", "الرخصة: ") + t.orig_license + ". ", h("a", { href: t.orig_repo, target: "_blank", rel: "noopener noreferrer", text: tr("Original repository", "الريبو الأصلي") + " \u2197" })); }
   async function dynTools() {
-    var SELT = "id,slug,name,class,description_en,description_ar,commands,visibility,created_by", PRC = ",price_minor,currency,discount_percent,discount_until";
+    var SELT = "id,slug,name,class,description_en,description_ar,commands,visibility,created_by,third_party,orig_creator,orig_license,orig_repo", PRC = ",price_minor,currency,discount_percent,discount_until";
     var r = await sb.from("tools").select(SELT + PRC).eq("status", "published"); if (r.error) r = await sb.from("tools").select(SELT).eq("status", "published"); if (r.error || !r.data) return;
     r.data.forEach(function (t) {
       var sc0 = document.querySelector('article.card[data-name^="' + t.slug + ' "]');
@@ -598,22 +608,23 @@
       var grid = document.querySelector("#c-" + t.class + " .grid"); if (!grid) return;
       var cmds = h("div", { "class": "cmds" }); (t.commands || []).forEach(function (c) { cmds.appendChild(h("code", { text: c })); });
       var p = h("p", { text: t.description_en }); if (t.description_ar) { p.setAttribute("data-en", t.description_en); p.setAttribute("data-ar", t.description_ar); }
-      var tagc = t.visibility === "private" ? h("span", { "class": "tag", text: "PRO" }) : h("span", { "class": "tag new", text: "NEW" });
+      var tagc = t.third_party ? h("span", { "class": "tag third", text: "THIRD-PARTY" }) : t.visibility === "private" ? h("span", { "class": "tag", text: "PRO" }) : h("span", { "class": "tag new", text: "NEW" });
       var priceEl = null;
       if (t.price_minor != null) { var on = t.discount_percent > 0 && (!t.discount_until || new Date(t.discount_until) > new Date()), eff = on ? Math.floor(t.price_minor * (100 - t.discount_percent) / 100) : t.price_minor;
         priceEl = h("span", { "class": "priv" }, on ? h("s", { text: (t.price_minor / 100).toFixed(2) }) : null, on ? " " : null, (eff / 100).toFixed(2) + " " + t.currency + (on ? " (-" + t.discount_percent + "%)" : "")); }
-      grid.appendChild(h("article", { "class": "card", "data-name": t.slug + " " + t.class, "data-c": t.class }, h("div", { "class": "top" }, h("h3", { text: t.name }), h("span", null, tagc)), p, cmds,
+      grid.appendChild(h("article", { "class": t.third_party ? "card third" : "card", "data-o": t.third_party ? "third" : null, "data-name": t.slug + " " + t.class, "data-c": t.class }, h("div", { "class": "top" }, h("h3", { text: t.name }), h("span", null, tagc)), p, cmds, t.third_party ? creditEl(t) : null,
         h("div", { "class": "foot" }, h("span", { "class": "priv", text: t.visibility === "private" ? "Subscribers only" : "Public" }), priceEl, h("a", { "class": "more", href: "tool.html?t=" + encodeURIComponent(t.slug), text: "Details" }), (me && (me.role === "owner" || (me.role === "admin" && t.created_by === me.id))) ? h("a", { "class": "more", href: "admin.html#edit-" + encodeURIComponent(t.slug), text: tr("Edit", "تعديل") }) : null)));
     });
   }
 
   async function toolPage() {
     var app = $("app"), slug = new URLSearchParams(location.search).get("t") || ""; clear(app);
-    var r = await sb.from("tools").select("id,name,class,description_en,description_ar,commands,visibility,created_by").eq("slug", slug).eq("status", "published").maybeSingle();
+    var r = await sb.from("tools").select("id,name,class,description_en,description_ar,commands,visibility,created_by,third_party,orig_creator,orig_license,orig_repo").eq("slug", slug).eq("status", "published").maybeSingle();
     var box = h("div", { "class": "wide" }); app.appendChild(box);
     if (!r.data) return box.appendChild(h("div", { "class": "off", text: "404" }));
     var t = r.data, a = (await sb.from("tool_assets").select("video_url,repo_url,file_path").eq("tool_id", t.id).maybeSingle()).data;
     var pn = h("div", { "class": "panel" }, h("h1", { text: t.name }), h("p", { text: EN() || !t.description_ar ? t.description_en : t.description_ar }));
+    if (t.third_party) pn.appendChild(creditEl(t));
     (t.commands || []).forEach(function (c) { pn.appendChild(h("code", { text: c, style: "display:block;margin:4px 0" })); });
     if (!a) { pn.appendChild(h("p", { "class": "hint", text: tr("Video, repo and files are for subscribers only.", "الفيديو والريبو والملفات للمشتركين بس.") })); pn.appendChild(h("a", { "class": "btn f", href: me ? "account.html" : "login.html", text: tr("Subscribe", "اشترك") })); }
     else {
