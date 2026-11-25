@@ -283,13 +283,18 @@
     var subR = await sb.from("subscriptions").select("status,current_period_end").eq("user_id", me.id).maybeSingle();
     var active = subR.data && /^(active|trialing)$/.test(subR.data.status) && new Date(subR.data.current_period_end) > new Date();
     plansBox.appendChild(h("p", { text: active ? tr("Active until ", "نشط لحد ") + new Date(subR.data.current_period_end).toLocaleDateString() : tr("No active subscription. Private tools need one.", "مفيش اشتراك فعال. الأدوات الخاصة محتاجة اشتراك.") }));
-    var pl = await sb.from("plans").select("id,name,price_minor,currency,period").eq("active", true);
+    var pl = await sb.from("plans").select("id,name,price_minor,currency,period,scope,description").eq("active", true);
+    var ptA = (await sb.from("plan_tools").select("plan_id,tool_id")).data || [], tnA = {}; ((await sb.from("tools").select("id,name")).data || []).forEach(function (x) { tnA[x.id] = x.name; });
+    var upa = (await sb.from("user_plan_access").select("plan_id,current_period_end").eq("user_id", me.id)).data || [];
+    upa.filter(function (a) { return new Date(a.current_period_end) > new Date(); }).forEach(function (a) { var pn_ = (pl.data || []).filter(function (q) { return q.id === a.plan_id; })[0]; plansBox.appendChild(h("p", { text: (pn_ ? pn_.name : tr("Plan", "خطة")) + tr(" active until ", " نشطة لحد ") + new Date(a.current_period_end).toLocaleDateString() })); });
     var pm = await sb.rpc("payment_methods"), methods = (pm.data || []).map(function (x) { return x.method; });
     var manualBox = h("div"), payMsg = h("div", { "class": "msg" });
     if ((pl.data || []).length && !methods.length) plansBox.appendChild(h("p", { "class": "hint", text: tr("Payments are not open yet.", "الدفع لسه مش مفتوح.") }));
     if (methods.length) plansBox.appendChild(h("p", { "class": "hint", text: tr("Choose how to pay:", "اختار طريقة الدفع:") }));
     (pl.data || []).forEach(function (p) {
       if (!methods.length) return;
+      var covA = p.scope === "tools" ? tr("Covers only: ", "بتشمل بس: ") + ptA.filter(function (q) { return q.plan_id === p.id; }).map(function (q) { return tnA[q.tool_id] || "?"; }).join(", ") : tr("Covers all tools", "بتشمل كل الأدوات");
+      plansBox.appendChild(h("p", { "class": "hint", text: p.name + ": " + covA + (p.description ? ". " + p.description : "") }));
       var row = h("div", { "class": "row" }, h("span", { text: p.name + " - " + (p.price_minor / 100).toFixed(2) + " " + p.currency + " / " + p.period + "  " }));
       if (methods.indexOf("paymob") > -1 && p.currency === "EGP") row.appendChild(h("button", { "class": "btn", type: "button", text: tr("Pay by card / wallet (Paymob)", "ادفع بكارت / محفظة (Paymob)"), on: { click: async function () {
         var s = (await sb.auth.getSession()).data.session;
@@ -545,16 +550,27 @@
       c.addEventListener("change", async function () { var x = await sb.from("payment_providers").update({ enabled: c.checked }).eq("provider", p.provider); if (x.error) { c.checked = !c.checked; say(pmsg, x.error.message, "err"); } });
       pp.appendChild(h("label", { style: "display:inline-block;margin-inline-end:14px" }, c, " " + NAMES[p.provider] + (p.provider === "paymob" ? " (not tested yet)" : " (not tested yet)")));
     });
-    var pl = await sb.from("plans").select("id,name,price_minor,currency,period,active"); (pl.data || []).forEach(function (p) {
-      pp.appendChild(h("p", { text: p.name + ": " + (p.price_minor / 100).toFixed(2) + " " + p.currency + "/" + p.period + (p.active ? "" : " (off)") }));
+    var pl = await sb.from("plans").select("id,name,price_minor,currency,period,active,scope,description");
+    var allT = (await sb.from("tools").select("id,name").order("name")).data || [], ptR = (await sb.from("plan_tools").select("plan_id,tool_id")).data || [], tName = {}; allT.forEach(function (x) { tName[x.id] = x.name; });
+    (pl.data || []).forEach(function (p) {
+      var cov = p.scope === "tools" ? tr("only: ", "بس: ") + ptR.filter(function (q) { return q.plan_id === p.id; }).map(function (q) { return tName[q.tool_id] || "?"; }).join(", ") : tr("all tools", "كل الأدوات");
+      pp.appendChild(h("p", { text: p.name + ": " + (p.price_minor / 100).toFixed(2) + " " + p.currency + "/" + p.period + " (" + cov + ")" + (p.description ? " - " + p.description : "") + (p.active ? "" : " (off)") }));
     });
     if (owner) {
       pp.appendChild(h("p", { "class": "hint", text: tr("A plan's price applies to every enabled method. Paymob needs EGP plans.", "سعر الخطة بيتطبق على كل طرق الدفع المفعلة. Paymob محتاج خطط بالجنيه.") }));
       var n = h("input", { type: "text", placeholder: "name", maxlength: "40" }), pr = h("input", { type: "text", placeholder: "price e.g. 99.00", inputmode: "decimal" }), cu = h("input", { type: "text", placeholder: "EGP", maxlength: "3" });
       var pe = h("select", null, h("option", { value: "month", text: "month" }), h("option", { value: "year", text: "year" }));
-      pp.appendChild(h("div", { "class": "row" }, n, pr, cu, pe, h("button", { "class": "btn f", type: "button", text: tr("Add plan", "ضيف خطة"), on: { click: async function () {
+      var scSel = h("select", null, h("option", { value: "all", text: tr("All tools", "كل الأدوات") }), h("option", { value: "tools", text: tr("Only selected tools", "أدوات محددة بس") })), dsc = h("input", { type: "text", maxlength: "300", placeholder: tr("Plan details shown to customers (optional)", "تفاصيل الخطة للعملاء (اختياري)"), style: "min-width:260px" }), picks = {}, pickBox = h("div", { style: "display:none;max-height:220px;overflow:auto;padding:6px 0" });
+      allT.forEach(function (x) { var cb = h("input", { type: "checkbox" }); picks[x.id] = cb; pickBox.appendChild(h("label", { style: "display:inline-block;margin:2px 10px 2px 0" }, cb, " " + x.name)); });
+      scSel.addEventListener("change", function () { pickBox.style.display = scSel.value === "tools" ? "block" : "none"; });
+      pp.appendChild(h("div", { "class": "row" }, n, pr, cu, pe, scSel, dsc));
+      pp.appendChild(pickBox);
+      pp.appendChild(h("div", { "class": "row" }, h("button", { "class": "btn f", type: "button", text: tr("Add plan", "ضيف خطة"), on: { click: async function () {
         var minor = Math.round(parseFloat(pr.value) * 100); if (!(minor >= 0) || !/^[A-Za-z]{3}$/.test(cu.value)) return say(pmsg, "price/currency?", "err");
-        var x = await sb.from("plans").insert({ name: n.value.trim(), price_minor: minor, currency: cu.value.toUpperCase(), period: pe.value, provider: "manual", active: true });
+        var chosen = Object.keys(picks).filter(function (k) { return picks[k].checked; });
+        if (scSel.value === "tools" && !chosen.length) return say(pmsg, tr("Pick at least one tool.", "اختار أداة واحدة على الأقل."), "err");
+        var x = await sb.from("plans").insert({ name: n.value.trim(), price_minor: minor, currency: cu.value.toUpperCase(), period: pe.value, provider: "manual", active: true, scope: scSel.value, description: dsc.value.trim() || null }).select("id").single();
+        if (!x.error && scSel.value === "tools") { var y = await sb.from("plan_tools").insert(chosen.map(function (k) { return { plan_id: x.data.id, tool_id: k }; })); if (y.error) return say(pmsg, y.error.message, "err"); }
         say(pmsg, x.error ? x.error.message : tr("Added. Reload to see it.", "اتضافت. حدّث الصفحة."), x.error ? "err" : "ok");
       } } })));
       /* Vodafone Cash details shown to customers (owner only; kept in the database, not in the repo) */
