@@ -139,12 +139,12 @@
           if (!USER_RE.test(uname.value)) return say(msg, tr("Invalid username.", "اسم مستخدم غير صحيح."), "err");
           var ct = takeCaptcha(); if (!ct) return say(msg, tr("Please complete the check above first.", "كمّل التحقق اللي فوق الأول."), "err");
           var r = await sb.auth.signUp({ email: em, password: pw.value, options: { captchaToken: ct, data: { username: uname.value, avatar: pick() } } });
-          if (r.error) return say(msg, tr("Could not create the account. The email or username may already be used.", "ماقدرناش نعمل الحساب. الإيميل أو الاسم ممكن يكونوا مستخدمين."), "err");
+          if (r.error) return say(msg, tr("Could not create the account. The email or username may already be used.", "ماقدرناش نعمل الحساب. الإيميل أو الاسم ممكن يكونوا مستخدمين.") + " [" + (r.error.code || r.error.status || "error") + "]", "err");
           pending = em; setMode("code"); return say(msg, tr("We sent a code to your email.", "بعتنا كود على الإيميل."), "ok");
         }
         var ct2 = takeCaptcha(); if (!ct2) return say(msg, tr("Please complete the check above first.", "كمّل التحقق اللي فوق الأول."), "err");
         var s = await sb.auth.signInWithPassword({ email: em, password: pw.value, options: { captchaToken: ct2 } });
-        if (s.error) return say(msg, tr("Wrong email or password.", "الإيميل أو الباسورد غلط."), "err");
+        if (s.error) return say(msg, tr("Wrong email or password.", "الإيميل أو الباسورد غلط.") + (s.error.code && s.error.code !== "invalid_credentials" ? " [" + s.error.code + "]" : ""), "err");
         go("account.html");
       } finally { main.disabled = false; }
     });
