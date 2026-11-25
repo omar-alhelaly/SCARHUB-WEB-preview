@@ -646,14 +646,22 @@
 
   /* ---------- published tools on tools.html ---------- */
   function creditEl(t) { return h("div", { "class": "credit" }, h("b", { text: tr("Not created by Zenoth.", "مش من عمل Zenoth.") }), " " + tr("Created by ", "المطوّر الأصلي: ") + t.orig_creator + ". " + tr("License: ", "الرخصة: ") + t.orig_license + ". ", h("a", { href: t.orig_repo, target: "_blank", rel: "noopener noreferrer", text: tr("Original repository", "الريبو الأصلي") + " \u2197" })); }
+  async function canOpen(t) {
+    if (t.visibility !== "private") return true; if (!me) return false; if (me.role === "owner" || me.role === "admin") return true;
+    var x = await sb.rpc("has_tool_access", { uid: me.id, tid: t.id }); return x.data === true;
+  }
+  function lockText() { return "\uD83D\uDD12 " + tr("Subscribers only. Subscribe to unlock the commands, guide and files.", "\u0644\u0644\u0645\u0634\u062a\u0631\u0643\u064a\u0646 \u0641\u0642\u0637. \u0627\u0634\u062a\u0631\u0643 \u0639\u0634\u0627\u0646 \u062a\u0641\u062a\u062d \u0627\u0644\u0623\u0648\u0627\u0645\u0631 \u0648\u0627\u0644\u062f\u0644\u064a\u0644 \u0648\u0627\u0644\u0645\u0644\u0641\u0627\u062a."); }
+
   async function dynTools() {
     var SELT = "id,slug,name,class,description_en,description_ar,commands,visibility,created_by,third_party,orig_creator,orig_license,orig_repo", PRC = ",price_minor,currency,discount_percent,discount_until";
     var r = await sb.from("tools").select(SELT + PRC).eq("status", "published"); if (r.error) r = await sb.from("tools").select(SELT).eq("status", "published"); if (r.error || !r.data) return;
+    var LK = {}, st = document.createElement("style"); st.textContent = ".card.locked{opacity:.85;border-style:dashed}.card.locked .lockmsg{margin:8px 0;padding:8px 10px;border:1px dashed currentColor;border-radius:8px;font-size:13px;opacity:.8}"; document.head.appendChild(st);
+    await Promise.all(r.data.filter(function (t) { return t.visibility === "private"; }).map(async function (t) { LK[t.id] = !(await canOpen(t)); }));
     r.data.forEach(function (t) {
       var sc0 = document.querySelector('article.card[data-name^="' + t.slug + ' "]');
       if (sc0) {
         var pp0 = sc0.querySelector("p"); if (pp0) { pp0.setAttribute("data-en", t.description_en); if (t.description_ar) pp0.setAttribute("data-ar", t.description_ar); pp0.textContent = (EN() || !t.description_ar) ? t.description_en : t.description_ar; }
-        var cm0 = sc0.querySelector(".cmds"); if (cm0 && t.commands && t.commands.length) { clear(cm0); t.commands.forEach(function (c) { cm0.appendChild(h("code", { text: c })); }); }
+        var cm0 = sc0.querySelector(".cmds"); if (LK[t.id]) { sc0.classList.add("locked"); if (cm0) { clear(cm0); cm0.appendChild(h("div", { "class": "lockmsg", text: lockText() })); } } else if (cm0 && t.commands && t.commands.length) { clear(cm0); t.commands.forEach(function (c) { cm0.appendChild(h("code", { text: c })); }); }
         var ft0 = sc0.querySelector(".foot"), more0 = ft0 && ft0.querySelector("a.more");
         if (ft0 && t.price_minor != null) { var on0 = t.discount_percent > 0 && (!t.discount_until || new Date(t.discount_until) > new Date()), eff0 = on0 ? Math.floor(t.price_minor * (100 - t.discount_percent) / 100) : t.price_minor;
           ft0.insertBefore(h("span", { "class": "priv" }, on0 ? h("s", { text: (t.price_minor / 100).toFixed(2) }) : null, on0 ? " " : null, (eff0 / 100).toFixed(2) + " " + t.currency + (on0 ? " (-" + t.discount_percent + "%)" : "")), more0 || null); }
@@ -661,14 +669,14 @@
         return;
       }
       var grid = document.querySelector("#c-" + t.class + " .grid"); if (!grid) return;
-      var cmds = h("div", { "class": "cmds" }); (t.commands || []).forEach(function (c) { cmds.appendChild(h("code", { text: c })); });
+      var locked = !!LK[t.id], cmds = h("div", { "class": "cmds" }); if (locked) cmds.appendChild(h("div", { "class": "lockmsg", text: lockText() })); else (t.commands || []).forEach(function (c) { cmds.appendChild(h("code", { text: c })); });
       var p = h("p", { text: t.description_en }); if (t.description_ar) { p.setAttribute("data-en", t.description_en); p.setAttribute("data-ar", t.description_ar); }
-      var tagc = t.third_party ? h("span", { "class": "tag third", text: "THIRD-PARTY" }) : t.visibility === "private" ? h("span", { "class": "tag", text: "PRO" }) : h("span", { "class": "tag new", text: "NEW" });
+      var tagc = t.third_party ? h("span", { "class": "tag third", text: "THIRD-PARTY" }) : t.visibility === "private" ? h("span", { "class": "tag", text: locked ? tr("LOCKED", "مقفول") : "PRO" }) : h("span", { "class": "tag new", text: "NEW" });
       var priceEl = null;
       if (t.price_minor != null) { var on = t.discount_percent > 0 && (!t.discount_until || new Date(t.discount_until) > new Date()), eff = on ? Math.floor(t.price_minor * (100 - t.discount_percent) / 100) : t.price_minor;
         priceEl = h("span", { "class": "priv" }, on ? h("s", { text: (t.price_minor / 100).toFixed(2) }) : null, on ? " " : null, (eff / 100).toFixed(2) + " " + t.currency + (on ? " (-" + t.discount_percent + "%)" : "")); }
-      grid.appendChild(h("article", { "class": t.third_party ? "card third" : "card", "data-o": t.third_party ? "third" : null, "data-name": t.slug + " " + t.class, "data-c": t.class }, h("div", { "class": "top" }, h("h3", { text: t.name }), h("span", null, tagc)), p, cmds, t.third_party ? creditEl(t) : null,
-        h("div", { "class": "foot" }, h("span", { "class": "priv", text: t.visibility === "private" ? "Subscribers only" : "Public" }), priceEl, h("a", { "class": "more", href: "tool.html?t=" + encodeURIComponent(t.slug), text: "Details" }), (me && (me.role === "owner" || (me.role === "admin" && t.created_by === me.id))) ? h("a", { "class": "more", href: "admin.html#edit-" + encodeURIComponent(t.slug), text: tr("Edit", "تعديل") }) : null)));
+      grid.appendChild(h("article", { "class": (t.third_party ? "card third" : "card") + (locked ? " locked" : ""), "data-o": t.third_party ? "third" : null, "data-name": t.slug + " " + t.class, "data-c": t.class }, h("div", { "class": "top" }, h("h3", { text: t.name }), h("span", null, tagc)), p, cmds, t.third_party ? creditEl(t) : null,
+        h("div", { "class": "foot" }, h("span", { "class": "priv", text: t.visibility === "private" ? "Subscribers only" : "Public" }), priceEl, locked ? h("a", { "class": "more", href: me ? "account.html" : "login.html", text: tr("Unlock", "افتح") }) : null, h("a", { "class": "more", href: "tool.html?t=" + encodeURIComponent(t.slug), text: "Details" }), (me && (me.role === "owner" || (me.role === "admin" && t.created_by === me.id))) ? h("a", { "class": "more", href: "admin.html#edit-" + encodeURIComponent(t.slug), text: tr("Edit", "تعديل") }) : null)));
     });
     var tc = document.getElementById("tcount");
     if (tc) {
@@ -687,7 +695,8 @@
     var t = r.data, a = (await sb.from("tool_assets").select("video_url,repo_url,file_path").eq("tool_id", t.id).maybeSingle()).data;
     var pn = h("div", { "class": "panel" }, h("h1", { text: t.name }), h("p", { text: EN() || !t.description_ar ? t.description_en : t.description_ar }));
     if (t.third_party) pn.appendChild(creditEl(t));
-    (t.commands || []).forEach(function (c) { pn.appendChild(h("code", { text: c, style: "display:block;margin:4px 0" })); });
+    var tOpen = await canOpen(t);
+    if (!tOpen) pn.appendChild(h("p", { "class": "hint", text: lockText() })); else (t.commands || []).forEach(function (c) { pn.appendChild(h("code", { text: c, style: "display:block;margin:4px 0" })); });
     if (!a) { pn.appendChild(h("p", { "class": "hint", text: tr("Video, repo and files are for subscribers only.", "الفيديو والريبو والملفات للمشتركين بس.") })); pn.appendChild(h("a", { "class": "btn f", href: me ? "account.html" : "login.html", text: tr("Subscribe", "اشترك") })); }
     else {
       if (a.video_url && /^https:\/\//.test(a.video_url)) pn.appendChild(h("p", null, h("a", { "class": "btn", href: a.video_url, target: "_blank", rel: "noopener noreferrer", text: tr("Watch video", "شاهد الفيديو") })));
