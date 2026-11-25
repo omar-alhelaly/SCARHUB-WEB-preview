@@ -367,6 +367,12 @@
     ut.appendChild(h("table", { "class": "t" }, h("thead", null, h("tr", null, h("th", { text: tr("Name", "الاسم") }), h("th", { text: owner ? "Email" : "" }), h("th", { text: tr("Role", "الدور") }), h("th", { text: tr("Status", "الحالة") }), h("th", { text: tr("Sub", "اشتراك") }), h("th", { text: "" }))), tb));
     async function users() {
       var r = await sb.rpc("admin_list_users"); clear(tb); if (r.error) return;
+      var gm = {}, plansL = [];
+      if (owner) {
+        var gr = await sb.rpc("admin_list_grants"); (gr.data || []).forEach(function (g) { (gm[g.user_id] = gm[g.user_id] || []).push(g); });
+        var pr = await sb.from("plans").select("id,name,scope,active"); plansL = pr.data || [];
+      }
+      function endTxt(v) { return /^infinity/.test(String(v)) ? tr("no expiry", "من غير انتهاء") : tr("until ", "لحد ") + new Date(v).toLocaleDateString(); }
       r.data.forEach(function (u) {
         var staff = u.role !== "user", name = staff ? (u.alias + (owner && u.username ? " (" + u.username + ")" : "")) : u.username;
         var act = h("td");
@@ -390,8 +396,25 @@
             var x = await sb.rpc("admin_delete_user", { target: u.id }); if (x.error) alert(x.error.message); users();
           } } }));
         }
+        var mine = gm[u.id] || [], subCell = h("td", { text: u.subscribed ? "yes" : "-" });
+        if (mine.length) { clear(subCell); subCell.appendChild(h("span", { "class": "tag", text: tr("Free (owner)", "مجاني (من المالك)") })); mine.forEach(function (g) { subCell.appendChild(h("div", { "class": "hint", text: (g.plan_name || tr("All tools", "كل الأدوات")) + " " + endTxt(g.ends) })); }); }
+        if (owner && u.role !== "owner" && u.status === "active") {
+          var gs = h("select", { "aria-label": "plan" }); gs.appendChild(h("option", { value: "", text: tr("All tools", "كل الأدوات") }));
+          plansL.forEach(function (p) { gs.appendChild(h("option", { value: p.id, text: p.name + (p.scope === "tools" ? "" : " (all)") })); });
+          var gd = h("input", { type: "date", "aria-label": tr("Expiry (optional)", "الانتهاء (اختياري)"), title: tr("Expiry (optional)", "الانتهاء (اختياري)") });
+          var gact = h("div", { "class": "hint" }, gs, gd, h("button", { "class": "btn", type: "button", text: tr("Give free plan", "اديله اشتراك مجاني"), on: { click: async function () {
+            var until = gd.value ? new Date(gd.value + "T23:59:59").toISOString() : null;
+            if (!confirm(tr("Give this user free access (", "تدي المستخدم ده وصول مجاني (") + gs.options[gs.selectedIndex].text + ", " + (until ? tr("until ", "لحد ") + gd.value : tr("no expiry", "من غير انتهاء")) + ")?")) return;
+            var x = await sb.rpc("admin_grant_plan", { target: u.id, p_plan: gs.value || null, p_until: until }); if (x.error) alert(x.error.message); users();
+          } } }));
+          mine.forEach(function (g) { gact.appendChild(h("button", { "class": "btn", type: "button", style: "color:#e11d2e", text: tr("Revoke ", "الغي ") + (g.plan_name || tr("All tools", "كل الأدوات")), on: { click: async function () {
+            if (!confirm(tr("Take back this free access?", "ترجّع الوصول المجاني ده؟"))) return;
+            var x = await sb.rpc("admin_revoke_plan", { target: u.id, p_plan: g.plan_id || null }); if (x.error) alert(x.error.message); users();
+          } } })); });
+          act.appendChild(gact);
+        }
         tb.appendChild(h("tr", null, h("td", null, h("span", { "class": "av", style: "display:inline-block;width:28px;vertical-align:middle;margin-inline-end:6px;cursor:default" }, avatarSvg(u.avatar, u.id)), name || "-"), h("td", { text: u.email || "" }),
-          h("td", null, h("span", { "class": "tag " + (u.role === "owner" ? "owner" : ""), text: u.role })), h("td", null, h("span", { "class": "tag " + (u.status === "deleted" || u.status === "banned" ? "del" : ""), text: u.status })), h("td", { text: u.subscribed ? "yes" : "-" }), act));
+          h("td", null, h("span", { "class": "tag " + (u.role === "owner" ? "owner" : ""), text: u.role })), h("td", null, h("span", { "class": "tag " + (u.status === "deleted" || u.status === "banned" ? "del" : ""), text: u.status })), subCell, act));
       });
     }
     if (owner) {
