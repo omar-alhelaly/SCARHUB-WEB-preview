@@ -554,7 +554,37 @@
     var allT = (await sb.from("tools").select("id,name").order("name")).data || [], ptR = (await sb.from("plan_tools").select("plan_id,tool_id")).data || [], tName = {}; allT.forEach(function (x) { tName[x.id] = x.name; });
     (pl.data || []).forEach(function (p) {
       var cov = p.scope === "tools" ? tr("only: ", "بس: ") + ptR.filter(function (q) { return q.plan_id === p.id; }).map(function (q) { return tName[q.tool_id] || "?"; }).join(", ") : tr("all tools", "كل الأدوات");
-      pp.appendChild(h("p", { text: p.name + ": " + (p.price_minor / 100).toFixed(2) + " " + p.currency + "/" + p.period + " (" + cov + ")" + (p.description ? " - " + p.description : "") + (p.active ? "" : " (off)") }));
+      var planLbl = h("span", { text: p.name + ": " + (p.price_minor / 100).toFixed(2) + " " + p.currency + "/" + p.period + " (" + cov + ")" + (p.description ? " - " + p.description : "") + (p.active ? "" : " (OFF)") + "  " });
+      var planRow = h("p", null, planLbl); pp.appendChild(planRow);
+      if (owner) {
+        var editPlanBox = h("div", { style: "display:none;padding:6px 0 12px" });
+        var en = h("input", { type: "text", maxlength: "40", value: p.name }), epr = h("input", { type: "text", inputmode: "decimal", value: (p.price_minor / 100).toFixed(2) }), edsc = h("input", { type: "text", maxlength: "300", value: p.description || "", placeholder: tr("Plan details", "تفاصيل الخطة"), style: "min-width:260px" });
+        var esc = h("select", null, h("option", { value: "all", text: tr("All tools", "كل الأدوات") }), h("option", { value: "tools", text: tr("Only selected tools", "أدوات محددة بس") })); esc.value = p.scope;
+        var epicks = {}, epBox = h("div", { style: "max-height:200px;overflow:auto;padding:6px 0;display:" + (p.scope === "tools" ? "block" : "none") });
+        var mine = ptR.filter(function (q) { return q.plan_id === p.id; }).map(function (q) { return q.tool_id; });
+        allT.forEach(function (x) { var cb = h("input", { type: "checkbox" }); cb.checked = mine.indexOf(x.id) > -1; epicks[x.id] = cb; epBox.appendChild(h("label", { style: "display:inline-block;margin:2px 10px 2px 0" }, cb, " " + x.name)); });
+        esc.addEventListener("change", function () { epBox.style.display = esc.value === "tools" ? "block" : "none"; });
+        var saveP = h("button", { "class": "btn f", type: "button", text: tr("Save plan", "احفظ الخطة"), on: { click: async function () {
+          var mn = Math.round(parseFloat(epr.value) * 100); if (!(mn >= 0 && mn <= 100000000) || en.value.trim().length < 2) return say(pmsg, tr("Name or price?", "الاسم أو السعر؟"), "err");
+          var ch = Object.keys(epicks).filter(function (k) { return epicks[k].checked; });
+          if (esc.value === "tools" && !ch.length) return say(pmsg, tr("Pick at least one tool.", "اختار أداة واحدة على الأقل."), "err");
+          var u = await sb.from("plans").update({ name: en.value.trim(), price_minor: mn, description: edsc.value.trim() || null, scope: esc.value }).eq("id", p.id).select("id");
+          if (u.error || !u.data || !u.data.length) return say(pmsg, u.error ? u.error.message : tr("Not saved.", "ماتحفظش."), "err");
+          var d = await sb.from("plan_tools").delete().eq("plan_id", p.id); if (d.error) return say(pmsg, d.error.message, "err");
+          if (esc.value === "tools") { var ins2 = await sb.from("plan_tools").insert(ch.map(function (k) { return { plan_id: p.id, tool_id: k }; })); if (ins2.error) return say(pmsg, ins2.error.message, "err"); }
+          say(pmsg, tr("Plan saved. Reload to see it.", "الخطة اتحفظت. حدّث الصفحة."), "ok");
+        } } });
+        editPlanBox.appendChild(h("div", { "class": "row" }, en, epr, esc, edsc)); editPlanBox.appendChild(epBox);
+        editPlanBox.appendChild(h("p", { "class": "hint", text: tr("Price and tool changes apply to new payments. People who already paid keep their period, but their access follows the plan's current tools.", "تغيير السعر والأدوات بيسري على الدفعات الجديدة. اللي دفع قبل كده بيكمل مدته، بس وصوله بيتبع أدوات الخطة الحالية.") }));
+        editPlanBox.appendChild(h("div", { "class": "row" }, saveP));
+        planRow.appendChild(h("button", { "class": "btn", type: "button", text: tr("Edit", "تعديل"), on: { click: function () { editPlanBox.style.display = editPlanBox.style.display === "none" ? "block" : "none"; } } }));
+        planRow.appendChild(document.createTextNode(" "));
+        planRow.appendChild(h("button", { "class": "btn", type: "button", text: p.active ? tr("Turn off", "إيقاف") : tr("Turn on", "تشغيل"), on: { click: async function () {
+          var o = await sb.from("plans").update({ active: !p.active }).eq("id", p.id).select("id");
+          say(pmsg, o.error || !o.data || !o.data.length ? tr("Not changed.", "ماتغيرش.") : (p.active ? tr("Plan is off: not sold anymore. Current holders keep access until their period ends. Reload.", "الخطة اتوقفت: مبتتباعش. اللي معاه اشتراك يكمل لحد ما يخلص. حدّث الصفحة.") : tr("Plan is on. Reload.", "الخطة اشتغلت. حدّث الصفحة.")), o.error || !o.data || !o.data.length ? "err" : "ok");
+        } } }));
+        pp.appendChild(editPlanBox);
+      }
     });
     if (owner) {
       pp.appendChild(h("p", { "class": "hint", text: tr("A plan's price applies to every enabled method. Paymob needs EGP plans.", "سعر الخطة بيتطبق على كل طرق الدفع المفعلة. Paymob محتاج خطط بالجنيه.") }));
