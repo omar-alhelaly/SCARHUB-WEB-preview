@@ -106,9 +106,12 @@
     upBox.appendChild(h("label", { "for": "un", text: tr("Username (3-20: letters, numbers, _)", "اسم المستخدم (3-20: حروف وأرقام و _)") })); upBox.appendChild(uname); upBox.appendChild(unHint);
     upBox.appendChild(h("label", { text: tr("Choose an avatar", "اختار صورة") })); upBox.appendChild(avBox);
     codeBox.appendChild(h("label", { "for": "otp", text: tr("Verification code from your email", "كود التأكيد من الإيميل") })); codeBox.appendChild(code);
+    var cap = h("div", { id: "cap" }), capId = null, capTok = null;
+    new Promise(function (ok) { if (window.turnstile) return ok(); var s = document.createElement("script"); s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"; s.async = true; s.onload = ok; s.onerror = ok; document.head.appendChild(s); }).then(function () { if (!window.turnstile || !CFG.turnstileSiteKey) return; capId = window.turnstile.render(cap, { sitekey: CFG.turnstileSiteKey, callback: function (x) { capTok = x; }, "expired-callback": function () { capTok = null; }, "error-callback": function () { capTok = null; } }); });
+    function takeCaptcha() { var x = capTok; if (x) { capTok = null; setTimeout(function () { window.turnstile.reset(capId); }, 0); } return x; }
     form.appendChild(h("label", { "for": "em", text: tr("Email", "الإيميل") })); form.appendChild(email); form.appendChild(emHint);
     form.appendChild(h("div", { id: "pwwrap" }, h("label", { "for": "pw", text: tr("Password (12-64: letters, numbers, symbols)", "الباسورد (12-64: حروف وأرقام ورموز)") }), pw, pwHint));
-    form.appendChild(upBox); form.appendChild(codeBox); form.appendChild(h("div", { "class": "row" }, main)); form.appendChild(msg);
+    form.appendChild(upBox); form.appendChild(codeBox); form.appendChild(cap); form.appendChild(h("div", { "class": "row" }, main)); form.appendChild(msg);
     pick = avatarPicker(avBox, avatar, function (c) { avatar = c; });
     function setMode(m) {
       mode = m; upBox.style.display = m === "up" ? "" : "none"; codeBox.style.display = m === "code" ? "" : "none"; $("pwwrap").style.display = m === "code" ? "none" : "";
@@ -134,11 +137,13 @@
         if (mode === "up") {
           var pr = pwProblems(pw.value); if (pr.length) return say(msg, tr("Password needs: ", "الباسورد ناقص: ") + pr.join(", "), "err");
           if (!USER_RE.test(uname.value)) return say(msg, tr("Invalid username.", "اسم مستخدم غير صحيح."), "err");
-          var r = await sb.auth.signUp({ email: em, password: pw.value, options: { data: { username: uname.value, avatar: pick() } } });
+          var ct = takeCaptcha(); if (!ct) return say(msg, tr("Please complete the check above first.", "كمّل التحقق اللي فوق الأول."), "err");
+          var r = await sb.auth.signUp({ email: em, password: pw.value, options: { captchaToken: ct, data: { username: uname.value, avatar: pick() } } });
           if (r.error) return say(msg, tr("Could not create the account. The email or username may already be used.", "ماقدرناش نعمل الحساب. الإيميل أو الاسم ممكن يكونوا مستخدمين."), "err");
           pending = em; setMode("code"); return say(msg, tr("We sent a code to your email.", "بعتنا كود على الإيميل."), "ok");
         }
-        var s = await sb.auth.signInWithPassword({ email: em, password: pw.value });
+        var ct2 = takeCaptcha(); if (!ct2) return say(msg, tr("Please complete the check above first.", "كمّل التحقق اللي فوق الأول."), "err");
+        var s = await sb.auth.signInWithPassword({ email: em, password: pw.value, options: { captchaToken: ct2 } });
         if (s.error) return say(msg, tr("Wrong email or password.", "الإيميل أو الباسورد غلط."), "err");
         go("account.html");
       } finally { main.disabled = false; }
