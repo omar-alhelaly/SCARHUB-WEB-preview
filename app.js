@@ -379,8 +379,19 @@
             var x = await sb.rpc("set_role", { target: u.id, new_role: sel.value, new_alias: sel.value === "admin" ? al.value : null }); if (x.error) alert(x.error.message); users();
           } } }));
         }
+        if (owner && u.role !== "owner" && u.status !== "deleted") {
+          var banned = u.status === "banned", dn = u.username || u.alias || "";
+          act.appendChild(h("button", { "class": "btn", type: "button", text: banned ? tr("Unblock", "فك الحظر") : tr("Block", "حظر"), on: { click: async function () {
+            if (!banned && !confirm(tr("Block this user? They will be signed out and cannot log in again until you unblock them.", "تحظر المستخدم ده؟ هيتسجل خروج ومش هيقدر يدخل تاني لحد ما تفك الحظر."))) return;
+            var x = await sb.rpc("admin_set_ban", { target: u.id, ban: !banned }); if (x.error) alert(x.error.message); users();
+          } } }));
+          act.appendChild(h("button", { "class": "btn", type: "button", style: "color:#e11d2e", text: tr("Delete", "حذف"), on: { click: async function () {
+            if (!confirm(tr("Delete this user permanently? This cannot be undone.", "تحذف المستخدم ده نهائي؟ مش هتقدر ترجعه.") + (dn ? "\n" + dn : ""))) return;
+            var x = await sb.rpc("admin_delete_user", { target: u.id }); if (x.error) alert(x.error.message); users();
+          } } }));
+        }
         tb.appendChild(h("tr", null, h("td", null, h("span", { "class": "av", style: "display:inline-block;width:28px;vertical-align:middle;margin-inline-end:6px;cursor:default" }, avatarSvg(u.avatar, u.id)), name || "-"), h("td", { text: u.email || "" }),
-          h("td", null, h("span", { "class": "tag " + (u.role === "owner" ? "owner" : ""), text: u.role })), h("td", null, h("span", { "class": "tag " + (u.status === "deleted" ? "del" : ""), text: u.status })), h("td", { text: u.subscribed ? "yes" : "-" }), act));
+          h("td", null, h("span", { "class": "tag " + (u.role === "owner" ? "owner" : ""), text: u.role })), h("td", null, h("span", { "class": "tag " + (u.status === "deleted" || u.status === "banned" ? "del" : ""), text: u.status })), h("td", { text: u.subscribed ? "yes" : "-" }), act));
       });
     }
     if (owner) {
