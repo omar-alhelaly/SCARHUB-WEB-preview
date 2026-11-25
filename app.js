@@ -133,6 +133,7 @@
     side.appendChild(h("p", { text: (isStaff() ? me.alias : me.username) + (me.role === "owner" ? " (owner)" : "") }));
     [["account.html", tr("My account", "حسابي")], ["community.html", tr("Community", "المجتمع")], ["tools.html", tr("Tools", "الأدوات")]].forEach(function (l) { side.appendChild(h("a", { href: l[0], text: l[1] })); });
     if (isStaff()) side.appendChild(h("a", { href: "admin.html", text: tr("Admin panel", "لوحة الإدارة") }));
+    if (isStaff()) side.appendChild(h("a", { href: "admin.html#manage", text: tr("Manage tools", "إدارة الأدوات") }));
     side.appendChild(h("button", { type: "button", text: tr("Edit profile", "تعديل البروفايل"), on: { click: function () { go("account.html#edit"); } } }));
     side.appendChild(h("button", { type: "button", text: tr("Sign out", "تسجيل الخروج"), on: { click: async function () { await sb.auth.signOut(); go("index.html"); } } }));
     side.appendChild(h("button", { type: "button", "class": "danger", text: tr("Delete account", "حذف الحساب"), on: { click: function () { go("account.html#delete"); } } }));
@@ -140,7 +141,7 @@
     var mainEl = document.getElementById("main");
     if (mainEl) {
       var bar = h("div", { "class": "wide", style: "display:flex;gap:8px;flex-wrap:wrap;margin:10px auto 0" }), here = location.pathname.split("/").pop() || "index.html";
-      [["account.html", "My account", "حسابي"], ["community.html", "Community", "المجتمع"], ["tools.html", "Tools", "الأدوات"]].concat(isStaff() ? [["admin.html", "Admin panel", "لوحة الإدارة"]] : []).forEach(function (l) { bar.appendChild(h("a", { "class": "btn" + (here === l[0] ? " f" : ""), href: l[0], text: tr(l[1], l[2]) })); });
+      [["account.html", "My account", "حسابي"], ["community.html", "Community", "المجتمع"], ["tools.html", "Tools", "الأدوات"]].concat(isStaff() ? [["admin.html", "Admin panel", "لوحة الإدارة"], ["admin.html#manage", "Manage tools", "إدارة الأدوات"]] : []).forEach(function (l) { bar.appendChild(h("a", { "class": "btn" + (here === l[0] ? " f" : ""), href: l[0], text: tr(l[1], l[2]) })); });
       bar.appendChild(h("a", { "class": "btn", href: "account.html#edit", text: tr("Edit profile", "تعديل البروفايل") }));
       bar.appendChild(h("button", { "class": "btn", type: "button", text: tr("Sign out", "تسجيل الخروج"), on: { click: async function () { await sb.auth.signOut(); go("index.html"); } } }));
       mainEl.insertBefore(bar, mainEl.children[1] || null);
@@ -485,7 +486,7 @@
         }
         mpl.appendChild(row); mpl.appendChild(holder);
       });
-      var hm = location.hash.match(/^#edit-(.+)$/); if (hm) { var sl = decodeURIComponent(hm[1]); if (editors[sl]) editors[sl](); }
+      if (location.hash === "#manage") mp.scrollIntoView(); var hm = location.hash.match(/^#edit-(.+)$/); if (hm) { var sl = decodeURIComponent(hm[1]); if (editors[sl]) editors[sl](); }
     };
     manageTools();
     if (owner) {
