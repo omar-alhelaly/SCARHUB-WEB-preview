@@ -18,6 +18,10 @@ window.addEventListener('DOMContentLoaded',function(){
    var bb=document.createElement('button');bb.type='button';bb.id='backbtn';bb.className='lang';bb.dataset.en='\u2190 Back';bb.dataset.ar='\u0631\u062c\u0648\u0639 \u2192';bb.textContent=bb.dataset.en;
    bb.onclick=function(){var same=false;try{same=document.referrer&&new URL(document.referrer).host===location.host}catch(e){}if(same&&history.length>1)history.back();else location.href='index.html'};
    an.parentNode.insertBefore(bb,an)}}catch(e){}
+
+ try{var lk=document.querySelector('#nav .links'),upd=lk&&lk.querySelector('a[href="updates.html"]');
+  if(lk&&upd&&!lk.querySelector('a[href="research.html"]')){var pg=location.pathname.split('/').pop();
+   [['research.html','Research','\u0628\u062d\u0648\u062b'],['incidents.html','Incidents','\u0642\u0635\u0635 \u0627\u0644\u062d\u0648\u0627\u062f\u062b']].reverse().forEach(function(x){var na=document.createElement('a');na.href=x[0];na.dataset.en=x[1];na.dataset.ar=x[2];na.textContent=x[1];if(pg===x[0])na.className='on';upd.parentNode.insertBefore(na,upd.nextSibling)})}}catch(e){}
  setLang(L);
  var nav=document.querySelector('nav'),bg=document.getElementById('burger');
  if(bg)bg.onclick=function(){nav.classList.toggle('open')};
