@@ -1,3 +1,1 @@
-// Fill these two public values after the Supabase project exists. The anon key is public by design (RLS protects data).
-// NEVER put the service_role key or any Stripe secret here.
-window.SCAR_CFG = { url: "", anonKey: "" };
+window.SCAR_CFG = { url: "https://qmemyjipjrnbadtsqats.supabase.co", anonKey: "sb_publishable_KIMFKzk2n5Brn8OPuhB_RA_mH-xnOlG", turnstileSiteKey: "0x4AAAAAAGRe8O4QQYZbV37w" };
