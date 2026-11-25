@@ -5,7 +5,7 @@
   var PAGE = document.body.getAttribute("data-page") || "";
   var EN = function () { return document.documentElement.lang !== "ar"; };
   var tr = function (en, ar) { return EN() ? en : ar; };
-  var sb = null, me = null;
+  var sb = null, me = null, recovering = false;
   var EMAIL_RE = /^(?=.{6,254}$)[A-Za-z0-9](?:[A-Za-z0-9._%+-]{0,62}[A-Za-z0-9])?@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,24}$/;
   var USER_RE = /^[A-Za-z][A-Za-z0-9_]{2,19}$/, ALIAS_RE = /^[A-Za-z][A-Za-z0-9_ ]{2,24}$/;
   function pwProblems(p) {
@@ -63,6 +63,7 @@
   async function load() {
     if (!CFG.url || !CFG.anonKey || !window.supabase) { if (PAGE !== "tools") off(); return false; }
     sb = window.supabase.createClient(CFG.url, CFG.anonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, flowType: "pkce" } });
+    sb.auth.onAuthStateChange(function (ev) { if (ev === "PASSWORD_RECOVERY") recovering = true; });
     var cm = PAGE === "login" ? location.search.match(/[?&]code=([^&]+)/) : null;
     if (cm) { try { await sb.auth.exchangeCodeForSession(decodeURIComponent(cm[1])); } catch (e) {} history.replaceState(null, "", location.pathname); }
     var s = (await sb.auth.getSession()).data.session;
@@ -114,12 +115,23 @@
     form.appendChild(h("label", { "for": "em", text: tr("Email", "الإيميل") })); form.appendChild(email); form.appendChild(emHint);
     form.appendChild(h("div", { id: "pwwrap" }, h("label", { "for": "pw", text: tr("Password (12-64: letters, numbers, symbols)", "الباسورد (12-64: حروف وأرقام ورموز)") }), pw, pwHint));
     form.appendChild(upBox); form.appendChild(codeBox); form.appendChild(cap); form.appendChild(h("div", { "class": "row" }, main)); form.appendChild(msg);
+    var forgot = h("button", { "class": "btn", type: "button", text: tr("Forgot password?", "نسيت الباسورد؟") });
+    forgot.onclick = async function () {
+      var fe = email.value.trim(); if (!EMAIL_RE.test(fe)) return say(msg, tr("Enter your email first.", "اكتب إيميلك الأول."), "err");
+      var fc = takeCaptcha(); if (!fc) return say(msg, tr("Please complete the check above first.", "كمّل التحقق اللي فوق الأول."), "err");
+      forgot.disabled = true;
+      var rr = await sb.auth.resetPasswordForEmail(fe, { captchaToken: fc, redirectTo: location.origin + location.pathname.replace(/[^/]*$/, "") + "login.html" });
+      forgot.disabled = false;
+      if (rr.error) return say(msg, tr("Could not send the email.", "ماقدرناش نبعت الإيميل.") + " [" + (rr.error.code || rr.error.status || "error") + "]", "err");
+      say(msg, tr("If an account exists for that email, we sent a reset link.", "لو في حساب بالإيميل ده، بعتنا لينك إعادة الباسورد."), "ok");
+    };
+    form.appendChild(h("div", { "class": "row" }, forgot));
     pick = avatarPicker(avBox, avatar, function (c) { avatar = c; });
     function setMode(m) {
       mode = m; upBox.style.display = m === "up" ? "" : "none"; codeBox.style.display = m === "code" ? "" : "none"; $("pwwrap").style.display = m === "code" ? "none" : "";
       pw.autocomplete = m === "up" ? "new-password" : "current-password";
       main.textContent = m === "in" ? tr("Sign in", "دخول") : m === "up" ? tr("Create account", "إنشاء حساب") : tr("Verify email", "تأكيد الإيميل");
-      tabIn.setAttribute("aria-pressed", m === "in"); tabUp.setAttribute("aria-pressed", m === "up"); say(msg, "");
+      forgot.style.display = m === "in" ? "" : "none"; tabIn.setAttribute("aria-pressed", m === "in"); tabUp.setAttribute("aria-pressed", m === "up"); say(msg, "");
     }
     tabIn.textContent = tr("Sign in", "دخول"); tabUp.textContent = tr("Sign up", "حساب جديد");
     tabIn.onclick = function () { setMode("in"); }; tabUp.onclick = function () { setMode("up"); };
@@ -152,6 +164,22 @@
     });
     clear(app); app.appendChild(h("div", { "class": "auth" }, h("h2", { text: tr("Welcome to SCARHUB", "أهلاً في SCARHUB") }), h("div", { "class": "tabs" }, tabIn, tabUp), form));
     setMode("in");
+  }
+
+  function resetPage() {
+    var app = $("app"), p1 = h("input", { type: "password", id: "np", autocomplete: "new-password", maxlength: "64", required: "" });
+    var hint = h("div", { "class": "hint" }), msg = h("div", { "class": "msg", role: "status", "aria-live": "polite" });
+    var btn = h("button", { "class": "btn f", type: "submit", text: tr("Set new password", "حط الباسورد الجديد") }), form = h("form", { novalidate: "" });
+    p1.addEventListener("input", function () { var q = pwProblems(p1.value); hint.textContent = q.length ? tr("Needs: ", "ناقص: ") + q.join(", ") : "OK"; hint.className = "hint " + (q.length ? "bad" : "good"); });
+    form.appendChild(h("label", { "for": "np", text: tr("New password (12-64: letters, numbers, symbols)", "الباسورد الجديد (12-64: حروف وأرقام ورموز)") })); form.appendChild(p1); form.appendChild(hint);
+    form.appendChild(h("div", { "class": "row" }, btn)); form.appendChild(msg);
+    form.addEventListener("submit", async function (e) {
+      e.preventDefault(); var q = pwProblems(p1.value); if (q.length) return say(msg, tr("Password needs: ", "الباسورد ناقص: ") + q.join(", "), "err");
+      btn.disabled = true; var u = await sb.auth.updateUser({ password: p1.value }); btn.disabled = false;
+      if (u.error) return say(msg, tr("Could not change the password.", "ماقدرناش نغير الباسورد.") + " [" + (u.error.code || u.error.status || "error") + "]", "err");
+      await sb.auth.signOut(); say(msg, tr("Password changed. Taking you to sign in...", "الباسورد اتغير. هنوديك لتسجيل الدخول..."), "ok"); setTimeout(function () { go("login.html"); }, 1500);
+    });
+    clear(app); app.appendChild(h("div", { "class": "auth" }, h("h2", { text: tr("Choose a new password", "اختار باسورد جديد") }), form));
   }
 
   /* ---------- account ---------- */
@@ -397,7 +425,7 @@
     if (PAGE === "tool") { if (ok) { sideMenu(); toolPage(); } return; }
     if (PAGE === "tools") { if (ok) dynTools(); return; }
     if (!ok) return;
-    if (PAGE === "login") { if (me) return go("account.html"); loginPage(); }
+    if (PAGE === "login") { if (recovering) return resetPage(); if (me) return go("account.html"); loginPage(); }
     else { sideMenu(); if (PAGE === "account") accountPage(); else if (PAGE === "community") communityPage(); else if (PAGE === "admin") adminPage(); }
   })();
 })();
