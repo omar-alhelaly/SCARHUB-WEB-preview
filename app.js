@@ -63,6 +63,8 @@
   async function load() {
     if (!CFG.url || !CFG.anonKey || !window.supabase) { if (PAGE !== "tools") off(); return false; }
     sb = window.supabase.createClient(CFG.url, CFG.anonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, flowType: "pkce" } });
+    var cm = PAGE === "login" ? location.search.match(/[?&]code=([^&]+)/) : null;
+    if (cm) { try { await sb.auth.exchangeCodeForSession(decodeURIComponent(cm[1])); } catch (e) {} history.replaceState(null, "", location.pathname); }
     var s = (await sb.auth.getSession()).data.session;
     if (s) {
       var r = await sb.from("profiles").select("id,email,username,alias,avatar,role,status").eq("id", s.user.id).maybeSingle();
@@ -138,9 +140,9 @@
           var pr = pwProblems(pw.value); if (pr.length) return say(msg, tr("Password needs: ", "الباسورد ناقص: ") + pr.join(", "), "err");
           if (!USER_RE.test(uname.value)) return say(msg, tr("Invalid username.", "اسم مستخدم غير صحيح."), "err");
           var ct = takeCaptcha(); if (!ct) return say(msg, tr("Please complete the check above first.", "كمّل التحقق اللي فوق الأول."), "err");
-          var r = await sb.auth.signUp({ email: em, password: pw.value, options: { captchaToken: ct, data: { username: uname.value, avatar: pick() } } });
+          var r = await sb.auth.signUp({ email: em, password: pw.value, options: { captchaToken: ct, emailRedirectTo: location.origin + location.pathname.replace(/[^/]*$/, "") + "login.html", data: { username: uname.value, avatar: pick() } } });
           if (r.error) return say(msg, tr("Could not create the account. The email or username may already be used.", "ماقدرناش نعمل الحساب. الإيميل أو الاسم ممكن يكونوا مستخدمين.") + " [" + (r.error.code || r.error.status || "error") + "]", "err");
-          pending = em; setMode("code"); return say(msg, tr("We sent a code to your email.", "بعتنا كود على الإيميل."), "ok");
+          pending = em; setMode("code"); return say(msg, tr("We sent you an email. Open the link in it to confirm your account, then sign in. If it shows a code, enter it below.", "بعتنالك إيميل. افتح اللينك اللي فيه عشان تأكد حسابك وبعدين سجل دخول. لو فيه كود اكتبه تحت."), "ok");
         }
         var ct2 = takeCaptcha(); if (!ct2) return say(msg, tr("Please complete the check above first.", "كمّل التحقق اللي فوق الأول."), "err");
         var s = await sb.auth.signInWithPassword({ email: em, password: pw.value, options: { captchaToken: ct2 } });
