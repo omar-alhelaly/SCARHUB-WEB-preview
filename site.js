@@ -34,3 +34,4 @@ window.addEventListener('DOMContentLoaded',function(){
    if(s[0]=='out'){h+=s[1]+'\n';tp.innerHTML=h;setTimeout(step,500)}else{var c=0;(function ty(){tp.innerHTML=h+'<b>'+s[0]+'</b>'+s[1].slice(0,c)+'_';if(c++<s[1].length)setTimeout(ty,28);else{h+='<b>'+s[0]+'</b>'+s[1]+'\n';setTimeout(step,350)}})()}})()}
 });
 })();
+;(function(){if(/tool-scar[a-z]+\.html$/.test(location.pathname)){var s=document.createElement('script');s.src='tool-guide.js';document.head.appendChild(s)}})();
