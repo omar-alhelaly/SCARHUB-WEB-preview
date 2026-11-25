@@ -1,5 +1,5 @@
 
-;(function(){var m=location.pathname.match(/tool-(scar[a-z]+)\.html$/);if(m&&m[1]!=='scarhash')location.replace('tool.html?t='+m[1])})();
+;(function(){var m=location.pathname.match(/tool-(scar[a-z]+)\.html$/);if(m)location.replace('tool.html?t='+m[1])})();
 
 (function(){
 var $=function(s,r){return [].slice.call((r||document).querySelectorAll(s))};
