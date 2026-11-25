@@ -434,6 +434,7 @@
         if (oc.length < 2 || ol.length < 2) return say(tmsg, tr("Third-party tools need the original creator and the license.", "الأدوات التانية لازم المطوّر الأصلي والرخصة."), "err");
         if (!/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(orr)) return say(tmsg, tr("Original repository must look like https://github.com/owner/repo", "رابط الريبو لازم يبقى https://github.com/owner/repo"), "err");
         tp_ = { third_party: true, orig_creator: oc, orig_license: ol, orig_repo: orr }; }
+      if (tp_.third_party && pm_ != null) return say(tmsg, tr("Credited open-source tools cannot have a price.", "الأدوات المفتوحة المصدر المنسوبة مينفعش ليها سعر."), "err");
       var ins = await sb.from("tools").insert(Object.assign({ slug: slug, name: f.name.value.trim(), class: cls.value, description_en: f.den.value.trim(), description_ar: f.dar.value.trim() || null, commands: cmds, visibility: vis.value, status: st.value, created_by: me.id }, tp_, pm_ != null ? { price_minor: pm_, currency: cur_ } : {})).select("id").single();
       if (ins.error) return say(tmsg, ins.error.message, "err");
       var path = null;
@@ -462,7 +463,7 @@
       row.appendChild(msgG); refresh(); return row;
     }
     var manageTools = async function () {
-      var rt = await TSQ("id,slug,name,class,description_en,description_ar,commands,visibility,status,created_by,price_minor,currency,discount_percent,discount_until", function (q) { return q.order("name"); }); clear(mpl); if (rt.error) return say(mmsg, rt.error.message, "err");
+      var rt = await TSQ("id,slug,name,class,description_en,description_ar,commands,visibility,status,created_by,third_party,price_minor,currency,discount_percent,discount_until", function (q) { return q.order("name"); }); clear(mpl); if (rt.error) return say(mmsg, rt.error.message, "err");
       var ids = rt.data.map(function (t) { return t.id; }), amap = {};
       if (ids.length) ((await sb.from("tool_assets").select("tool_id,video_url,repo_url,file_path").in("tool_id", ids)).data || []).forEach(function (a) { amap[a.tool_id] = a; });
       if (!rt.data.length) mpl.appendChild(h("p", { "class": "hint", text: tr("No tools yet. Add one above.", "مفيش أدوات لسه. ضيف واحدة فوق.") }));
@@ -483,11 +484,14 @@
             var pv = pr1.value.trim(), cv = (cu1.value.trim() || "EGP").toUpperCase(); if (!/^[A-Z]{3}$/.test(cv)) return say(em, tr("Currency?", "العملة؟"), "err");
             if (pv === "") upd.price_minor = null; else { var pm = Math.round(parseFloat(pv) * 100); if (!(pm >= 0 && pm <= 100000000)) return say(em, tr("Price?", "السعر؟"), "err"); upd.price_minor = pm; } upd.currency = cv;
             if (owner) { var dv = parseInt(ds1.value || "0", 10); if (!(dv >= 0 && dv <= 90)) return say(em, tr("Discount 0 to 90", "الخصم من 0 لـ 90"), "err"); upd.discount_percent = upd.price_minor == null ? 0 : dv; upd.discount_until = du1.value ? new Date(du1.value + "T23:59:59Z").toISOString() : null; }
+            if (t.third_party) { delete upd.currency; upd.price_minor = null; upd.discount_percent = 0; upd.discount_until = null; }
             var x = await sb.from("tools").update(upd).eq("id", t.id).select("id");
             if (x.error) return say(em, x.error.message, "err"); if (!x.data || !x.data.length) return say(em, tr("Not allowed: you can only edit your own tools.", "مش مسموح: تقدر تعدل أدواتك إنت بس."), "err");
             var y = await sb.from("tool_assets").upsert({ tool_id: t.id, video_url: vid.value.trim() || null, repo_url: rp.value.trim() || null, file_path: a.file_path || null }, { onConflict: "tool_id" });
-            say(em, y.error ? y.error.message : tr("Saved.", "اتحفظ."), y.error ? "err" : "ok"); if (!y.error) manageTools();
+            say(em, y.error ? y.error.message : "\u2713 " + tr("Saved.", "اتحفظ."), y.error ? "err" : "ok");
+            if (y.error) toast("\u2717 " + y.error.message); else { toast("\u2713 " + tr("Saved: ", "اتحفظ: ") + t.name + " - " + priceTxt(upd)); manageTools(); }
           } } });
+          if (t.third_party) { pr1.value = ""; pr1.disabled = cu1.disabled = ds1.disabled = du1.disabled = true; pr1.placeholder = tr("No price for credited tools", "مفيش سعر للأدوات المنسوبة"); }
           holder.appendChild(h("div", { "class": "auth", style: "max-width:none;margin:10px 0" }, h("h3", { text: tr("Edit ", "تعديل ") + t.name }), h("label", { text: tr("Name", "الاسم") }), n1, h("label", { text: tr("Class", "التصنيف") }), c1,
             h("label", { text: tr("Description (English)", "الوصف (انجليزي)") }), d1, h("label", { text: tr("Description (Arabic)", "الوصف (عربي)") }), d2, h("label", { text: tr("Commands, one per line", "الأوامر، واحد في السطر") }), cm1,
             h("label", { text: tr("Visibility", "الظهور") }), v1, h("label", { text: tr("Status", "الحالة") }), s1, h("label", { text: tr("Video URL (https)", "رابط الفيديو") }), vid, h("label", { text: tr("GitHub repo URL", "رابط الريبو") }), rp,
@@ -520,9 +524,10 @@
     /* tool prices: owner edits all tools and sets discounts; other admins edit only the price of tools they created */
     var tp = h("div", { "class": "panel" }, h("h2", { text: tr("Tool prices", "أسعار الأدوات") })), tpmsg = h("div", { "class": "msg" }); box.appendChild(tp);
     tp.appendChild(h("p", { "class": "hint", text: owner ? tr("You can edit the price and discount of every tool.", "تقدر تعدل السعر والخصم لأي أداة.") : tr("You can edit the price of tools you created. Discounts are set by the owner.", "تقدر تعدل سعر الأدوات اللي إنت عملتها. الخصومات من المالك بس.") }));
-    var tl = await TSQ("id,name,created_by,price_minor,currency,discount_percent,discount_until", function (q) { return q.order("name"); });
+    var tl = await TSQ("id,name,created_by,third_party,price_minor,currency,discount_percent,discount_until", function (q) { return q.order("name"); });
     if (tl.error) tp.style.display = "none";
     (tl.data || []).forEach(function (t) {
+      if (t.third_party) return;
       var mine = t.created_by === me.id, canPrice = owner || mine;
       var pr = h("input", { type: "text", inputmode: "decimal", maxlength: "12", placeholder: tr("no price", "من غير سعر"), value: t.price_minor == null ? "" : (t.price_minor / 100).toFixed(2) });
       var cu = h("input", { type: "text", maxlength: "3", value: t.currency, style: "width:70px" });
@@ -531,12 +536,16 @@
       pr.disabled = cu.disabled = !canPrice; ds.disabled = du.disabled = !owner;
       var row = h("div", { "class": "row" }, h("span", { text: t.name + (mine ? "" : tr(" (another admin's)", " (لأدمن تاني)")) + "  " }), pr, cu);
       if (owner) { row.appendChild(h("span", { text: " -% " })); row.appendChild(ds); row.appendChild(h("span", { text: tr(" until ", " لحد ") })); row.appendChild(du); }
-      if (canPrice) row.appendChild(h("button", { "class": "btn f", type: "button", text: tr("Save", "حفظ"), on: { click: async function () {
-        var upd = {}, v = pr.value.trim(), c = cu.value.trim().toUpperCase();
+      if (canPrice) row.appendChild(h("button", { "class": "btn f", type: "button", text: tr("Save", "حفظ"), on: { click: async function (ev) {
+        var btn = ev.currentTarget, upd = {}, v = pr.value.trim(), c = cu.value.trim().toUpperCase();
         if (v === "") upd.price_minor = null; else { var m = Math.round(parseFloat(v) * 100); if (!(m >= 0 && m <= 100000000)) return say(tpmsg, tr("Price?", "السعر؟"), "err"); upd.price_minor = m; }
         if (!/^[A-Z]{3}$/.test(c)) return say(tpmsg, tr("Currency?", "العملة؟"), "err"); upd.currency = c;
         if (owner) { var d = parseInt(ds.value || "0", 10); if (!(d >= 0 && d <= 90)) return say(tpmsg, tr("Discount 0 to 90", "الخصم من 0 لـ 90"), "err"); upd.discount_percent = upd.price_minor == null ? 0 : d; upd.discount_until = du.value ? new Date(du.value + "T23:59:59Z").toISOString() : null; }
-        var x = await sb.from("tools").update(upd).eq("id", t.id); say(tpmsg, x.error ? x.error.message : tr("Saved.", "اتحفظ."), x.error ? "err" : "ok");
+        var ob = btn.textContent; btn.disabled = true; btn.textContent = tr("Saving...", "بيتحفظ...");
+        var x = await sb.from("tools").update(upd).eq("id", t.id).select("id"); btn.disabled = false;
+        if (x.error || !x.data || !x.data.length) { btn.textContent = ob; var em2 = x.error ? x.error.message : tr("Not saved: you can only change prices of your own tools.", "اتحفظش: تقدر تغير أسعار أدواتك إنت بس."); say(tpmsg, em2, "err"); toast("\u2717 " + em2); return; }
+        btn.textContent = "\u2713 " + tr("Saved", "اتحفظ"); setTimeout(function () { btn.textContent = ob; }, 3000);
+        var okm = tr("Saved: ", "اتحفظ: ") + t.name + " - " + priceTxt(upd); say(tpmsg, "\u2713 " + okm, "ok"); toast("\u2713 " + okm);
       } } }));
       tp.appendChild(row);
     });
@@ -646,6 +655,11 @@
 
   /* ---------- published tools on tools.html ---------- */
   function creditEl(t) { return h("div", { "class": "credit" }, h("b", { text: tr("Not created by Zenoth.", "مش من عمل Zenoth.") }), " " + tr("Created by ", "المطوّر الأصلي: ") + t.orig_creator + ". " + tr("License: ", "الرخصة: ") + t.orig_license + ". ", h("a", { href: t.orig_repo, target: "_blank", rel: "noopener noreferrer", text: tr("Original repository", "الريبو الأصلي") + " \u2197" })); }
+  function toast(text) {
+    var d = h("div", { role: "status", text: text, style: "position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:99999;background:#1e7a3c;color:#fff;padding:12px 22px;border-radius:10px;font-size:16px;font-weight:600;box-shadow:0 6px 24px rgba(0,0,0,.35)" });
+    document.body.appendChild(d); setTimeout(function () { if (d.parentNode) d.parentNode.removeChild(d); }, 4500);
+  }
+  function priceTxt(upd) { return upd.price_minor == null ? tr("no price", "من غير سعر") : (upd.price_minor / 100).toFixed(2) + " " + (upd.currency || "") + (upd.discount_percent > 0 ? " (-" + upd.discount_percent + "%)" : ""); }
   async function TSQ(cols, f) {
     var r = await f(sb.from("tools_view").select(cols)); if (r.error) r = await f(sb.from("tools").select(cols)); return r;
   }
@@ -666,7 +680,7 @@
         var pp0 = sc0.querySelector("p"); if (pp0) { pp0.setAttribute("data-en", t.description_en); if (t.description_ar) pp0.setAttribute("data-ar", t.description_ar); pp0.textContent = (EN() || !t.description_ar) ? t.description_en : t.description_ar; }
         var cm0 = sc0.querySelector(".cmds"); if (LK[t.id]) { sc0.classList.add("locked"); if (cm0) { clear(cm0); cm0.appendChild(h("div", { "class": "lockmsg", text: lockText() })); } } else if (cm0 && t.commands && t.commands.length) { clear(cm0); t.commands.forEach(function (c) { cm0.appendChild(h("code", { text: c })); }); }
         var ft0 = sc0.querySelector(".foot"), more0 = ft0 && ft0.querySelector("a.more");
-        if (ft0 && t.price_minor != null) { var on0 = t.discount_percent > 0 && (!t.discount_until || new Date(t.discount_until) > new Date()), eff0 = on0 ? Math.floor(t.price_minor * (100 - t.discount_percent) / 100) : t.price_minor;
+        if (ft0 && t.price_minor != null && !t.third_party) { var on0 = t.discount_percent > 0 && (!t.discount_until || new Date(t.discount_until) > new Date()), eff0 = on0 ? Math.floor(t.price_minor * (100 - t.discount_percent) / 100) : t.price_minor;
           ft0.insertBefore(h("span", { "class": "priv" }, on0 ? h("s", { text: (t.price_minor / 100).toFixed(2) }) : null, on0 ? " " : null, (eff0 / 100).toFixed(2) + " " + t.currency + (on0 ? " (-" + t.discount_percent + "%)" : "")), more0 || null); }
         if (ft0 && me && me.role === "owner") ft0.appendChild(h("a", { "class": "more", href: "admin.html#edit-" + encodeURIComponent(t.slug), text: tr("Edit", "تعديل") }));
         return;
@@ -676,7 +690,7 @@
       var p = h("p", { text: t.description_en }); if (t.description_ar) { p.setAttribute("data-en", t.description_en); p.setAttribute("data-ar", t.description_ar); }
       var tagc = t.third_party ? h("span", { "class": "tag third", text: "THIRD-PARTY" }) : t.visibility === "private" ? h("span", { "class": "tag", text: locked ? tr("LOCKED", "مقفول") : "PRO" }) : h("span", { "class": "tag new", text: "NEW" });
       var priceEl = null;
-      if (t.price_minor != null) { var on = t.discount_percent > 0 && (!t.discount_until || new Date(t.discount_until) > new Date()), eff = on ? Math.floor(t.price_minor * (100 - t.discount_percent) / 100) : t.price_minor;
+      if (t.price_minor != null && !t.third_party) { var on = t.discount_percent > 0 && (!t.discount_until || new Date(t.discount_until) > new Date()), eff = on ? Math.floor(t.price_minor * (100 - t.discount_percent) / 100) : t.price_minor;
         priceEl = h("span", { "class": "priv" }, on ? h("s", { text: (t.price_minor / 100).toFixed(2) }) : null, on ? " " : null, (eff / 100).toFixed(2) + " " + t.currency + (on ? " (-" + t.discount_percent + "%)" : "")); }
       grid.appendChild(h("article", { "class": (t.third_party ? "card third" : "card") + (locked ? " locked" : ""), "data-o": t.third_party ? "third" : null, "data-name": t.slug + " " + t.class, "data-c": t.class }, h("div", { "class": "top" }, h("h3", { text: t.name }), h("span", null, tagc)), p, cmds, t.third_party && !locked ? creditEl(t) : null,
         h("div", { "class": "foot" }, h("span", { "class": "priv", text: t.visibility === "private" ? "Subscribers only" : "Public" }), priceEl, locked ? h("a", { "class": "more", href: me ? "account.html" : "login.html", text: tr("Unlock", "افتح") }) : null, h("a", { "class": "more", href: "tool.html?t=" + encodeURIComponent(t.slug), text: "Details" }), (me && (me.role === "owner" || (me.role === "admin" && t.created_by === me.id))) ? h("a", { "class": "more", href: "admin.html#edit-" + encodeURIComponent(t.slug), text: tr("Edit", "تعديل") }) : null)));
