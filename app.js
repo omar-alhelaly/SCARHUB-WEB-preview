@@ -29,7 +29,9 @@
   /* avatars: b1-b8 boys, g1-g8 girls, generated SVG */
   var SKIN = ["#f1c9a5", "#e0a97d", "#c58c5c", "#8d5a3b"], HAIR = ["#1b1b1b", "#4a2c17", "#8a5a2b", "#c9a04a", "#7a1f1f", "#2f3d5a", "#3c3c3c", "#0e0e0e"], BG = ["#2a1215", "#122a24", "#12202a", "#2a2412"];
   var avN = 0;
-  function avatarSvg(code) {
+  function avatarSvg(code, uid) {
+    if (code === "custom" && uid) return h("img", { src: CFG.url + "/storage/v1/object/public/avatars/" + uid + "/avatar", alt: "", style: "width:100%;height:100%;border-radius:50%;object-fit:cover;display:block" });
+    if (code === "custom") code = "b1";
     var NS = "http://www.w3.org/2000/svg", girl = code[0] === "g", n = (parseInt(code.slice(1), 10) || 1) - 1;
     var s = document.createElementNS(NS, "svg"); s.setAttribute("viewBox", "0 0 64 64"); s.setAttribute("aria-hidden", "true");
     function add(tag, a, par) { var e = document.createElementNS(NS, tag); for (var k in a) e.setAttribute(k, a[k]); (par || s).appendChild(e); return e; }
@@ -126,7 +128,7 @@
   function sideMenu() {
     if (!me) return;
     var scrim = h("div", { "class": "scrim" }), side = h("nav", { "class": "side", "aria-label": "Account", id: "side" });
-    var btn = h("button", { "class": "acct", type: "button", "aria-label": tr("Account menu", "قائمة الحساب"), "aria-expanded": "false" }, avatarSvg(me.avatar));
+    var btn = h("button", { "class": "acct", type: "button", "aria-label": tr("Account menu", "قائمة الحساب"), "aria-expanded": "false" }, avatarSvg(me.avatar, me.id));
     function toggle(o) { side.classList.toggle("open", o); scrim.classList.toggle("open", o); btn.setAttribute("aria-expanded", o ? "true" : "false"); }
     btn.addEventListener("click", function () { toggle(!side.classList.contains("open")); }); scrim.addEventListener("click", function () { toggle(false); });
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") toggle(false); });
@@ -262,13 +264,21 @@
     var box = h("div", { "class": "wide" }); app.appendChild(box);
     var uname = h("input", { type: "text", maxlength: "20", value: me.username }), avBox = h("div", { "class": "avatars" }), msg = h("div", { "class": "msg" });
     var cur = me.avatar; avatarPicker(avBox, cur, function (c) { cur = c; });
+    var upFile = h("input", { type: "file", accept: "image/png,image/jpeg,image/webp", style: "max-width:230px" });
+    var upBox = h("div", { "class": "row" }, h("span", { "class": "hint", text: tr("Own picture (owner/admin only, PNG/JPG/WebP, max 1 MB):", "صورتك الخاصة (للمالك والأدمن فقط، PNG/JPG/WebP، لحد 1 ميجا):") }), upFile, h("button", { "class": "btn", type: "button", text: tr("Upload picture", "ارفع الصورة"), on: { click: async function () {
+      var f = upFile.files && upFile.files[0]; if (!f) return say(msg, tr("Choose an image.", "اختار صورة."), "err");
+      if (["image/png", "image/jpeg", "image/webp"].indexOf(f.type) < 0 || f.size > 1048576) return say(msg, tr("PNG, JPG or WebP, max 1 MB.", "PNG أو JPG أو WebP، لحد 1 ميجا."), "err");
+      var x = await sb.storage.from("avatars").upload(me.id + "/avatar", f, { upsert: true, contentType: f.type, cacheControl: "60" }); if (x.error) return say(msg, x.error.message, "err");
+      var y = await sb.rpc("update_my_profile", { new_username: null, new_avatar: "custom" }); if (y.error) return say(msg, y.error.message, "err");
+      cur = "custom"; me.avatar = "custom"; say(msg, tr("Picture saved. Refresh to see it everywhere.", "الصورة اتحفظت. اعمل Refresh عشان تظهر في كل حتة."), "ok");
+    } } }));
     var save = h("button", { "class": "btn f", type: "button", text: tr("Save", "حفظ"), on: { click: async function () {
       if (!USER_RE.test(uname.value)) return say(msg, tr("Invalid username.", "اسم مستخدم غير صحيح."), "err");
       var r = await sb.rpc("update_my_profile", { new_username: uname.value, new_avatar: cur });
       say(msg, r.error ? tr("Could not save (name taken?).", "ماتحفظش (الاسم مستخدم؟).") : tr("Saved.", "اتحفظ."), r.error ? "err" : "ok");
     } } });
     box.appendChild(h("div", { "class": "panel", id: "edit" }, h("h2", { text: tr("My profile", "بروفايلي") }), h("p", { text: me.email }),
-      h("p", { text: tr("Role: ", "الدور: ") + me.role }), h("label", { text: tr("Username", "اسم المستخدم") }), uname, avBox, h("div", { "class": "row" }, save), msg));
+      h("p", { text: tr("Role: ", "الدور: ") + me.role }), h("label", { text: tr("Username", "اسم المستخدم") }), uname, avBox, isStaff() ? upBox : null, h("div", { "class": "row" }, save), msg));
     var plansBox = h("div", { "class": "panel" }, h("h2", { text: tr("Subscription", "الاشتراك") })); box.appendChild(plansBox);
     var subR = await sb.from("subscriptions").select("status,current_period_end").eq("user_id", me.id).maybeSingle();
     var active = subR.data && /^(active|trialing)$/.test(subR.data.status) && new Date(subR.data.current_period_end) > new Date();
@@ -314,13 +324,13 @@
     var err = h("div", { "class": "msg" }), cur = "general", names = {}, sub = null;
     async function who(ids) {
       var need = ids.filter(function (i) { return !names[i]; }); if (!need.length) return;
-      var r = await sb.from("public_profiles").select("id,display_name,avatar").in("id", need);
+      var r = await sb.from("public_profiles").select("id,display_name,avatar,subscribed").in("id", need);
       (r.data || []).forEach(function (p) { names[p.id] = p; });
     }
     function line(m) {
       var p = names[m.user_id] || { display_name: "?", avatar: "b1" }, del = null;
       if (isStaff()) del = h("button", { "class": "btn", type: "button", text: "x", "aria-label": "delete", on: { click: async function () { await sb.from("chat_messages").delete().eq("id", m.id); load(); } } });
-      var el = h("div", { "class": "cm" }, h("div", { "class": "av" }, avatarSvg(p.avatar)), h("div", { style: "flex:1" }, h("b", { text: p.display_name }), h("p", { text: m.body })), del);
+      var el = h("div", { "class": "cm" }, h("div", { "class": "av" }, avatarSvg(p.avatar, p.id)), h("div", { style: "flex:1" }, h("b", p.subscribed ? { text: "\u2605 " + p.display_name, style: "color:#d4a017", title: tr("Subscriber", "مشترك") } : { text: p.display_name }), h("p", { text: m.body })), del);
       el.setAttribute("data-id", m.id); return el;
     }
     async function load() {
@@ -364,7 +374,7 @@
             var x = await sb.rpc("set_role", { target: u.id, new_role: sel.value, new_alias: sel.value === "admin" ? al.value : null }); if (x.error) alert(x.error.message); users();
           } } }));
         }
-        tb.appendChild(h("tr", null, h("td", null, h("span", { "class": "av", style: "display:inline-block;width:28px;vertical-align:middle;margin-inline-end:6px;cursor:default" }, avatarSvg(u.avatar)), name || "-"), h("td", { text: u.email || "" }),
+        tb.appendChild(h("tr", null, h("td", null, h("span", { "class": "av", style: "display:inline-block;width:28px;vertical-align:middle;margin-inline-end:6px;cursor:default" }, avatarSvg(u.avatar, u.id)), name || "-"), h("td", { text: u.email || "" }),
           h("td", null, h("span", { "class": "tag " + (u.role === "owner" ? "owner" : ""), text: u.role })), h("td", null, h("span", { "class": "tag " + (u.status === "deleted" ? "del" : ""), text: u.status })), h("td", { text: u.subscribed ? "yes" : "-" }), act));
       });
     }
