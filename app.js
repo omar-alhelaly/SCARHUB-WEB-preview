@@ -583,6 +583,15 @@
           var o = await sb.from("plans").update({ active: !p.active }).eq("id", p.id).select("id");
           say(pmsg, o.error || !o.data || !o.data.length ? tr("Not changed.", "ماتغيرش.") : (p.active ? tr("Plan is off: not sold anymore. Current holders keep access until their period ends. Reload.", "الخطة اتوقفت: مبتتباعش. اللي معاه اشتراك يكمل لحد ما يخلص. حدّث الصفحة.") : tr("Plan is on. Reload.", "الخطة اشتغلت. حدّث الصفحة.")), o.error || !o.data || !o.data.length ? "err" : "ok");
         } } }));
+        planRow.appendChild(document.createTextNode(" "));
+        var delPlanBtn = h("button", { "class": "btn", type: "button", text: tr("Delete", "حذف"), on: { click: async function () {
+          if (!window.confirm(tr("Delete the plan \"" + p.name + "\"? This cannot be undone.", "تحذف الخطة \"" + p.name + "\"؟ مينفعش ترجع."))) return;
+          var dl = await sb.from("plans").delete().eq("id", p.id).select("id");
+          if (dl.error) return say(pmsg, tr("This plan already has payments or holders, so it cannot be deleted. Use Turn off instead.", "الخطة دي عليها دفعات أو مشتركين فمينفعش تتحذف. استخدم إيقاف بدلها."), "err");
+          if (!dl.data || !dl.data.length) return say(pmsg, tr("Not deleted.", "ماتحذفتش."), "err");
+          planRow.remove(); editPlanBox.remove(); say(pmsg, tr("Plan deleted.", "الخطة اتحذفت."), "ok");
+        } } });
+        planRow.appendChild(delPlanBtn);
         pp.appendChild(editPlanBox);
       }
     });
