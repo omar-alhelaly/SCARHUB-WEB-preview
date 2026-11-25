@@ -575,6 +575,16 @@
     var SELT = "id,slug,name,class,description_en,description_ar,commands,visibility,created_by", PRC = ",price_minor,currency,discount_percent,discount_until";
     var r = await sb.from("tools").select(SELT + PRC).eq("status", "published"); if (r.error) r = await sb.from("tools").select(SELT).eq("status", "published"); if (r.error || !r.data) return;
     r.data.forEach(function (t) {
+      var sc0 = document.querySelector('article.card[data-name^="' + t.slug + ' "]');
+      if (sc0) {
+        var pp0 = sc0.querySelector("p"); if (pp0) { pp0.setAttribute("data-en", t.description_en); if (t.description_ar) pp0.setAttribute("data-ar", t.description_ar); pp0.textContent = (EN() || !t.description_ar) ? t.description_en : t.description_ar; }
+        var cm0 = sc0.querySelector(".cmds"); if (cm0 && t.commands && t.commands.length) { clear(cm0); t.commands.forEach(function (c) { cm0.appendChild(h("code", { text: c })); }); }
+        var ft0 = sc0.querySelector(".foot"), more0 = ft0 && ft0.querySelector("a.more");
+        if (ft0 && t.price_minor != null) { var on0 = t.discount_percent > 0 && (!t.discount_until || new Date(t.discount_until) > new Date()), eff0 = on0 ? Math.floor(t.price_minor * (100 - t.discount_percent) / 100) : t.price_minor;
+          ft0.insertBefore(h("span", { "class": "priv" }, on0 ? h("s", { text: (t.price_minor / 100).toFixed(2) }) : null, on0 ? " " : null, (eff0 / 100).toFixed(2) + " " + t.currency + (on0 ? " (-" + t.discount_percent + "%)" : "")), more0 || null); }
+        if (ft0 && me && me.role === "owner") ft0.appendChild(h("a", { "class": "more", href: "admin.html#edit-" + encodeURIComponent(t.slug), text: tr("Edit", "تعديل") }));
+        return;
+      }
       var grid = document.querySelector("#c-" + t.class + " .grid"); if (!grid) return;
       var cmds = h("div", { "class": "cmds" }); (t.commands || []).forEach(function (c) { cmds.appendChild(h("code", { text: c })); });
       var p = h("p", { text: t.description_en }); if (t.description_ar) { p.setAttribute("data-en", t.description_en); p.setAttribute("data-ar", t.description_ar); }
