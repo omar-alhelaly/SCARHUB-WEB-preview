@@ -560,7 +560,7 @@
       pp.appendChild(h("label", { style: "display:inline-block;margin-inline-end:14px" }, c, " " + NAMES[p.provider] + (p.provider === "paymob" ? " (not tested yet)" : " (not tested yet)")));
     });
     var pl = await sb.from("plans").select("id,name,price_minor,currency,period,active,scope,description");
-    var allT = (await sb.from("tools").select("id,name").order("name")).data || [], ptR = (await sb.from("plan_tools").select("plan_id,tool_id")).data || [], tName = {}; allT.forEach(function (x) { tName[x.id] = x.name; });
+    var allT0 = (await TSQ("id,name,third_party", function (q) { return q.order("name"); })).data || [], allT = allT0.filter(function (x) { return !x.third_party; }), ptR = (await sb.from("plan_tools").select("plan_id,tool_id")).data || [], tName = {}; allT0.forEach(function (x) { tName[x.id] = x.name; });
     (pl.data || []).forEach(function (p) {
       var cov = p.scope === "tools" ? tr("only: ", "بس: ") + ptR.filter(function (q) { return q.plan_id === p.id; }).map(function (q) { return tName[q.tool_id] || "?"; }).join(", ") : tr("all tools", "كل الأدوات");
       var planLbl = h("span", { text: p.name + ": " + (p.price_minor / 100).toFixed(2) + " " + p.currency + "/" + p.period + " (" + cov + ")" + (p.description ? " - " + p.description : "") + (p.active ? "" : " (OFF)") + "  " });
