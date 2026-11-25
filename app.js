@@ -28,7 +28,52 @@
 
   /* avatars: b1-b8 boys, g1-g8 girls, generated SVG */
   var SKIN = ["#f1c9a5", "#e0a97d", "#c58c5c", "#8d5a3b"], HAIR = ["#1b1b1b", "#4a2c17", "#8a5a2b", "#c9a04a", "#7a1f1f", "#2f3d5a", "#3c3c3c", "#0e0e0e"], BG = ["#2a1215", "#122a24", "#12202a", "#2a2412"];
+  var avN = 0;
   function avatarSvg(code) {
+    var NS = "http://www.w3.org/2000/svg", girl = code[0] === "g", n = (parseInt(code.slice(1), 10) || 1) - 1;
+    var s = document.createElementNS(NS, "svg"); s.setAttribute("viewBox", "0 0 64 64"); s.setAttribute("aria-hidden", "true");
+    function add(tag, a, par) { var e = document.createElementNS(NS, tag); for (var k in a) e.setAttribute(k, a[k]); (par || s).appendChild(e); return e; }
+    var SK = ["#f6d3b3", "#e8b88f", "#c68a5e", "#8c5a3c"], HR = ["#1c1917", "#3b2314", "#6b4423", "#b9893b", "#7c2d12", "#27324a", "#4b5563", "#0c0a09"];
+    var CL = ["#ef4444", "#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#ec4899", "#14b8a6", "#6366f1"], BGS = ["#fde2e4", "#dbeafe", "#dcfce7", "#ede9fe", "#fef3c7", "#fce7f3", "#ccfbf1", "#e0e7ff"];
+    var skin = SK[[0, 1, 2, 3, 1, 0, 2, 1][n]], hair = HR[(n * 3 + (girl ? 2 : 0)) % 8], shirt = CL[(n + (girl ? 3 : 0)) % 8], bg = BGS[(n + (girl ? 4 : 0)) % 8];
+    var id = "avc" + (++avN), defs = add("defs", {}), cp = add("clipPath", { id: id }, defs); add("circle", { cx: 32, cy: 32, r: 32 }, cp);
+    var g = add("g", { "clip-path": "url(#" + id + ")" });
+    function A(tag, a) { return add(tag, a, g); }
+    var hijab = girl && (n === 3 || n === 7), hc = hijab ? CL[(n + 1) % 8] : hair;
+    A("rect", { width: 64, height: 64, fill: bg });
+    if (girl && !hijab) {
+      if (n === 0 || n === 6) A("path", { d: "M17 30c0-14 6-19 15-19s15 5 15 19v24H17z", fill: hair });
+      if (n === 1) A("path", { d: "M17 30c0-14 6-19 15-19s15 5 15 19v8H17z", fill: hair });
+      if (n === 4) [[19, 22], [17, 31], [19, 40], [45, 22], [47, 31], [45, 40], [26, 15], [32, 13], [38, 15]].forEach(function (c) { A("circle", { cx: c[0], cy: c[1], r: 5.5, fill: hair }); });
+    }
+    if (hijab) A("path", { d: "M15 32c0-16 7-22 17-22s17 6 17 22c0 9-3 15-7 19H22c-4-4-7-10-7-19z", fill: hc });
+    A("path", { d: hijab ? "M8 64c1-10 9-15 24-15s23 5 24 15z" : "M8 64c1-12 10-17 24-17s23 5 24 17z", fill: hijab ? hc : shirt });
+    if (!hijab) A("path", { d: "M26 47l6 6 6-6", fill: "none", stroke: "rgba(0,0,0,.18)", "stroke-width": 1.6, "stroke-linejoin": "round" });
+    A("rect", { x: 28, y: 39, width: 8, height: 11, rx: 3, fill: skin }); A("rect", { x: 28, y: 39, width: 8, height: 4, fill: "rgba(0,0,0,.1)" });
+    if (!hijab) { A("circle", { cx: 20.3, cy: 30, r: 2.6, fill: skin }); A("circle", { cx: 43.7, cy: 30, r: 2.6, fill: skin }); }
+    A("ellipse", { cx: 32, cy: 29, rx: hijab ? 10.5 : 12, ry: hijab ? 12.5 : 13.5, fill: skin });
+    var fr = "M19.5 29c0-11 5-15.5 12.5-15.5S44.5 18 44.5 29c-3.5-5-7.5-7-12.5-7s-9 2-12.5 7z";
+    if (hijab) A("path", { d: "M20.5 30c0-9 5-14 11.5-14s11.5 5 11.5 14c-3-5-7-7-11.5-7s-8.5 2-11.5 7z", fill: hc });
+    else if (girl) { A("path", { d: fr, fill: hair }); if (n === 2) { A("path", { d: "M44 22c8 0 10 9 6 17-1-6-3-9-6-11z", fill: hair }); A("circle", { cx: 45.5, cy: 23, r: 2, fill: shirt }); } if (n === 5) A("circle", { cx: 32, cy: 11.5, r: 5.5, fill: hair }); }
+    else {
+      if (n === 0 || n === 5) A("path", { d: "M20 27.5c0-10.5 5-14.5 12-14.5s12 4 12 14.5c-3-4.5-7-6.5-12-6.5s-9 2-12 6.5z", fill: hair });
+      if (n === 1 || n === 6) A("path", { d: "M19.5 28c-1-11.5 5-15.5 13-15.5 7.5 0 12 4.5 11.5 13.5-2-5-6-7.5-10.5-7.5-5 0-10 3-14 9.5z", fill: hair });
+      if (n === 2) [[22, 21], [27, 16.5], [33, 15.5], [39, 17], [43, 22], [20, 27], [44, 27]].forEach(function (c) { A("circle", { cx: c[0], cy: c[1], r: 5, fill: hair }); });
+      if (n === 3) A("path", { d: "M20.5 26c0-9 5-12.5 11.5-12.5S43.5 17 43.5 26c-4-2.5-7-3.5-11.5-3.5s-7.5 1-11.5 3.5z", fill: hair, opacity: ".85" });
+      if (n === 4) A("path", { d: "M18.5 33c-2.5-14 3-20 13.5-20s16 6 13.5 20c-1-8-4.5-12.5-13.5-12.5s-12.5 4.5-13.5 12.5z", fill: hair });
+      if (n === 5) A("path", { d: "M20.5 31c0 11 5 16.5 11.5 16.5s11.5-5.5 11.5-16.5c-1 3.5-3.5 5.5-6 6.5-2-1.8-3.8-2.2-5.5-2.2s-3.5.4-5.5 2.2c-2.5-1-5-3-6-6.5z", fill: hair });
+      if (n === 7) { A("path", { d: "M19 26c0-9.5 6-13.5 13-13.5S45 16.5 45 26z", fill: "#1f2937" }); A("path", { d: "M31 25.5h15q2.5 0 2.5 2.2H31z", fill: "#1f2937" }); }
+    }
+    A("path", { d: "M24 25.8q3-1.8 6 0", fill: "none", stroke: "#2b2118", "stroke-width": 1.4, "stroke-linecap": "round" }); A("path", { d: "M34 25.8q3-1.8 6 0", fill: "none", stroke: "#2b2118", "stroke-width": 1.4, "stroke-linecap": "round" });
+    A("ellipse", { cx: 27, cy: 29.5, rx: 1.7, ry: 2.1, fill: "#1f2937" }); A("ellipse", { cx: 37, cy: 29.5, rx: 1.7, ry: 2.1, fill: "#1f2937" });
+    A("circle", { cx: 27.6, cy: 28.8, r: 0.6, fill: "#fff" }); A("circle", { cx: 37.6, cy: 28.8, r: 0.6, fill: "#fff" });
+    A("path", { d: "M32 30.5v4q-1.8 1.2-2.8.4", fill: "none", stroke: "rgba(0,0,0,.28)", "stroke-width": 1.2, "stroke-linecap": "round" });
+    A("circle", { cx: 24.5, cy: 34.5, r: 2.4, fill: "#f43f5e", opacity: ".15" }); A("circle", { cx: 39.5, cy: 34.5, r: 2.4, fill: "#f43f5e", opacity: ".15" });
+    A("path", { d: "M28.5 38q3.5 2.8 7 0", fill: "none", stroke: !girl && n === 5 ? "#f5d5c5" : "#a8453a", "stroke-width": 1.5, "stroke-linecap": "round" });
+    if (n === 6) { A("circle", { cx: 27, cy: 29.5, r: 4.4, fill: "rgba(255,255,255,.15)", stroke: "#111827", "stroke-width": 1.2 }); A("circle", { cx: 37, cy: 29.5, r: 4.4, fill: "rgba(255,255,255,.15)", stroke: "#111827", "stroke-width": 1.2 }); A("path", { d: "M31.4 29.5h1.2", stroke: "#111827", "stroke-width": 1.2 }); }
+    return s;
+  }
+  function avatarSvgOld(code) {
     var NS = "http://www.w3.org/2000/svg", girl = code[0] === "g", n = parseInt(code.slice(1), 10) - 1;
     var s = document.createElementNS(NS, "svg"); s.setAttribute("viewBox", "0 0 64 64"); s.setAttribute("aria-hidden", "true");
     function add(tag, a) { var e = document.createElementNS(NS, tag); for (var k in a) e.setAttribute(k, a[k]); s.appendChild(e); return e; }
@@ -92,6 +137,14 @@
     side.appendChild(h("button", { type: "button", text: tr("Sign out", "تسجيل الخروج"), on: { click: async function () { await sb.auth.signOut(); go("index.html"); } } }));
     side.appendChild(h("button", { type: "button", "class": "danger", text: tr("Delete account", "حذف الحساب"), on: { click: function () { go("account.html#delete"); } } }));
     document.body.appendChild(scrim); document.body.appendChild(side); document.body.appendChild(btn);
+    var mainEl = document.getElementById("main");
+    if (mainEl) {
+      var bar = h("div", { "class": "wide", style: "display:flex;gap:8px;flex-wrap:wrap;margin:10px auto 0" }), here = location.pathname.split("/").pop() || "index.html";
+      [["account.html", "My account", "حسابي"], ["community.html", "Community", "المجتمع"], ["tools.html", "Tools", "الأدوات"]].concat(isStaff() ? [["admin.html", "Admin panel", "لوحة الإدارة"]] : []).forEach(function (l) { bar.appendChild(h("a", { "class": "btn" + (here === l[0] ? " f" : ""), href: l[0], text: tr(l[1], l[2]) })); });
+      bar.appendChild(h("a", { "class": "btn", href: "account.html#edit", text: tr("Edit profile", "تعديل البروفايل") }));
+      bar.appendChild(h("button", { "class": "btn", type: "button", text: tr("Sign out", "تسجيل الخروج"), on: { click: async function () { await sb.auth.signOut(); go("index.html"); } } }));
+      mainEl.insertBefore(bar, mainEl.children[1] || null);
+    }
   }
 
   /* ---------- login ---------- */
@@ -314,6 +367,28 @@
           h("td", null, h("span", { "class": "tag " + (u.role === "owner" ? "owner" : ""), text: u.role })), h("td", null, h("span", { "class": "tag " + (u.status === "deleted" ? "del" : ""), text: u.status })), h("td", { text: u.subscribed ? "yes" : "-" }), act));
       });
     }
+    if (owner) {
+      var ap = h("div", { "class": "panel" }, h("h2", { text: tr("Admins", "الأدمنز") })), apmsg = h("div", { "class": "msg" }), apl = h("div"), pick = h("select", { "aria-label": "user" });
+      var aal = h("input", { type: "text", placeholder: tr("Public alias (3-25)", "الاسم المستعار (3-25)"), maxlength: "25" });
+      var adminsPanel = async function () {
+        var rr = await sb.rpc("admin_list_users"); clear(apl); clear(pick); if (rr.error) return say(apmsg, rr.error.message, "err");
+        pick.appendChild(h("option", { value: "", text: tr("Choose a user...", "اختار مستخدم...") }));
+        rr.data.forEach(function (u) {
+          if (u.status !== "active" || u.role === "owner") return;
+          if (u.role === "user") pick.appendChild(h("option", { value: u.id, text: u.username + " - " + (u.email || "") }));
+          else apl.appendChild(h("div", { "class": "row" }, h("span", { text: u.alias + " (" + u.username + ", " + (u.email || "") + ")  " }), h("button", { "class": "btn", type: "button", text: tr("Remove admin", "شيل الأدمن"), on: { click: async function () {
+            if (!confirm(tr("Remove this admin?", "تشيل الأدمن ده؟"))) return;
+            var x = await sb.rpc("set_role", { target: u.id, new_role: "user", new_alias: null }); say(apmsg, x.error ? x.error.message : tr("Removed.", "اتشال."), x.error ? "err" : "ok"); adminsPanel(); users();
+          } } })));
+        });
+        if (!apl.firstChild) apl.appendChild(h("p", { "class": "hint", text: tr("No admins yet.", "مفيش أدمنز لسه.") }));
+      };
+      ap.appendChild(h("p", { "class": "hint", text: tr("Only you (the owner) can add or remove admins. The person must sign up first.", "انت بس (المالك) اللي تضيف أو تشيل أدمن. لازم الشخص يسجل الأول.") })); ap.appendChild(apl);
+      ap.appendChild(h("div", { "class": "row" }, pick, aal, h("button", { "class": "btn f", type: "button", text: tr("Add admin", "ضيف أدمن"), on: { click: async function () {
+        if (!pick.value) return say(apmsg, tr("Choose a user.", "اختار مستخدم."), "err"); if (!ALIAS_RE.test(aal.value)) return say(apmsg, tr("Alias needs 3-25 letters, numbers or spaces, starting with a letter.", "الاسم المستعار 3-25 حرف ويبدأ بحرف."), "err");
+        var x = await sb.rpc("set_role", { target: pick.value, new_role: "admin", new_alias: aal.value }); say(apmsg, x.error ? x.error.message : tr("Admin added.", "اتضاف أدمن."), x.error ? "err" : "ok"); aal.value = ""; adminsPanel(); users();
+      } } }))); ap.appendChild(apmsg); box.appendChild(ap); adminsPanel();
+    }
     box.appendChild(ut); users();
     /* tool upload */
     var f = {}; function inp(id, label, attrs, tag) { var e = h(tag || "input", Object.assign({ id: "t_" + id }, attrs || {})); f[id] = e; return h("div", null, h("label", { "for": "t_" + id, text: label }), e); }
@@ -324,13 +399,17 @@
       inp("name", tr("Name", "الاسم"), { maxlength: "40", required: "", type: "text" }), inp("slug", "Slug (a-z, 0-9, -)", { maxlength: "41", required: "", type: "text" }),
       h("label", { text: tr("Class", "التصنيف") }), cls, inp("den", tr("Description (English)", "الوصف (انجليزي)"), { maxlength: "600", rows: "3" }, "textarea"), inp("dar", tr("Description (Arabic)", "الوصف (عربي)"), { maxlength: "600", rows: "3" }, "textarea"),
       inp("cmds", tr("Commands, one per line (max 10)", "الأوامر، واحد في السطر (10 كحد أقصى)"), { rows: "3" }, "textarea"), h("label", { text: tr("Visibility", "الظهور") }), vis, h("label", { text: tr("Status", "الحالة") }), st,
+      inp("price", tr("Price (optional, e.g. 49.00)", "السعر (اختياري، مثلا 49.00)"), { type: "text", inputmode: "decimal", maxlength: "12" }), inp("cur", tr("Currency", "العملة"), { type: "text", maxlength: "3", value: "EGP" }),
       inp("video", tr("Video URL (https)", "رابط الفيديو (https)"), { type: "text" }), inp("repo", tr("GitHub repo URL", "رابط الريبو"), { type: "text" }), h("label", { "for": "t_file", text: tr("File (zip, max 50 MB)", "ملف (zip حتى 50MB)") }), file,
       h("div", { "class": "row" }, h("button", { "class": "btn f", type: "submit", text: tr("Publish", "نشر") })), tmsg);
     tf.addEventListener("submit", async function (e) {
       e.preventDefault(); var slug = f.slug.value.trim();
       if (!/^[a-z0-9][a-z0-9-]{1,40}$/.test(slug)) return say(tmsg, "slug?", "err");
       var cmds = f.cmds.value.split("\n").map(function (x) { return x.trim(); }).filter(Boolean).slice(0, 10);
-      var ins = await sb.from("tools").insert({ slug: slug, name: f.name.value.trim(), class: cls.value, description_en: f.den.value.trim(), description_ar: f.dar.value.trim() || null, commands: cmds, visibility: vis.value, status: st.value, created_by: me.id }).select("id").single();
+      var pm_ = null, cur_ = (f.cur.value.trim() || "EGP").toUpperCase();
+      if (f.price.value.trim()) { pm_ = Math.round(parseFloat(f.price.value) * 100); if (!(pm_ >= 0 && pm_ <= 100000000)) return say(tmsg, tr("Price?", "السعر؟"), "err"); }
+      if (!/^[A-Z]{3}$/.test(cur_)) return say(tmsg, tr("Currency?", "العملة؟"), "err");
+      var ins = await sb.from("tools").insert(Object.assign({ slug: slug, name: f.name.value.trim(), class: cls.value, description_en: f.den.value.trim(), description_ar: f.dar.value.trim() || null, commands: cmds, visibility: vis.value, status: st.value, created_by: me.id }, pm_ != null ? { price_minor: pm_, currency: cur_ } : {})).select("id").single();
       if (ins.error) return say(tmsg, ins.error.message, "err");
       var path = null;
       if (file.files[0]) { if (file.files[0].size > 52428800) return say(tmsg, "file > 50 MB", "err"); path = slug + "/" + file.files[0].name.replace(/[^A-Za-z0-9._-]/g, "_").toLowerCase(); var up = await sb.storage.from("tool-files").upload(path, file.files[0], { upsert: false }); if (up.error) return say(tmsg, up.error.message, "err"); }
@@ -338,6 +417,76 @@
       say(tmsg, ax.error ? ax.error.message : tr("Published.", "اتنشرت."), ax.error ? "err" : "ok");
     });
     box.appendChild(h("div", { "class": "panel" }, tf));
+    var mp = h("div", { "class": "panel", id: "manage" }, h("h2", { text: tr("Manage tools", "إدارة الأدوات") })), mpl = h("div"), mmsg = h("div", { "class": "msg" }), editors = {};
+    mp.appendChild(h("p", { "class": "hint", text: owner ? tr("You can edit or delete every tool.", "تقدر تعدل أو تمسح أي أداة.") : tr("You can edit or delete the tools you created.", "تقدر تعدل أو تمسح الأدوات اللي إنت عملتها.") })); mp.appendChild(mpl); mp.appendChild(mmsg); box.appendChild(mp);
+    var manageTools = async function () {
+      var rt = await sb.from("tools").select("id,slug,name,class,description_en,description_ar,commands,visibility,status,created_by").order("name"); clear(mpl); if (rt.error) return say(mmsg, rt.error.message, "err");
+      var ids = rt.data.map(function (t) { return t.id; }), amap = {};
+      if (ids.length) ((await sb.from("tool_assets").select("tool_id,video_url,repo_url,file_path").in("tool_id", ids)).data || []).forEach(function (a) { amap[a.tool_id] = a; });
+      if (!rt.data.length) mpl.appendChild(h("p", { "class": "hint", text: tr("No tools yet. Add one above.", "مفيش أدوات لسه. ضيف واحدة فوق.") }));
+      rt.data.forEach(function (t) {
+        var can = owner || t.created_by === me.id, a = amap[t.id] || {}, holder = h("div");
+        var row = h("div", { "class": "row", id: "tool-" + t.slug }, h("span", { text: t.name + "  [" + t.class + ", " + t.status + ", " + t.visibility + "]" + (can ? "" : tr(" read only", " قراءة فقط")) + "  " }));
+        function openEdit() {
+          clear(holder);
+          var n1 = h("input", { type: "text", maxlength: "40", value: t.name }), c1 = h("select"), d1 = h("textarea", { rows: "3", maxlength: "600" }), d2 = h("textarea", { rows: "3", maxlength: "600" }), cm1 = h("textarea", { rows: "3" });
+          ["recon", "forensics", "defense", "pentest", "crypto", "mobile", "platform"].forEach(function (c) { var o = h("option", { value: c, text: c }); if (c === t.class) o.selected = true; c1.appendChild(o); });
+          d1.value = t.description_en || ""; d2.value = t.description_ar || ""; cm1.value = (t.commands || []).join("\n");
+          var v1 = h("select"), s1 = h("select"); ["public", "private"].forEach(function (c) { var o = h("option", { value: c, text: c }); if (c === t.visibility) o.selected = true; v1.appendChild(o); }); ["published", "draft"].forEach(function (c) { var o = h("option", { value: c, text: c }); if (c === t.status) o.selected = true; s1.appendChild(o); });
+          var vid = h("input", { type: "text", value: a.video_url || "" }), rp = h("input", { type: "text", value: a.repo_url || "" }), em = h("div", { "class": "msg" });
+          var save = h("button", { "class": "btn f", type: "button", text: tr("Save changes", "احفظ التعديل"), on: { click: async function () {
+            var upd = { name: n1.value.trim(), class: c1.value, description_en: d1.value.trim(), description_ar: d2.value.trim() || null, commands: cm1.value.split("\n").map(function (x) { return x.trim(); }).filter(Boolean).slice(0, 10), visibility: v1.value, status: s1.value };
+            var x = await sb.from("tools").update(upd).eq("id", t.id).select("id");
+            if (x.error) return say(em, x.error.message, "err"); if (!x.data || !x.data.length) return say(em, tr("Not allowed: you can only edit your own tools.", "مش مسموح: تقدر تعدل أدواتك إنت بس."), "err");
+            var y = await sb.from("tool_assets").upsert({ tool_id: t.id, video_url: vid.value.trim() || null, repo_url: rp.value.trim() || null, file_path: a.file_path || null }, { onConflict: "tool_id" });
+            say(em, y.error ? y.error.message : tr("Saved.", "اتحفظ."), y.error ? "err" : "ok"); if (!y.error) manageTools();
+          } } });
+          holder.appendChild(h("div", { "class": "auth", style: "max-width:none;margin:10px 0" }, h("h3", { text: tr("Edit ", "تعديل ") + t.name }), h("label", { text: tr("Name", "الاسم") }), n1, h("label", { text: tr("Class", "التصنيف") }), c1,
+            h("label", { text: tr("Description (English)", "الوصف (انجليزي)") }), d1, h("label", { text: tr("Description (Arabic)", "الوصف (عربي)") }), d2, h("label", { text: tr("Commands, one per line", "الأوامر، واحد في السطر") }), cm1,
+            h("label", { text: tr("Visibility", "الظهور") }), v1, h("label", { text: tr("Status", "الحالة") }), s1, h("label", { text: tr("Video URL (https)", "رابط الفيديو") }), vid, h("label", { text: tr("GitHub repo URL", "رابط الريبو") }), rp,
+            h("div", { "class": "row" }, save, h("button", { "class": "btn", type: "button", text: tr("Cancel", "إلغاء"), on: { click: function () { clear(holder); } } })), em));
+          holder.scrollIntoView();
+        }
+        editors[t.slug] = openEdit;
+        if (can) {
+          row.appendChild(h("button", { "class": "btn f", type: "button", text: tr("Edit", "تعديل"), on: { click: openEdit } }));
+          row.appendChild(h("button", { "class": "btn", type: "button", text: tr("Delete", "مسح"), on: { click: async function () {
+            if (!confirm(tr("Delete this tool for good?", "تمسح الأداة نهائي؟"))) return;
+            var x = await sb.from("tools").delete().eq("id", t.id).select("id");
+            if (x.error) return say(mmsg, x.error.message, "err"); if (!x.data || !x.data.length) return say(mmsg, tr("Not allowed.", "مش مسموح."), "err");
+            if (a.file_path) await sb.storage.from("tool-files").remove([a.file_path]);
+            say(mmsg, tr("Deleted.", "اتمسحت."), "ok"); manageTools();
+          } } }));
+        }
+        mpl.appendChild(row); mpl.appendChild(holder);
+      });
+      var hm = location.hash.match(/^#edit-(.+)$/); if (hm) { var sl = decodeURIComponent(hm[1]); if (editors[sl]) editors[sl](); }
+    };
+    manageTools();
+    /* tool prices: owner edits all tools and sets discounts; other admins edit only the price of tools they created */
+    var tp = h("div", { "class": "panel" }, h("h2", { text: tr("Tool prices", "أسعار الأدوات") })), tpmsg = h("div", { "class": "msg" }); box.appendChild(tp);
+    tp.appendChild(h("p", { "class": "hint", text: owner ? tr("You can edit the price and discount of every tool.", "تقدر تعدل السعر والخصم لأي أداة.") : tr("You can edit the price of tools you created. Discounts are set by the owner.", "تقدر تعدل سعر الأدوات اللي إنت عملتها. الخصومات من المالك بس.") }));
+    var tl = await sb.from("tools").select("id,name,created_by,price_minor,currency,discount_percent,discount_until").order("name");
+    if (tl.error) tp.style.display = "none";
+    (tl.data || []).forEach(function (t) {
+      var mine = t.created_by === me.id, canPrice = owner || mine;
+      var pr = h("input", { type: "text", inputmode: "decimal", maxlength: "12", placeholder: tr("no price", "من غير سعر"), value: t.price_minor == null ? "" : (t.price_minor / 100).toFixed(2) });
+      var cu = h("input", { type: "text", maxlength: "3", value: t.currency, style: "width:70px" });
+      var ds = h("input", { type: "number", min: "0", max: "90", value: String(t.discount_percent), style: "width:70px", title: "discount %" });
+      var du = h("input", { type: "date", value: t.discount_until ? t.discount_until.slice(0, 10) : "" });
+      pr.disabled = cu.disabled = !canPrice; ds.disabled = du.disabled = !owner;
+      var row = h("div", { "class": "row" }, h("span", { text: t.name + (mine ? "" : tr(" (another admin's)", " (لأدمن تاني)")) + "  " }), pr, cu);
+      if (owner) { row.appendChild(h("span", { text: " -% " })); row.appendChild(ds); row.appendChild(h("span", { text: tr(" until ", " لحد ") })); row.appendChild(du); }
+      if (canPrice) row.appendChild(h("button", { "class": "btn f", type: "button", text: tr("Save", "حفظ"), on: { click: async function () {
+        var upd = {}, v = pr.value.trim(), c = cu.value.trim().toUpperCase();
+        if (v === "") upd.price_minor = null; else { var m = Math.round(parseFloat(v) * 100); if (!(m >= 0 && m <= 100000000)) return say(tpmsg, tr("Price?", "السعر؟"), "err"); upd.price_minor = m; }
+        if (!/^[A-Z]{3}$/.test(c)) return say(tpmsg, tr("Currency?", "العملة؟"), "err"); upd.currency = c;
+        if (owner) { var d = parseInt(ds.value || "0", 10); if (!(d >= 0 && d <= 90)) return say(tpmsg, tr("Discount 0 to 90", "الخصم من 0 لـ 90"), "err"); upd.discount_percent = upd.price_minor == null ? 0 : d; upd.discount_until = du.value ? new Date(du.value + "T23:59:59Z").toISOString() : null; }
+        var x = await sb.from("tools").update(upd).eq("id", t.id); say(tpmsg, x.error ? x.error.message : tr("Saved.", "اتحفظ."), x.error ? "err" : "ok");
+      } } }));
+      tp.appendChild(row);
+    });
+    tp.appendChild(tpmsg);
     if (!owner) return;
     /* plans (owner only) */
     var pp = h("div", { "class": "panel" }, h("h2", { text: tr("Payments", "المدفوعات") })), pmsg = h("div", { "class": "msg" }); box.appendChild(pp);
@@ -393,20 +542,24 @@
 
   /* ---------- published tools on tools.html ---------- */
   async function dynTools() {
-    var r = await sb.from("tools").select("id,slug,name,class,description_en,description_ar,commands,visibility").eq("status", "published"); if (r.error || !r.data) return;
+    var SELT = "id,slug,name,class,description_en,description_ar,commands,visibility,created_by", PRC = ",price_minor,currency,discount_percent,discount_until";
+    var r = await sb.from("tools").select(SELT + PRC).eq("status", "published"); if (r.error) r = await sb.from("tools").select(SELT).eq("status", "published"); if (r.error || !r.data) return;
     r.data.forEach(function (t) {
       var grid = document.querySelector("#c-" + t.class + " .grid"); if (!grid) return;
       var cmds = h("div", { "class": "cmds" }); (t.commands || []).forEach(function (c) { cmds.appendChild(h("code", { text: c })); });
       var p = h("p", { text: t.description_en }); if (t.description_ar) { p.setAttribute("data-en", t.description_en); p.setAttribute("data-ar", t.description_ar); }
       var tagc = t.visibility === "private" ? h("span", { "class": "tag", text: "PRO" }) : h("span", { "class": "tag new", text: "NEW" });
+      var priceEl = null;
+      if (t.price_minor != null) { var on = t.discount_percent > 0 && (!t.discount_until || new Date(t.discount_until) > new Date()), eff = on ? Math.floor(t.price_minor * (100 - t.discount_percent) / 100) : t.price_minor;
+        priceEl = h("span", { "class": "priv" }, on ? h("s", { text: (t.price_minor / 100).toFixed(2) }) : null, on ? " " : null, (eff / 100).toFixed(2) + " " + t.currency + (on ? " (-" + t.discount_percent + "%)" : "")); }
       grid.appendChild(h("article", { "class": "card", "data-name": t.slug + " " + t.class, "data-c": t.class }, h("div", { "class": "top" }, h("h3", { text: t.name }), h("span", null, tagc)), p, cmds,
-        h("div", { "class": "foot" }, h("span", { "class": "priv", text: t.visibility === "private" ? "Subscribers only" : "Public" }), h("a", { "class": "more", href: "tool.html?t=" + encodeURIComponent(t.slug), text: "Details" }))));
+        h("div", { "class": "foot" }, h("span", { "class": "priv", text: t.visibility === "private" ? "Subscribers only" : "Public" }), priceEl, h("a", { "class": "more", href: "tool.html?t=" + encodeURIComponent(t.slug), text: "Details" }), (me && (me.role === "owner" || (me.role === "admin" && t.created_by === me.id))) ? h("a", { "class": "more", href: "admin.html#edit-" + encodeURIComponent(t.slug), text: tr("Edit", "تعديل") }) : null)));
     });
   }
 
   async function toolPage() {
     var app = $("app"), slug = new URLSearchParams(location.search).get("t") || ""; clear(app);
-    var r = await sb.from("tools").select("id,name,class,description_en,description_ar,commands,visibility").eq("slug", slug).eq("status", "published").maybeSingle();
+    var r = await sb.from("tools").select("id,name,class,description_en,description_ar,commands,visibility,created_by").eq("slug", slug).eq("status", "published").maybeSingle();
     var box = h("div", { "class": "wide" }); app.appendChild(box);
     if (!r.data) return box.appendChild(h("div", { "class": "off", text: "404" }));
     var t = r.data, a = (await sb.from("tool_assets").select("video_url,repo_url,file_path").eq("tool_id", t.id).maybeSingle()).data;
@@ -418,6 +571,7 @@
       if (a.repo_url) pn.appendChild(h("p", null, h("a", { "class": "btn", href: a.repo_url, target: "_blank", rel: "noopener noreferrer", text: "GitHub" })));
       if (a.file_path) pn.appendChild(h("button", { "class": "btn f", type: "button", text: tr("Download", "تحميل"), on: { click: async function () { var u = await sb.storage.from("tool-files").createSignedUrl(a.file_path, 60); if (u.data) location.href = u.data.signedUrl; } } }));
     }
+    if (me && (me.role === "owner" || (me.role === "admin" && t.created_by === me.id))) pn.appendChild(h("p", null, h("a", { "class": "btn", href: "admin.html#edit-" + encodeURIComponent(slug), text: tr("Edit this tool", "عدّل الأداة دي") })));
     box.appendChild(pn);
   }
   (async function () {
