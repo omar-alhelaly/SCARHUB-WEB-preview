@@ -670,6 +670,13 @@
       grid.appendChild(h("article", { "class": t.third_party ? "card third" : "card", "data-o": t.third_party ? "third" : null, "data-name": t.slug + " " + t.class, "data-c": t.class }, h("div", { "class": "top" }, h("h3", { text: t.name }), h("span", null, tagc)), p, cmds, t.third_party ? creditEl(t) : null,
         h("div", { "class": "foot" }, h("span", { "class": "priv", text: t.visibility === "private" ? "Subscribers only" : "Public" }), priceEl, h("a", { "class": "more", href: "tool.html?t=" + encodeURIComponent(t.slug), text: "Details" }), (me && (me.role === "owner" || (me.role === "admin" && t.created_by === me.id))) ? h("a", { "class": "more", href: "admin.html#edit-" + encodeURIComponent(t.slug), text: tr("Edit", "تعديل") }) : null)));
     });
+    var tc = document.getElementById("tcount");
+    if (tc) {
+      var nz = document.querySelectorAll("article.card:not(.third)").length, n3 = document.querySelectorAll("article.card.third").length;
+      var en = nz + " tools by Zenoth plus " + n3 + " credited third-party tools, in 7 classes. Pick a class, search by name, or hover a card for a demo.";
+      var ar = nz + " \u0623\u062f\u0627\u0629 \u0645\u0646 Zenoth \u0648" + n3 + " \u0623\u062f\u0627\u0629 \u0645\u0646 \u0645\u0637\u0648\u0651\u0631\u064a\u0646 \u062a\u0627\u0646\u064a\u0646 \u0645\u0639 \u0646\u0633\u0628\u0647\u0627 \u0644\u064a\u0647\u0645\u060c \u0641\u064a 7 \u0641\u0626\u0627\u062a. \u0627\u062e\u062a\u0627\u0631 \u0641\u0626\u0629 \u0623\u0648 \u062f\u0648\u0651\u0631 \u0628\u0627\u0644\u0627\u0633\u0645 \u0623\u0648 \u0642\u0641 \u0628\u0627\u0644\u0645\u0627\u0648\u0633 \u0639\u0644\u0649 \u0643\u0627\u0631\u062a \u0644\u062a\u0634\u0648\u0641 \u062f\u064a\u0645\u0648.";
+      tc.setAttribute("data-en", en); tc.setAttribute("data-ar", ar); tc.textContent = EN() ? en : ar;
+    }
   }
 
   async function toolPage() {
