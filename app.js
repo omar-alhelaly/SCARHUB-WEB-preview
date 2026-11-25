@@ -462,7 +462,7 @@
       row.appendChild(msgG); refresh(); return row;
     }
     var manageTools = async function () {
-      var rt = await sb.from("tools").select("id,slug,name,class,description_en,description_ar,commands,visibility,status,created_by,price_minor,currency,discount_percent,discount_until").order("name"); clear(mpl); if (rt.error) return say(mmsg, rt.error.message, "err");
+      var rt = await TSQ("id,slug,name,class,description_en,description_ar,commands,visibility,status,created_by,price_minor,currency,discount_percent,discount_until", function (q) { return q.order("name"); }); clear(mpl); if (rt.error) return say(mmsg, rt.error.message, "err");
       var ids = rt.data.map(function (t) { return t.id; }), amap = {};
       if (ids.length) ((await sb.from("tool_assets").select("tool_id,video_url,repo_url,file_path").in("tool_id", ids)).data || []).forEach(function (a) { amap[a.tool_id] = a; });
       if (!rt.data.length) mpl.appendChild(h("p", { "class": "hint", text: tr("No tools yet. Add one above.", "مفيش أدوات لسه. ضيف واحدة فوق.") }));
@@ -520,7 +520,7 @@
     /* tool prices: owner edits all tools and sets discounts; other admins edit only the price of tools they created */
     var tp = h("div", { "class": "panel" }, h("h2", { text: tr("Tool prices", "أسعار الأدوات") })), tpmsg = h("div", { "class": "msg" }); box.appendChild(tp);
     tp.appendChild(h("p", { "class": "hint", text: owner ? tr("You can edit the price and discount of every tool.", "تقدر تعدل السعر والخصم لأي أداة.") : tr("You can edit the price of tools you created. Discounts are set by the owner.", "تقدر تعدل سعر الأدوات اللي إنت عملتها. الخصومات من المالك بس.") }));
-    var tl = await sb.from("tools").select("id,name,created_by,price_minor,currency,discount_percent,discount_until").order("name");
+    var tl = await TSQ("id,name,created_by,price_minor,currency,discount_percent,discount_until", function (q) { return q.order("name"); });
     if (tl.error) tp.style.display = "none";
     (tl.data || []).forEach(function (t) {
       var mine = t.created_by === me.id, canPrice = owner || mine;
@@ -646,6 +646,9 @@
 
   /* ---------- published tools on tools.html ---------- */
   function creditEl(t) { return h("div", { "class": "credit" }, h("b", { text: tr("Not created by Zenoth.", "مش من عمل Zenoth.") }), " " + tr("Created by ", "المطوّر الأصلي: ") + t.orig_creator + ". " + tr("License: ", "الرخصة: ") + t.orig_license + ". ", h("a", { href: t.orig_repo, target: "_blank", rel: "noopener noreferrer", text: tr("Original repository", "الريبو الأصلي") + " \u2197" })); }
+  async function TSQ(cols, f) {
+    var r = await f(sb.from("tools_view").select(cols)); if (r.error) r = await f(sb.from("tools").select(cols)); return r;
+  }
   async function canOpen(t) {
     if (t.visibility !== "private") return true; if (!me) return false; if (me.role === "owner" || me.role === "admin") return true;
     var x = await sb.rpc("has_tool_access", { uid: me.id, tid: t.id }); return x.data === true;
@@ -654,7 +657,7 @@
 
   async function dynTools() {
     var SELT = "id,slug,name,class,description_en,description_ar,commands,visibility,created_by,third_party,orig_creator,orig_license,orig_repo", PRC = ",price_minor,currency,discount_percent,discount_until";
-    var r = await sb.from("tools").select(SELT + PRC).eq("status", "published"); if (r.error) r = await sb.from("tools").select(SELT).eq("status", "published"); if (r.error || !r.data) return;
+    var pubF = function (q) { return q.eq("status", "published"); }, r = await TSQ(SELT + PRC, pubF); if (r.error) r = await TSQ(SELT, pubF); if (r.error || !r.data) return;
     var LK = {}, st = document.createElement("style"); st.textContent = ".card.locked{opacity:.85;border-style:dashed}.card.locked .lockmsg{margin:8px 0;padding:8px 10px;border:1px dashed currentColor;border-radius:8px;font-size:13px;opacity:.8}"; document.head.appendChild(st);
     await Promise.all(r.data.filter(function (t) { return t.visibility === "private"; }).map(async function (t) { LK[t.id] = !(await canOpen(t)); }));
     r.data.forEach(function (t) {
@@ -675,7 +678,7 @@
       var priceEl = null;
       if (t.price_minor != null) { var on = t.discount_percent > 0 && (!t.discount_until || new Date(t.discount_until) > new Date()), eff = on ? Math.floor(t.price_minor * (100 - t.discount_percent) / 100) : t.price_minor;
         priceEl = h("span", { "class": "priv" }, on ? h("s", { text: (t.price_minor / 100).toFixed(2) }) : null, on ? " " : null, (eff / 100).toFixed(2) + " " + t.currency + (on ? " (-" + t.discount_percent + "%)" : "")); }
-      grid.appendChild(h("article", { "class": (t.third_party ? "card third" : "card") + (locked ? " locked" : ""), "data-o": t.third_party ? "third" : null, "data-name": t.slug + " " + t.class, "data-c": t.class }, h("div", { "class": "top" }, h("h3", { text: t.name }), h("span", null, tagc)), p, cmds, t.third_party ? creditEl(t) : null,
+      grid.appendChild(h("article", { "class": (t.third_party ? "card third" : "card") + (locked ? " locked" : ""), "data-o": t.third_party ? "third" : null, "data-name": t.slug + " " + t.class, "data-c": t.class }, h("div", { "class": "top" }, h("h3", { text: t.name }), h("span", null, tagc)), p, cmds, t.third_party && !locked ? creditEl(t) : null,
         h("div", { "class": "foot" }, h("span", { "class": "priv", text: t.visibility === "private" ? "Subscribers only" : "Public" }), priceEl, locked ? h("a", { "class": "more", href: me ? "account.html" : "login.html", text: tr("Unlock", "افتح") }) : null, h("a", { "class": "more", href: "tool.html?t=" + encodeURIComponent(t.slug), text: "Details" }), (me && (me.role === "owner" || (me.role === "admin" && t.created_by === me.id))) ? h("a", { "class": "more", href: "admin.html#edit-" + encodeURIComponent(t.slug), text: tr("Edit", "تعديل") }) : null)));
     });
     var tc = document.getElementById("tcount");
@@ -689,12 +692,12 @@
 
   async function toolPage() {
     var app = $("app"), slug = new URLSearchParams(location.search).get("t") || ""; clear(app);
-    var r = await sb.from("tools").select("id,name,class,description_en,description_ar,commands,visibility,created_by,third_party,orig_creator,orig_license,orig_repo").eq("slug", slug).eq("status", "published").maybeSingle();
+    var r = await TSQ("id,name,class,description_en,description_ar,commands,visibility,created_by,third_party,orig_creator,orig_license,orig_repo", function (q) { return q.eq("slug", slug).eq("status", "published").maybeSingle(); });
     var box = h("div", { "class": "wide" }); app.appendChild(box);
     if (!r.data) return box.appendChild(h("div", { "class": "off", text: "404" }));
     var t = r.data, a = (await sb.from("tool_assets").select("video_url,repo_url,file_path").eq("tool_id", t.id).maybeSingle()).data;
     var pn = h("div", { "class": "panel" }, h("h1", { text: t.name }), h("p", { text: EN() || !t.description_ar ? t.description_en : t.description_ar }));
-    if (t.third_party) pn.appendChild(creditEl(t));
+    if (t.third_party && t.orig_repo) pn.appendChild(creditEl(t));
     var tOpen = await canOpen(t);
     if (!tOpen) pn.appendChild(h("p", { "class": "hint", text: lockText() })); else (t.commands || []).forEach(function (c) { pn.appendChild(h("code", { text: c, style: "display:block;margin:4px 0" })); });
     if (!a) { pn.appendChild(h("p", { "class": "hint", text: tr("Video, repo and files are for subscribers only.", "الفيديو والريبو والملفات للمشتركين بس.") })); pn.appendChild(h("a", { "class": "btn f", href: me ? "account.html" : "login.html", text: tr("Subscribe", "اشترك") })); }
