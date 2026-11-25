@@ -11,6 +11,11 @@ window.addEventListener('DOMContentLoaded',function(){
  $('img[data-k]').forEach(function(i){i.src=(window.SCAR_IMG||{})[i.dataset.k]||''});
  var b=document.getElementById('lang');if(b)b.onclick=function(){setLang(L=='en'?'ar':'en')};
  try{var ll=document.getElementById('loginlink');if(ll){for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(/^sb-.+-auth-token$/.test(k)&&/access_token/.test(localStorage.getItem(k)||'')){ll.href='account.html';ll.dataset.en='Account';ll.dataset.ar='\u062d\u0633\u0627\u0628\u064a';break}}}}catch(e){}
+ try{var pn=location.pathname.split('/').pop()||'index.html',mm=document.getElementById('main');
+  if(mm&&pn!=='index.html'&&!document.getElementById('backbtn')){var bw=document.createElement('div');bw.style.cssText='max-width:1200px;margin:14px auto 0;padding:0 24px';
+   var bb=document.createElement('button');bb.type='button';bb.id='backbtn';bb.className='btn';bb.dataset.en='\u2190 Back';bb.dataset.ar='\u0631\u062c\u0648\u0639 \u2192';bb.textContent=bb.dataset.en;
+   bb.onclick=function(){var same=false;try{same=document.referrer&&new URL(document.referrer).host===location.host}catch(e){}if(same&&history.length>1)history.back();else location.href='index.html'};
+   bw.appendChild(bb);mm.insertBefore(bw,mm.firstChild)}}catch(e){}
  setLang(L);
  var nav=document.querySelector('nav'),bg=document.getElementById('burger');
  if(bg)bg.onclick=function(){nav.classList.toggle('open')};
