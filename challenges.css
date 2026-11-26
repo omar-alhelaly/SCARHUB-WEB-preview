@@ -108,3 +108,4 @@ html[data-theme=light] #ch .legend i.l1{background:#9be9a8}html[data-theme=light
 #ch .mod.theory .mk{border-color:#3b82f6;color:#60a5fa}
 #ch .howto ul{margin:0;padding-inline-start:20px;font-size:14px;line-height:1.7}
 html[data-theme=light] #ch .mod.theory .mk{color:#1d4ed8}
+@media (min-width:981px){#ch .rg{align-items:start}#ch .rg>div:first-child{position:sticky;top:90px;max-height:calc(100vh - 110px);overflow:auto;align-self:start;padding-inline-end:4px}}
