@@ -7,7 +7,10 @@
   var tr = function (en, ar) { return EN() ? en : ar; };
   var sb = null, me = null, recovering = false;
   var EMAIL_RE = /^(?=.{6,254}$)[A-Za-z0-9](?:[A-Za-z0-9._%+-]{0,62}[A-Za-z0-9])?@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,24}$/;
-  var USER_RE = /^[A-Za-z][A-Za-z0-9_]{2,19}$/, ALIAS_RE = /^[A-Za-z][A-Za-z0-9_ ]{2,24}$/;
+  var USER_RE = /^[A-Za-z][A-Za-z0-9_]{2,19}$/, ALIAS_RE = /^[A-Za-z\u0621-\u064A][A-Za-z0-9_\u0621-\u064A ]{2,24}$/, STAFF_USER_RE = /^[A-Za-z\u0621-\u064A][A-Za-z0-9_\u0621-\u064A ]{2,19}$/;
+  /* names nobody may register: anything that reads as "zenoth" (case, leetspeak, separators, repeats, Arabic). Also enforced in the database. */
+  function reservedName(v) { var t = String(v || "").toLowerCase().replace(/[301!|4@5$7]/g, function (c) { return { "3": "e", "0": "o", "1": "i", "!": "i", "|": "i", "4": "a", "@": "a", "5": "s", "$": "s", "7": "t" }[c]; }).replace(/[^a-z\u0621-\u064A]/g, "").replace(/(.)\1+/g, "$1"); return t.indexOf("zenoth") > -1 || t.indexOf("\u0632\u064A\u0646\u0648\u0633") > -1 || t.indexOf("\u0632\u064A\u0646\u0648\u062B") > -1; }
+  function userNameOk(v, staff) { return (staff ? STAFF_USER_RE : USER_RE).test(v) && (staff || !reservedName(v)); }
   function pwProblems(p) {
     var r = [];
     if (p.length < 12 || p.length > 64) r.push(tr("12 to 64 characters", "من 12 لـ 64 حرف"));
@@ -320,7 +323,7 @@
     tabIn.onclick = function () { setMode("in"); }; tabUp.onclick = function () { setMode("up"); };
     email.addEventListener("input", function () { var ok = EMAIL_RE.test(email.value.trim()); emHint.textContent = email.value ? (ok ? "OK" : tr("Not a valid email", "إيميل غير صحيح")) : ""; emHint.className = "hint " + (ok ? "good" : "bad"); });
     pw.addEventListener("input", function () { if (mode !== "up") return; var p = pwProblems(pw.value); pwHint.textContent = p.length ? tr("Needs: ", "ناقص: ") + p.join(", ") : "OK"; pwHint.className = "hint " + (p.length ? "bad" : "good"); });
-    uname.addEventListener("input", function () { var ok = USER_RE.test(uname.value); unHint.textContent = uname.value ? (ok ? "OK" : tr("3-20 chars, start with a letter", "3-20 حرف وتبدأ بحرف")) : ""; unHint.className = "hint " + (ok ? "good" : "bad"); });
+    uname.addEventListener("input", function () { var ok = userNameOk(uname.value, false); unHint.textContent = uname.value ? (ok ? "OK" : (USER_RE.test(uname.value) ? tr("This name is not allowed", "الاسم ده مش مسموح") : tr("3-20 English letters, numbers or _, start with a letter", "3-20 حرف إنجليزي أو رقم أو _ وتبدأ بحرف"))) : ""; unHint.className = "hint " + (ok ? "good" : "bad"); });
     form.addEventListener("submit", async function (e) {
       e.preventDefault(); main.disabled = true; say(msg, "...");
       try {
@@ -333,7 +336,7 @@
         if (!EMAIL_RE.test(em)) return say(msg, tr("Enter a valid email.", "اكتب إيميل صحيح."), "err");
         if (mode === "up") {
           var pr = pwProblems(pw.value); if (pr.length) return say(msg, tr("Password needs: ", "الباسورد ناقص: ") + pr.join(", "), "err");
-          if (!USER_RE.test(uname.value)) return say(msg, tr("Invalid username.", "اسم مستخدم غير صحيح."), "err");
+          if (!userNameOk(uname.value, false)) return say(msg, tr("Invalid or not allowed username (English letters, numbers, _).", "اسم مستخدم غير صحيح أو مش مسموح (حروف إنجليزي وأرقام و _)."), "err");
           var ct = takeCaptcha(); if (!ct) return say(msg, tr("Please complete the check above first.", "كمّل التحقق اللي فوق الأول."), "err");
           var r = await sb.auth.signUp({ email: em, password: pw.value, options: { captchaToken: ct, emailRedirectTo: location.origin + location.pathname.replace(/[^/]*$/, "") + "login.html", data: { username: uname.value, avatar: pick() } } });
           if (r.error) return say(msg, tr("Could not create the account. The email or username may already be used.", "ماقدرناش نعمل الحساب. الإيميل أو الاسم ممكن يكونوا مستخدمين.") + " [" + (r.error.code || r.error.status || "error") + "]", "err");
@@ -433,7 +436,7 @@
     var box = h("div", { "class": "wide" }); app.appendChild(box);
     var inboxBox = h("div"); box.appendChild(inboxBox); inboxPanel(inboxBox);
     if (isStaff()) { var mfaBox = h("div"); box.appendChild(mfaBox); mfaPanel(mfaBox); }
-    var uname = h("input", { type: "text", maxlength: "20", value: me.username }), avBox = h("div", { "class": "avatars" }), msg = h("div", { "class": "msg" });
+    var uname = h("input", { type: "text", maxlength: "20", value: me.username }), alias = h("input", { type: "text", maxlength: "25", value: me.alias || "" }), avBox = h("div", { "class": "avatars" }), msg = h("div", { "class": "msg" });
     var cur = me.avatar; avatarPicker(avBox, cur, function (c) { cur = c; });
     var upFile = h("input", { type: "file", accept: "image/png,image/jpeg,image/webp", style: "max-width:230px" });
     var upBox = h("div", { "class": "row" }, h("span", { "class": "hint", text: tr("Own picture (owner/admin only, PNG/JPG/WebP, max 1 MB):", "صورتك الخاصة (للمالك والأدمن فقط، PNG/JPG/WebP، لحد 1 ميجا):") }), upFile, h("button", { "class": "btn", type: "button", text: tr("Upload picture", "ارفع الصورة"), on: { click: async function () {
@@ -444,12 +447,13 @@
       cur = "custom"; me.avatar = "custom"; say(msg, tr("Picture saved. Refresh to see it everywhere.", "الصورة اتحفظت. اعمل Refresh عشان تظهر في كل حتة."), "ok");
     } } }));
     var save = h("button", { "class": "btn f", type: "button", text: tr("Save", "حفظ"), on: { click: async function () {
-      if (!USER_RE.test(uname.value)) return say(msg, tr("Invalid username.", "اسم مستخدم غير صحيح."), "err");
+      if (!userNameOk(uname.value, isStaff())) return say(msg, isStaff() ? tr("Username: 3-20 letters (Arabic or English), numbers or _.", "اسم المستخدم: 3-20 حرف (عربي أو إنجليزي) أو أرقام أو _.") : tr("Invalid or not allowed username (English letters, numbers, _).", "اسم مستخدم غير صحيح أو مش مسموح (حروف إنجليزي وأرقام و _)."), "err");
+      if (isStaff() && alias.value.trim() !== (me.alias || "")) { if (!ALIAS_RE.test(alias.value.trim())) return say(msg, tr("Display name: 3-25 letters (Arabic or English), numbers, _ or spaces.", "الاسم الظاهر: 3-25 حرف (عربي أو إنجليزي) أو أرقام أو _ أو مسافة."), "err"); var ra = await sb.rpc("update_my_alias", { new_alias: alias.value.trim() }); if (ra.error) return say(msg, tr("Could not save the display name (taken?).", "ماتحفظش الاسم الظاهر (مستخدم؟)."), "err"); me.alias = alias.value.trim(); }
       var r = await sb.rpc("update_my_profile", { new_username: uname.value, new_avatar: cur });
       say(msg, r.error ? tr("Could not save (name taken?).", "ماتحفظش (الاسم مستخدم؟).") : tr("Saved.", "اتحفظ."), r.error ? "err" : "ok");
     } } });
     box.appendChild(h("div", { "class": "panel", id: "edit" }, h("h2", { text: tr("My profile", "بروفايلي") }), h("p", { text: me.email }),
-      h("p", { text: tr("Role: ", "الدور: ") + me.role }), h("label", { text: tr("Username", "اسم المستخدم") }), uname, avBox, isStaff() ? upBox : null, h("div", { "class": "row" }, save), msg));
+      h("p", { text: tr("Role: ", "الدور: ") + me.role }), h("label", { text: tr("Username", "اسم المستخدم") }), uname, isStaff() ? h("label", { text: tr("Display name (shown to others)", "الاسم الظاهر للناس") }) : null, isStaff() ? alias : null, avBox, isStaff() ? upBox : null, h("div", { "class": "row" }, save), msg));
     var plansBox = h("div", { "class": "panel" }, h("h2", { text: tr("Subscription", "الاشتراك") })); box.appendChild(plansBox);
     var subR = await sb.from("subscriptions").select("status,current_period_end").eq("user_id", me.id).maybeSingle();
     var active = subR.data && /^(active|trialing)$/.test(subR.data.status) && new Date(subR.data.current_period_end) > new Date();
