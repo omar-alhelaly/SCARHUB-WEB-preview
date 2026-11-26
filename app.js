@@ -450,8 +450,16 @@
     /* users */
     var ut = h("div", { "class": "panel" }, h("h2", { text: tr("Accounts", "الحسابات") })), tb = h("tbody");
     ut.appendChild(h("table", { "class": "t" }, h("thead", null, h("tr", null, h("th", { text: tr("Name", "الاسم") }), h("th", { text: owner ? "Email" : "" }), h("th", { text: tr("Role", "الدور") }), h("th", { text: tr("Status", "الحالة") }), h("th", { text: tr("Sub", "اشتراك") }), h("th", { text: "" }))), tb));
+    var view = "active", tabA = h("button", { type: "button", "class": "btn", text: "" }), tabD = h("button", { type: "button", "class": "btn", text: "" });
+    tabA.addEventListener("click", function () { view = "active"; users(); }); tabD.addEventListener("click", function () { view = "deleted"; users(); });
+    ut.insertBefore(h("div", { "class": "row" }, tabA, tabD), ut.children[1]);
     async function users() {
       var r = await sb.rpc("admin_list_users"); clear(tb); if (r.error) return;
+      var nDel = r.data.filter(function (u) { return u.status === "deleted"; }).length;
+      tabA.textContent = tr("Accounts", "الحسابات") + " (" + (r.data.length - nDel) + ")"; tabD.textContent = tr("Deleted", "المحذوفين") + " (" + nDel + ")";
+      tabA.setAttribute("aria-pressed", view === "active" ? "true" : "false"); tabD.setAttribute("aria-pressed", view === "deleted" ? "true" : "false");
+      tabA.style.opacity = view === "active" ? "1" : ".6"; tabD.style.opacity = view === "deleted" ? "1" : ".6";
+      r.data = r.data.filter(function (u) { return view === "deleted" ? u.status === "deleted" : u.status !== "deleted"; });
       var gm = {}, plansL = [];
       if (owner) {
         var gr = await sb.rpc("admin_list_grants"); (gr.data || []).forEach(function (g) { (gm[g.user_id] = gm[g.user_id] || []).push(g); });
