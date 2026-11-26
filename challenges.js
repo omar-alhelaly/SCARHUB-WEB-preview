@@ -221,7 +221,159 @@
     return h("div", { "class": "art" }, box);
   }
 
-  var VIEWERS = { log: viewLog, hex: viewHex, text: viewText, web: viewWeb, term: viewTerm };
+  /* ---------- original network simulator: PCs, switches, routers, cables, IPs, ping (all in the page, nothing real) ---------- */
+  function viewNet(a) {
+    var devs = [], links = [], sel = null, tool = "move", pend = null, seq = { pc: 0, sw: 0, rt: 0 };
+    var PORTS = { pc: 1, sw: 8, rt: 2 }, LBL = { pc: "PC", sw: "SW", rt: "RT" };
+    var wrap = h("div", { "class": "netlab" }), cv = h("div", { "class": "ncv" }), svg = document.createElementNS("http://www.w3.org/2000/svg", "svg"); svg.setAttribute("class", "nsvg");
+    cv.appendChild(svg);
+    var bar = h("div", { "class": "nbar" }), panel = h("div", { "class": "npanel" });
+    function ip2n(s) { var m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(String(s || "").trim()); if (!m) return null; var n = 0; for (var i = 1; i <= 4; i++) { if (+m[i] > 255) return null; n = n * 256 + +m[i]; } return n; }
+    function maskOk(s) { var n = ip2n(s); if (n == null) return false; var b = n.toString(2); return /^1*0*$/.test(("00000000000000000000000000000000" + b).slice(-32)) && n > 0; }
+    function same(ip1, m1, ip2) { var x = ip2n(ip1), y = ip2n(ip2), m = ip2n(m1); return x != null && y != null && m != null && ((x & m) >>> 0) === ((y & m) >>> 0); }
+    function add(type, x, y) { var d = { id: devs.length ? devs[devs.length - 1].id + 1 : 1, type: type, name: (type === "pc" ? "PC" : type === "sw" ? "Switch" : "Router") + (++seq[type]), x: x, y: y, ip: "", mask: "", gw: "", ifs: [{ n: "g0/0", ip: "", mask: "", up: false }, { n: "g0/1", ip: "", mask: "", up: false }], mode: "user", cur: null, hist: [] }; devs.push(d); sel = d.id; draw(); return d; }
+    function dev(id) { return devs.filter(function (d) { return d.id === id; })[0]; }
+    function degree(id) { return links.filter(function (l) { return l.a === id || l.b === id; }).length; }
+    function connect(x, y) {
+      if (x === y) return tr("Pick two different devices.", "اختار جهازين مختلفين.");
+      if (links.some(function (l) { return (l.a === x && l.b === y) || (l.a === y && l.b === x); })) return tr("These two are already connected.", "الجهازين دول متوصلين بالفعل.");
+      var A = dev(x), B = dev(y);
+      if (degree(x) >= PORTS[A.type] || degree(y) >= PORTS[B.type]) return tr("No free port on one of them.", "مفيش بورت فاضي على واحد منهم.");
+      links.push({ a: x, b: y }); return "";
+    }
+    /* layer 2: endpoints reachable from device d through switches only */
+    function domain(startId, viaId) {
+      var seen = {}, out = [], q = [viaId]; seen[startId] = 1; seen[viaId] = 1;
+      while (q.length) { var id = q.shift(), d = dev(id);
+        if (d.type !== "sw") { out.push(d); continue; }
+        links.forEach(function (l) { var o = l.a === id ? l.b : l.b === id ? l.a : null; if (o != null && !seen[o]) { seen[o] = 1; q.push(o); } }); }
+      return out;
+    }
+    function neighbors(d) { var r = []; links.forEach(function (l) { var o = l.a === d.id ? l.b : l.b === d.id ? l.a : null; if (o != null) r.push(o); }); return r; }
+    function endpointsFrom(d) { var out = []; neighbors(d).forEach(function (n) { var nd = dev(n); if (nd.type === "sw") { domain(d.id, n).forEach(function (e) { if (e !== d && out.indexOf(e) < 0) out.push(e); }); } else if (out.indexOf(nd) < 0) out.push(nd); }); return out; }
+    function holders(set, ip) { var n = ip2n(ip); return set.filter(function (e) { return e.type === "pc" ? ip2n(e.ip) === n : e.type === "rt" ? e.ifs.some(function (f) { return f.up && ip2n(f.ip) === n; }) : false; })[0] || null; }
+    function ifaceFor(rt, ip) { return rt.ifs.filter(function (f) { return f.up && f.ip && f.mask && same(f.ip, f.mask, ip); })[0] || null; }
+    function pingSim(src, target, srcIp, srcMask, gw) {
+      var out = [], tn = ip2n(target);
+      if (tn == null) return ["Ping request could not find host " + target + ". Please check the name and try again."];
+      out.push("Pinging " + target + " with 32 bytes of data:", "");
+      var res = "to", ttl = 0, from = target;
+      if (!srcIp) res = "gen";
+      else if (target === srcIp) { res = "ok"; ttl = 128; }
+      else if (same(srcIp, srcMask, target)) {
+        var set = endpointsFrom(src), hd = holders(set, target);
+        if (hd) { res = "ok"; ttl = hd.type === "pc" ? 128 : 255; if (hd.type === "pc" && same(hd.ip, hd.mask, srcIp) === false) res = "to"; } else res = "to";
+      } else {
+        if (!gw || !same(srcIp, srcMask, gw)) res = "unr";
+        else {
+          var set2 = endpointsFrom(src), g = holders(set2, gw);
+          if (!g || g.type !== "rt") res = "to";
+          else {
+            var inF = g.ifs.filter(function (f) { return f.up && ip2n(f.ip) === ip2n(gw); })[0], outF = ifaceFor(g, target);
+            if (!outF || outF === inF) { res = "unr"; from = gw; }
+            else {
+              var set3 = endpointsFrom2(g, outF), hd2 = holders(set3, target);
+              if (hd2 && hd2.type === "pc" && hd2.gw && same(hd2.ip, hd2.mask, hd2.gw) && ifaceHas(g, outF, hd2.gw)) { res = "ok"; ttl = 127; } else res = hd2 ? "to" : "unr2";
+              if (res === "unr2") { res = "unr"; from = gw; }
+            }
+          }
+        }
+      }
+      var okc = 0;
+      for (var i = 0; i < 4; i++) {
+        if (res === "ok") { out.push("Reply from " + target + ": bytes=32 time<1ms TTL=" + ttl); okc++; }
+        else if (res === "to") out.push("Request timed out.");
+        else if (res === "unr") out.push("Reply from " + (from === target ? srcIp : from) + ": Destination host unreachable.");
+        else out.push("PING: transmit failed. General failure.");
+      }
+      out.push("", "Ping statistics for " + target + ":", "    Packets: Sent = 4, Received = " + okc + ", Lost = " + (4 - okc) + " (" + (100 - okc * 25) + "% loss)");
+      return out;
+    }
+    function endpointsFrom2(rt, f) { /* endpoints reachable out of one router interface (links are assigned to interfaces in order) */
+      var idx = rt.ifs.indexOf(f), ns = neighbors(rt), n = ns[idx]; if (n == null) return []; var nd = dev(n); if (nd.type === "sw") return domain(rt.id, n); return [nd]; }
+    function ifaceHas(rt, f, gw) { return ip2n(f.ip) === ip2n(gw); }
+    function inIfFor(rt, ns) { return null; }
+    /* terminals */
+    function termFor(d) {
+      var out = h("div", { "class": "ntout" }), inp = h("input", { type: "text", "class": "ntin", autocomplete: "off", spellcheck: "false", placeholder: tr("type a command, e.g. help", "اكتب أمر، مثلاً help") }); ltr(inp);
+      function say(t) { out.appendChild(h("pre", { text: t })); out.scrollTop = out.scrollHeight; }
+      function pr() { if (d.type === "pc") return "C:\\>"; return d.mode === "user" ? d.name + ">" : d.mode === "priv" ? d.name + "#" : d.mode === "conf" ? d.name + "(config)#" : d.name + "(config-if)#"; }
+      var box = h("div", { "class": "nterm", onclick: function () { inp.focus(); } }, out, h("div", { "class": "ntl" }, h("span", { "class": "ntp", text: pr() }), inp));
+      var ps = box.querySelector(".ntp");
+      function run(line) {
+        var raw = line.trim(); say(pr() + " " + line); if (!raw) return; var t = raw.split(/\s+/), c = t[0].toLowerCase();
+        if (d.type === "pc") {
+          if (c === "help") say("ipconfig            show this PC's address, mask and gateway\nping <address>      send 4 test packets\nclear               clear the screen"); 
+          else if (c === "clear" || c === "cls") clear(out);
+          else if (c === "ipconfig") say("Ethernet adapter:\n   IPv4 Address. . . . . : " + (d.ip || "not set") + "\n   Subnet Mask . . . . . : " + (d.mask || "not set") + "\n   Default Gateway . . . : " + (d.gw || "not set"));
+          else if (c === "ping") { if (!t[1]) say("usage: ping <address>"); else say(pingSim(d, t[1], d.ip, d.mask, d.gw).join("\n")); }
+          else say("'" + t[0] + "' is not recognized here. Type help.");
+        } else {
+          var m = d.mode, lc = raw.toLowerCase();
+          if (c === "help" || c === "?") say("enable | configure terminal | interface g0/0 | ip address <ip> <mask> | no shutdown | shutdown | exit | end | show ip interface brief | ping <address>");
+          else if (c === "enable") { d.mode = "priv"; }
+          else if ((c === "configure" || c === "conf") && /^(conf|configure)\s+t/.test(lc)) { if (m === "user") say("% Type enable first."); else d.mode = "conf"; }
+          else if (c === "interface" || c === "int") { if (m !== "conf" && m !== "if") say("% Use configure terminal first."); else { var f = d.ifs.filter(function (x) { return x.n === (t[1] || "").toLowerCase().replace(/^gigabitethernet/, "g").replace(/^gi/, "g"); })[0]; if (f) { d.cur = f; d.mode = "if"; } else say("% Unknown interface. Use g0/0 or g0/1."); } }
+          else if (c === "ip" && t[1] === "address") { if (m !== "if") say("% Select an interface first."); else if (ip2n(t[2]) == null || !maskOk(t[3])) say("% Invalid address or mask."); else { d.cur.ip = t[2]; d.cur.mask = t[3]; } }
+          else if (lc === "no shutdown" || lc === "no shut") { if (m !== "if") say("% Select an interface first."); else { d.cur.up = true; say("%LINK-5-CHANGED: Interface " + d.cur.n + ", changed state to up"); } }
+          else if (c === "shutdown" || c === "shut") { if (m === "if") d.cur.up = false; else say("% Select an interface first."); }
+          else if (c === "exit") { d.mode = m === "if" ? "conf" : m === "conf" ? "priv" : "user"; }
+          else if (c === "end") { d.mode = "priv"; }
+          else if (lc === "show ip interface brief") { if (m === "user") say("% Type enable first."); else say("Interface   IP-Address      Status\n" + d.ifs.map(function (x) { return (x.n + "          ").slice(0, 12) + ((x.ip || "unassigned") + "               ").slice(0, 16) + (x.up ? "up" : "administratively down"); }).join("\n")); }
+          else if (c === "ping") { if (m === "user") say("% Type enable first."); else if (!t[1]) say("usage: ping <address>"); else { var f2 = ifaceFor(d, t[1]); var lines = ["Pinging " + t[1] + " with 32 bytes of data:", ""], okc = 0; var hd = f2 && holders(endpointsFrom2(d, f2), t[1]); for (var i = 0; i < 4; i++) { if (hd) { lines.push("Reply from " + t[1] + ": bytes=32 time<1ms TTL=128"); okc++; } else lines.push("Request timed out."); } lines.push("", "Packets: Sent = 4, Received = " + okc + ", Lost = " + (4 - okc)); say(lines.join("\n")); } }
+          else say("% Unknown command. Type help.");
+        }
+        ps.textContent = pr();
+      }
+      inp.addEventListener("keydown", function (e) { if (e.key === "Enter") { var v = inp.value; inp.value = ""; run(v); } });
+      say(d.type === "pc" ? "Simulated PC. Type help." : "Simulated router. Type help.");
+      return box;
+    }
+    function panelDraw() {
+      clear(panel); var d = sel != null ? dev(sel) : null;
+      if (!d) { panel.appendChild(h("p", { "class": "note", text: tr("Click a device to configure it.", "اضغط على جهاز عشان تظبطه.") })); return; }
+      panel.appendChild(h("h4", { text: d.name + " (" + (d.type === "pc" ? tr("computer", "كمبيوتر") : d.type === "sw" ? tr("switch", "سويتش") : tr("router", "راوتر")) + ")" }));
+      if (d.type === "sw") { panel.appendChild(h("p", { "class": "note", text: tr("A switch connects devices in the same network. It needs no setup here. Ports used: ", "السويتش بيوصّل الأجهزة في نفس الشبكة. مش محتاج إعداد هنا. البورتات المستخدمة: ") + degree(d.id) + " / 8" })); return; }
+      if (d.type === "pc") {
+        var fi = ltr(h("input", { type: "text", value: d.ip, placeholder: "192.168.1.10" })), fm = ltr(h("input", { type: "text", value: d.mask, placeholder: "255.255.255.0" })), fg = ltr(h("input", { type: "text", value: d.gw, placeholder: tr("optional", "اختياري") })), st = h("div", { "class": "note" });
+        panel.appendChild(h("div", { "class": "nform" }, h("label", { text: "IP" }), fi, h("label", { text: tr("Subnet mask", "الماسك") }), fm, h("label", { text: tr("Gateway", "الجيتواي") }), fg,
+          h("button", { "class": "btn2 f", type: "button", text: tr("Apply", "تطبيق"), onclick: function () { if ((fi.value && ip2n(fi.value) == null) || (fm.value && !maskOk(fm.value)) || (fg.value && ip2n(fg.value) == null)) { st.textContent = tr("Check the values: four numbers 0-255, and a valid mask like 255.255.255.0.", "راجع القيم: أربع أرقام من 0 لـ 255، وماسك صحيح زي 255.255.255.0."); return; } d.ip = fi.value.trim(); d.mask = fm.value.trim(); d.gw = fg.value.trim(); st.textContent = tr("Saved.", "اتحفظ."); } }), st));
+      }
+      if (d.type === "rt") panel.appendChild(h("p", { "class": "note", text: tr("Interfaces follow cable order: the first cable on this router is g0/0, the second is g0/1.", "الإنترفيسات بترتيب الكابلات: أول كابل على الراوتر هو g0/0 والتاني g0/1.") }));
+      panel.appendChild(termFor(d));
+    }
+    function draw() {
+      clear(cv); while (svg.firstChild) svg.removeChild(svg.firstChild); cv.appendChild(svg);
+      links.forEach(function (l, i) { var A = dev(l.a), B = dev(l.b), ln = document.createElementNS("http://www.w3.org/2000/svg", "line"); ln.setAttribute("x1", A.x + 30); ln.setAttribute("y1", A.y + 24); ln.setAttribute("x2", B.x + 30); ln.setAttribute("y2", B.y + 24); ln.setAttribute("class", "nln" + (tool === "del" ? " del" : "")); ln.addEventListener("click", function () { if (tool === "del") { links.splice(i, 1); draw(); } }); svg.appendChild(ln); });
+      devs.forEach(function (d) {
+        var el = h("div", { "class": "ndev " + d.type + (sel === d.id ? " sel" : "") + (pend === d.id ? " pend" : ""), style: "left:" + d.x + "px;top:" + d.y + "px", role: "button", tabindex: "0" }, h("b", { text: LBL[d.type] }), h("span", { text: d.name }));
+        var drag = null, moved = false;
+        el.addEventListener("pointerdown", function (e) { drag = { sx: e.clientX, sy: e.clientY, ox: d.x, oy: d.y }; moved = false; try { el.setPointerCapture(e.pointerId); } catch (x) {} });
+        el.addEventListener("pointermove", function (e) { if (!drag || tool !== "move") return; var dx = e.clientX - drag.sx, dy = e.clientY - drag.sy; if (Math.abs(dx) + Math.abs(dy) > 3) moved = true; d.x = Math.max(0, Math.min(cv.clientWidth - 62, drag.ox + dx)); d.y = Math.max(0, Math.min(cv.clientHeight - 50, drag.oy + dy)); el.style.left = d.x + "px"; el.style.top = d.y + "px"; var ls = svg.querySelectorAll("line"); links.forEach(function (l, i) { if (l.a === d.id || l.b === d.id) { var A = dev(l.a), B = dev(l.b); ls[i].setAttribute("x1", A.x + 30); ls[i].setAttribute("y1", A.y + 24); ls[i].setAttribute("x2", B.x + 30); ls[i].setAttribute("y2", B.y + 24); } }); });
+        el.addEventListener("pointerup", function () { drag = null; if (moved) return;
+          if (tool === "cable") { if (pend == null) { pend = d.id; msg.textContent = tr("Now click the second device.", "دوس على الجهاز التاني."); draw(); } else { var r = connect(pend, d.id); pend = null; msg.textContent = r; draw(); panelDraw(); } }
+          else if (tool === "del") { links = links.filter(function (l) { return l.a !== d.id && l.b !== d.id; }); devs = devs.filter(function (x) { return x.id !== d.id; }); if (sel === d.id) sel = null; draw(); panelDraw(); }
+          else { sel = d.id; draw(); panelDraw(); } });
+        cv.appendChild(el);
+      });
+    }
+    var msg = h("div", { "class": "note nmsg" });
+    function tb(label, fn, k) { var b = h("button", { type: "button", "class": "tab" + (k && tool === k ? " on" : ""), text: label, onclick: function () { fn(); [].forEach.call(bar.querySelectorAll("button[data-k]"), function (x) { x.classList.toggle("on", x.getAttribute("data-k") === tool); }); } }); if (k) b.setAttribute("data-k", k); return b; }
+    function put(t) { return function () { add(t, 20 + (devs.length % 5) * 90, 20 + Math.floor(devs.length / 5) * 80 + (devs.length % 2) * 30); panelDraw(); }; }
+    bar.appendChild(h("span", { "class": "note", text: tr("Add:", "ضيف:") }));
+    bar.appendChild(tb("+ PC", put("pc"))); bar.appendChild(tb("+ Switch", put("sw")));
+    if (!a.noRouter) bar.appendChild(tb("+ Router", put("rt")));
+    bar.appendChild(tb(tr("Move / select", "تحريك / اختيار"), function () { tool = "move"; pend = null; msg.textContent = ""; draw(); }, "move"));
+    bar.appendChild(tb(tr("Cable", "كابل"), function () { tool = "cable"; pend = null; msg.textContent = tr("Click the first device, then the second.", "دوس على أول جهاز وبعدين التاني."); draw(); }, "cable"));
+    bar.appendChild(tb(tr("Delete", "مسح"), function () { tool = "del"; pend = null; msg.textContent = tr("Click a device or a cable to remove it.", "دوس على جهاز أو كابل عشان تمسحه."); draw(); }, "del"));
+    bar.appendChild(tb(tr("Reset", "إعادة"), function () { devs = []; links = []; sel = null; pend = null; seq = { pc: 0, sw: 0, rt: 0 }; draw(); panelDraw(); }));
+    bar.querySelector('button[data-k="move"]').classList.add("on");
+    wrap.appendChild(bar); wrap.appendChild(msg); wrap.appendChild(cv); wrap.appendChild(panel);
+    if (a.note) wrap.appendChild(h("p", { "class": "note", text: pick(a, "note") }));
+    draw(); panelDraw();
+    return wrap;
+  }
+  var VIEWERS = { log: viewLog, hex: viewHex, text: viewText, web: viewWeb, term: viewTerm, net: viewNet };
 
   /* ---------- pages ---------- */
   var root, state = { stats: null };
