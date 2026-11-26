@@ -290,6 +290,7 @@
     function setCnt() { cnt.textContent = tr("Tasks", "المهام") + " · " + solved + " / " + r.tasks.length + " · " + got + " / " + total + " " + tr("pts", "نقطة"); }
     setCnt(); tb.appendChild(cnt);
     if (!me) tb.appendChild(h("div", { "class": "tipb" }, tr("Sign in to submit answers. ", "سجّل دخول عشان تبعت إجابات. "), h("a", { href: "login.html", text: tr("Sign in", "تسجيل الدخول") })));
+    var cards = [];
     r.tasks.forEach(function (t, i) {
       var st = h("div", { "class": "st" }), inp = h("input", { type: "text", placeholder: tr("Your answer", "إجابتك"), maxlength: "200", autocomplete: "off", spellcheck: "false", "aria-label": tr("answer", "إجابة") });
       var btn = h("button", { "class": "btn2 f", type: "button", text: tr("Check", "تحقق") });
@@ -310,7 +311,7 @@
         if (!t.solved) btn.disabled = false;
       }
       btn.addEventListener("click", check); inp.addEventListener("keydown", function (e) { if (e.key === "Enter") check(); });
-      var gd = (body.guides || [])[i];
+      var gd = body.modules ? null : (body.guides || [])[i];
       if (gd) {
         if (gd.learn && gd.learn.length) { var lb = h("div", { "class": "learn" }, h("h4", { text: tr("Learn", "اتعلّم") })); gd.learn.forEach(function (b) { if (b.t === "p") lb.appendChild(h("p", { text: EN() ? b.en : (b.ar || b.en) })); else if (b.t === "tip") lb.appendChild(h("div", { "class": "tipb", text: EN() ? b.en : (b.ar || b.en) })); else if (b.t === "code") lb.appendChild(h("pre", { "class": "cb", text: b.text })); }); card.appendChild(lb); }
         if (gd.how && gd.how.length) { var hl = h("ol"); gd.how.forEach(function (x) { hl.appendChild(h("li", { text: EN() ? x.en : (x.ar || x.en) })); }); card.appendChild(h("div", { "class": "howto" }, h("h4", { text: tr("How to do it in this lab", "إزاي تعملها في المعمل") }), hl)); }
@@ -319,8 +320,17 @@
       card.appendChild(h("div", { "class": "row" }, inp, btn)); card.appendChild(st);
       var hint = pick(t, "hint");
       if (hint) { var hb = h("div"); hb.style.display = "none"; hb.textContent = hint; card.appendChild(h("button", { "class": "hint", type: "button", text: tr("Show hint", "اظهر تلميح"), onclick: function (e) { hb.style.display = hb.style.display === "none" ? "block" : "none"; } })); card.appendChild(hb); }
-      tb.appendChild(card); if (t.solved) lockSolved();
+      cards[i] = card; if (t.solved) lockSolved();
     });
+    var mods = body.modules || [], used = {};
+    mods.forEach(function (m, mi) {
+      var mb = h("div", { "class": "mod " + (m.kind || "") }, h("h3", { "class": "mh" }, h("span", { "class": "mk", text: (m.kind === "practical" ? tr("Practical", "عملي") : tr("Theory", "نظري")) }), " " + tr("Task ", "المهمة ") + (mi + 1) + ": " + pick(m, "title")));
+      if (m.learn && m.learn.length) { var lb = h("div", { "class": "learn" }); m.learn.forEach(function (b) { if (b.t === "p") lb.appendChild(h("p", { text: EN() ? b.en : (b.ar || b.en) })); else if (b.t === "tip") lb.appendChild(h("div", { "class": "tipb", text: EN() ? b.en : (b.ar || b.en) })); else if (b.t === "code") lb.appendChild(h("pre", { "class": "cb", text: b.text })); }); mb.appendChild(lb); }
+      if (m.how && m.how.length) { var hl = h("ul"); m.how.forEach(function (x) { hl.appendChild(h("li", { text: EN() ? x.en : (x.ar || x.en) })); }); mb.appendChild(h("div", { "class": "howto" }, h("h4", { text: tr("Lab guide", "دليل المعمل") }), hl)); }
+      (m.tasks || []).forEach(function (ti) { if (cards[ti]) { mb.appendChild(cards[ti]); used[ti] = 1; } });
+      tb.appendChild(mb);
+    });
+    cards.forEach(function (c, i) { if (!used[i]) tb.appendChild(c); });
     right.appendChild(tb);
     root.appendChild(h("div", { "class": "rg" }, left, right));
   }
