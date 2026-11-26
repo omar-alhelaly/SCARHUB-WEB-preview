@@ -1207,9 +1207,9 @@
     /* logs (owner and admins) */
     var lp = h("div", { "class": "panel", id: "logs" }, h("h2", { text: tr("Logs", "السجل") })), lmsg = h("div", { "class": "msg" }), ltb = h("tbody"), lsel = h("select", { "aria-label": "filter" });
     box.appendChild(lp);
-    var LBL = { signup: ["Sign up", "تسجيل جديد"], login: ["Login", "دخول"], view_dm: ["Owner viewed a private chat", "المالك فتح شات خاص"], block_user: ["Block", "حظر"], unblock_user: ["Unblock", "فك حظر"], ban_user: ["Ban", "حظر"], unban_user: ["Unban", "فك حظر"], admin_delete_user: ["Account deleted by admin", "حذف حساب بواسطة أدمن"], delete_account: ["Account deleted by user", "المستخدم حذف حسابه"], grant_plan: ["Free plan granted", "اشتراك مجاني اتمنح"], revoke_plan: ["Free plan revoked", "اشتراك مجاني اتسحب"], review_manual_payment: ["Payment reviewed", "مراجعة دفعة"], set_role: ["Role changed", "تغيير صلاحية"], claim_owner: ["Owner claimed", "استلام الأونر"], tool_price: ["Tool price", "سعر أداة"], set_manual_instructions: ["Wallet details changed", "تغيير بيانات المحفظة"], delete_message: ["Message deleted", "رسالة اتمسحت"], contact_change: ["Contact details changed", "تعديل بيانات التواصل"], tool_added: ["Tool added", "أداة اتضافت"], tool_change: ["Tool changed", "أداة اتعدلت"], tool_deleted: ["Tool deleted", "أداة اتمسحت"], clear_user_chat: ["User chat cleared", "شات مستخدم اتمسح"], notice_sent: ["Notice emailed", "إيميل اتبعت"], notice_failed: ["Notice email failed", "الإيميل فشل"], notice_skipped: ["Notice skipped", "الإيميل اتخطى"] };
-    lsel.appendChild(h("option", { value: "", text: tr("All", "الكل") })); ["signup", "login", "view_dm", "block_user", "unblock_user", "ban_user", "unban_user", "admin_delete_user", "delete_account", "grant_plan", "revoke_plan", "review_manual_payment", "set_role", "delete_message", "contact_change", "tool_added", "tool_change", "tool_deleted", "clear_user_chat", "notice_sent", "notice_failed", "notice_skipped"].forEach(function (k) { lsel.appendChild(h("option", { value: k, text: tr(LBL[k][0], LBL[k][1]) })); });
-    lp.appendChild(h("div", { "class": "row" }, lsel)); lp.appendChild(h("table", { "class": "t" }, h("thead", null, h("tr", null, h("th", { text: tr("When", "الوقت") }), h("th", { text: tr("What", "إيه") }), h("th", { text: tr("By", "بواسطة") }), h("th", { text: tr("User", "المستخدم") }))), ltb)); lp.appendChild(lmsg);
+    var LBL = { signup: ["Sign up", "تسجيل جديد"], login: ["Login", "دخول"], view_dm: ["Owner viewed a private chat", "المالك فتح شات خاص"], block_user: ["Block", "حظر"], unblock_user: ["Unblock", "فك حظر"], ban_user: ["Ban", "حظر"], unban_user: ["Unban", "فك حظر"], admin_delete_user: ["Account deleted by admin", "حذف حساب بواسطة أدمن"], delete_account: ["Account deleted by user", "المستخدم حذف حسابه"], grant_plan: ["Free plan granted", "اشتراك مجاني اتمنح"], revoke_plan: ["Free plan revoked", "اشتراك مجاني اتسحب"], review_manual_payment: ["Payment reviewed", "مراجعة دفعة"], set_role: ["Role changed", "تغيير صلاحية"], claim_owner: ["Owner claimed", "استلام الأونر"], tool_price: ["Tool price", "سعر أداة"], set_manual_instructions: ["Wallet details changed", "تغيير بيانات المحفظة"], delete_message: ["Message deleted", "رسالة اتمسحت"], contact_change: ["Contact details changed", "تعديل بيانات التواصل"], tool_added: ["Tool added", "أداة اتضافت"], tool_change: ["Tool changed", "أداة اتعدلت"], tool_deleted: ["Tool deleted", "أداة اتمسحت"], clear_user_chat: ["User chat cleared", "شات مستخدم اتمسح"], notice_sent: ["Notice emailed", "إيميل اتبعت"], notice_failed: ["Notice email failed", "الإيميل فشل"], notice_skipped: ["Notice skipped", "الإيميل اتخطى"], set_alias: ["Alias changed", "تغيير اسم الظهور"], paymob_paid: ["Card payment confirmed", "دفع بالكارت اتأكد"] };
+    lsel.appendChild(h("option", { value: "", text: tr("All", "الكل") })); Object.keys(LBL).forEach(function (k) { lsel.appendChild(h("option", { value: k, text: tr(LBL[k][0], LBL[k][1]) })); });
+    var llive = h("span", { "class": "hint", style: "margin-inline-start:10px" }); lp.appendChild(h("div", { "class": "row" }, lsel, llive)); lp.appendChild(h("div", { style: "overflow-x:auto" }, h("table", { "class": "t" }, h("thead", null, h("tr", null, h("th", { text: tr("When", "الوقت") }), h("th", { text: tr("Action", "الإجراء") }), h("th", { text: tr("By", "بواسطة") }), h("th", { text: tr("Target", "الهدف") }), h("th", { text: tr("Details", "التفاصيل") }))), ltb))); lp.appendChild(lmsg);
     var allLogs = [];
     function lgMoney(v, c) { return v == null ? tr("no price", "من غير سعر") : (v / 100).toFixed(2) + " " + (c || ""); }
     function lgVis(v) { return v === "private" ? tr("subscribers only", "للمشتركين بس") : v === "public" ? tr("public", "عام") : v; }
@@ -1238,9 +1238,62 @@
       if (l.action === "tool_deleted") return tr("Tool deleted: ", "أداة اتمسحت: ") + nm;
       return tr("Tool changed: ", "أداة اتعدلت: ") + nm + " - " + (m.changes || []).map(lgChange).join("; ");
     }
-    function drawLogs() { clear(ltb); allLogs.filter(function (l) { return !lsel.value || l.action === lsel.value; }).slice(0, 200).forEach(function (l) { var lb = LBL[l.action]; ltb.appendChild(h("tr", null, h("td", { text: new Date(l.at).toLocaleString(EN() ? "en-GB" : "ar-EG") }), h("td", { text: (/^tool_(added|change|deleted)$/.test(l.action) ? lgTool(l) : (lb ? tr(lb[0], lb[1]) : l.action)) + (l.meta && l.meta.users ? " (" + l.meta.users + ")" : "") + (/^(admin_delete_user|clear_user_chat|delete_message)$/.test(l.action) && l.meta && l.meta.reason && !l.meta.scope ? " | " + tr("Reason: ", "السبب: ") + l.meta.reason : "") + (l.meta && l.meta.notice ? " | " + tr("email: ", "إيميل: ") + l.meta.notice : "") + (l.meta && l.meta.scope ? " (" + (l.meta.scope === "site" ? tr("site", "الموقع") : tr("chat", "الشات")) + (l.meta.reason ? ": " + l.meta.reason : "") + (l.meta.until ? ", " + tr("until ", "لحد ") + fmtTime(l.meta.until) : l.action === "block_user" ? ", " + tr("permanent", "دائم") : "") + ")" : "") }), h("td", { text: l.actor_name || "-" }), h("td", { text: l.target_name || "-" }))); }); }
+    function lgTime(v) { var d = new Date(v), p = function (n) { return String(n).padStart(2, "0"); }; return p(d.getDate()) + "/" + p(d.getMonth() + 1) + "/" + d.getFullYear() + " " + p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds()); }
+    function lgRole(r) { return r === "owner" ? tr("Owner", "مالك") : r === "admin" ? tr("Admin", "أدمن") : r === "user" ? tr("User", "مستخدم") : (r || "?"); }
+    function lgStat(r) { return r === "banned" ? tr("blocked", "محظور") : r === "active" ? tr("active", "نشط") : (r || "?"); }
+    function lgMoney2(a, c) { return a == null ? "" : (a / 100).toFixed(2) + " " + (c || ""); }
+    function lgUntil(u) { return u ? tr("until ", "لحد ") + lgTime(u) : tr("no expiry", "من غير انتهاء"); }
+    function lgNotice(n) { return n === "queued" ? tr("queued", "في الطابور") : n === "skipped" ? tr("skipped", "اتخطى") : n; }
+    function lgDetails(l) {
+      var m = l.meta || {}, o = [], ar = " \u2192 ", A = l.action;
+      if (/^tool_(added|change|deleted)$/.test(A)) return [lgTool(l)];
+      if (A === "set_role") o.push(tr("Role: ", "الصلاحية: ") + lgRole(m.old) + ar + lgRole(m.role)), m.alias && o.push(tr("Alias: ", "اسم الظهور: ") + (m.old_alias ? m.old_alias + ar : "") + m.alias), !m.alias && m.old_alias && o.push(tr("Alias removed: ", "اتشال اسم الظهور: ") + m.old_alias);
+      else if (A === "ban_user" || A === "unban_user") o.push(tr("Status: ", "الحالة: ") + lgStat(m.old || (A === "ban_user" ? "active" : "banned")) + ar + lgStat(m.new || (A === "ban_user" ? "banned" : "active")));
+      else if (A === "block_user" || A === "unblock_user") { o.push((A === "block_user" ? tr("Blocked in: ", "حظر في: ") : tr("Unblocked in: ", "فك حظر في: ")) + (m.scope === "site" ? tr("the whole site", "الموقع كله") : tr("chat", "الشات"))); if (A === "block_user") o.push(m.until ? tr("Until ", "لحد ") + lgTime(m.until) : tr("Permanent", "دائم")); if (m.reason) o.push(tr("Reason: ", "السبب: ") + m.reason); }
+      else if (A === "signup") o.push(tr("New account", "حساب جديد") + (m.user ? ": " + m.user : ""));
+      else if (A === "login") o.push(tr("Signed in", "سجّل دخول"));
+      else if (A === "claim_owner") o.push(tr("Became the owner", "بقى هو المالك"));
+      else if (A === "view_dm") o.push(tr("Opened the private chat: ", "فتح الشات الخاص: ") + (m.users || "?"));
+      else if (A === "admin_delete_user") { o.push(tr("Account deleted: ", "حساب اتحذف: ") + (m.name || l.target_name || "?")); if (m.reason) o.push(tr("Reason: ", "السبب: ") + m.reason); if (m.notice) o.push(tr("Email to user: ", "إيميل للمستخدم: ") + lgNotice(m.notice)); }
+      else if (A === "delete_account") o.push(tr("The user deleted their own account", "المستخدم حذف حسابه بنفسه"));
+      else if (A === "grant_plan") o.push(tr("Plan: ", "الباقة: ") + (m._plan || tr("all tools", "كل الأدوات")) + " (" + lgUntil(m.until) + ")");
+      else if (A === "revoke_plan") o.push(tr("Plan revoked: ", "الباقة اتسحبت: ") + (m._plan || tr("all tools", "كل الأدوات")));
+      else if (A === "review_manual_payment") { o.push((m.approved ? tr("Approved", "اتقبلت") : tr("Rejected", "اترفضت")) + (m._plan ? " - " + m._plan : "") + (m._amount != null ? " - " + lgMoney2(m._amount, m._cur) : "") + (m._period ? " / " + m._period : "") + (m._method ? " (" + m._method + ")" : "")); if (m._rej) o.push(tr("Reason: ", "السبب: ") + m._rej); }
+      else if (A === "paymob_paid") o.push(tr("Card payment confirmed", "دفع بالكارت اتأكد") + (m._plan ? " - " + m._plan : "") + (m._amount != null ? " - " + lgMoney2(m._amount, m._cur) : ""));
+      else if (A === "tool_price") { o.push(tr("Tool: ", "الأداة: ") + (m._tool || "?")); if (m.price_minor != null) o.push(tr("Price ", "السعر ") + lgMoney2(m.price_minor, m.currency)); if (m.discount) o.push(tr("Discount ", "الخصم ") + m.discount + "%" + (m.until ? " " + lgUntil(m.until) : "")); }
+      else if (A === "delete_message") { o.push((m.scope === "dm" ? tr("Private message deleted", "رسالة خاصة اتمسحت") : tr("Chat message deleted", "رسالة شات اتمسحت")) + (m.channel ? " (#" + m.channel + ")" : "") + (m.self ? tr(" - by its author", " - بواسطة صاحبها") : "")); if (m.reason) o.push(tr("Reason: ", "السبب: ") + m.reason); if (m.notice) o.push(tr("Email to user: ", "إيميل للمستخدم: ") + lgNotice(m.notice)); }
+      else if (A === "clear_user_chat") { o.push(tr("Chat messages cleared: ", "رسايل اتمسحت: ") + (m.count != null ? m.count : "?")); if (m.reason) o.push(tr("Reason: ", "السبب: ") + m.reason); if (m.notice) o.push(tr("Email to user: ", "إيميل للمستخدم: ") + lgNotice(m.notice)); }
+      else if (A === "notice_sent" || A === "notice_failed" || A === "notice_skipped") { o.push(tr("Type: ", "النوع: ") + (m.kind || "?")); if (m.why) o.push(tr("Why: ", "السبب: ") + m.why); if (m.error || m.err) o.push(String(m.error || m.err)); }
+      else if (A === "contact_change") o.push((m.users || "?") + ": " + (m.old ? m.old : "-") + ar + (m.new ? m.new : "-"));
+      else if (A === "set_alias") o.push(tr("Alias: ", "اسم الظهور: ") + (m.old ? m.old + ar : "") + (m.alias || "?"));
+      else if (A === "set_manual_instructions") { if (m.wallet_new != null) o.push(tr("Wallet: ", "المحفظة: ") + (m.wallet_old ? m.wallet_old + ar : "") + m.wallet_new); if (m.holder_new != null) o.push(tr("Holder: ", "الاسم: ") + (m.holder_old ? m.holder_old + ar : "") + m.holder_new); if (m.note_changed) o.push(tr("Note changed", "الملاحظة اتعدلت")); if (!o.length) o.push(tr("Wallet details changed", "بيانات المحفظة اتغيرت")); }
+      return o.length ? o : ["-"];
+    }
+    var seen = {}, fresh = {}, firstLoad = true, liveBusy = false;
+    function drawLogs() {
+      clear(ltb);
+      allLogs.filter(function (l) { return !lsel.value || l.action === lsel.value; }).slice(0, 300).forEach(function (l) {
+        var lb = LBL[l.action], id = l.meta && l.meta._id, dc = h("td"); lgDetails(l).forEach(function (t) { dc.appendChild(h("div", { text: t })); });
+        var tr1 = h("tr", null, h("td", { text: lgTime(l.at), dir: "ltr", style: "white-space:nowrap;text-align:start;unicode-bidi:isolate" }), h("td", { text: lb ? tr(lb[0], lb[1]) : l.action }), h("td", { text: l.actor_name || "-" }), h("td", { text: l.target_name || "-" }), dc);
+        if (id != null && fresh[id]) { tr1.style.background = "rgba(255,90,40,.28)"; tr1.style.transition = "background 4s"; setTimeout(function () { tr1.style.background = ""; }, 60); }
+        ltb.appendChild(tr1);
+      });
+    }
+    async function loadLogs(n) {
+      if (liveBusy) return; liveBusy = true;
+      try {
+        var lr = await sb.rpc("admin_logs", { p_limit: n || 500 }); if (lr.error) { if (firstLoad) say(lmsg, tr("Could not load logs.", "ماقدرتش أحمل السجل."), "err"); return; }
+        var rows = lr.data || [], map = {}, changed = firstLoad;
+        allLogs.forEach(function (l) { if (l.meta && l.meta._id != null) map[l.meta._id] = l; });
+        rows.forEach(function (l) { var id = l.meta && l.meta._id; if (id == null || map[id]) return; map[id] = l; changed = true; if (!firstLoad) { fresh[id] = 1; setTimeout(function () { delete fresh[id]; }, 8000); } });
+        if (changed) { allLogs = Object.keys(map).map(function (k) { return map[k]; }).sort(function (a, b) { return (new Date(b.at) - new Date(a.at)) || (b.meta._id - a.meta._id); }).slice(0, 500); drawLogs(); }
+        firstLoad = false; llive.textContent = tr("Live", "مباشر") + " \u25CF";
+      } finally { liveBusy = false; }
+    }
     lsel.addEventListener("change", drawLogs);
-    (async function () { var lr = await sb.rpc("admin_logs", { p_limit: 500 }); if (lr.error) return say(lmsg, tr("Could not load logs.", "ماقدرتش أحمل السجل."), "err"); allLogs = lr.data || []; drawLogs(); })();
+    loadLogs(500);
+    try { sb.channel("logs-" + me.id).on("postgres_changes", { event: "INSERT", schema: "public", table: "audit_log" }, function () { loadLogs(40); }).subscribe(); } catch (e) {}
+    setInterval(function () { if (!document.hidden) loadLogs(40); }, 3000);
     if (owner) {
       var dp = h("div", { "class": "panel", id: "dms" }, h("h2", { text: tr("Private chats (owner only, read-only)", "الشاتات الخاصة (للمالك فقط، قراءة بس)") })), dmsg = h("div", { "class": "msg" }), dview = h("div", { "class": "chatbox", style: "display:none;margin-top:10px" }), dtb = h("tbody");
       dp.appendChild(h("p", { "class": "hint", text: tr("Every time you open a conversation here it is written to the Logs. Admins cannot see private chats.", "كل مرة بتفتح محادثة هنا بتتسجل في السجل. الأدمن مايقدرش يشوف الشاتات الخاصة.") }));
