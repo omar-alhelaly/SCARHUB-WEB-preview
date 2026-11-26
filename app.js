@@ -648,6 +648,37 @@
     return out;
   }
 
+
+  /* ---------- contact page: values come from site_contact (public read); only the owner sees the editor ---------- */
+  var CT_KEYS = [["email", "Email", "الإيميل"], ["whatsapp", "WhatsApp", "واتساب"], ["linkedin", "LinkedIn", "لينكدإن"], ["github", "GitHub", "جيت هاب"], ["tiktok", "TikTok", "تيك توك"], ["facebook", "Facebook", "فيسبوك"], ["instagram", "Instagram", "انستجرام"]];
+  var CT_RE = { email: /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,24}$/, linkedin: /^https:\/\/([a-z]{2,3}\.)?linkedin\.com\/[^\s<>"']{1,255}$/, github: /^https:\/\/github\.com\/[^\s<>"']{1,255}$/, tiktok: /^https:\/\/(www\.)?tiktok\.com\/[^\s<>"']{1,255}$/, facebook: /^https:\/\/(www\.|m\.)?(facebook\.com|fb\.com|fb\.me)\/[^\s<>"']{1,255}$/, instagram: /^https:\/\/(www\.)?instagram\.com\/[^\s<>"']{1,255}$/ };
+  function ctValid(k, v) { if (k === "whatsapp") return /^\+?[0-9]{8,15}$/.test(v.replace(/[\s()-]/g, "")); return CT_RE[k] ? CT_RE[k].test(v) : false; }
+  function ctHref(k, v) { if (!ctValid(k, v)) return null; if (k === "email") return "mailto:" + v; if (k === "whatsapp") return "https://wa.me/" + v.replace(/[\s()-]/g, "").replace(/^\+/, ""); return v; }
+  async function contactPage() {
+    var box = document.querySelector(".contact"); if (!box || !sb) return;
+    var r = await sb.from("site_contact").select("key,value,label"), vals = {};
+    if (!r.error) (r.data || []).forEach(function (x) { vals[x.key] = x; });
+    function apply() { CT_KEYS.forEach(function (k) { var a = box.querySelector('a[data-k="' + k[0] + '"]'), v = vals[k[0]]; if (!a || !v) return; var href = ctHref(k[0], v.value); if (!href) return; a.setAttribute("href", href); var sm = a.querySelector("small"); if (sm) sm.textContent = v.label; }); }
+    apply();
+    if (!me || me.role !== "owner") return;
+    var panel = h("div", { "class": "panel", style: "max-width:760px;margin:24px auto 0" }, h("h2", { text: tr("Edit contact details (owner only)", "عدّل بيانات التواصل (للمالك بس)") }), h("p", { "class": "hint", text: tr("Changes show on this page for everyone and are written to the Logs.", "التعديلات بتظهر لكل الناس وبتتسجل في السجل.") }));
+    CT_KEYS.forEach(function (k) {
+      var cur = vals[k[0]] || { value: "", label: "" }, plain = k[0] === "email" || k[0] === "whatsapp", msg = h("div", { "class": "msg" });
+      var v = h("input", { type: "text", maxlength: "300", value: cur.value, "aria-label": tr(k[1] + " value", k[2]), placeholder: k[0] === "email" ? "name@example.com" : k[0] === "whatsapp" ? "+20 100 000 0000" : "https://..." });
+      var l = plain ? null : h("input", { type: "text", maxlength: "60", value: cur.label, "aria-label": tr(k[1] + " shown text", "النص الظاهر"), placeholder: tr("Shown text", "النص الظاهر") });
+      var sv = h("button", { type: "button", "class": "btn f", text: tr("Save", "حفظ") });
+      sv.onclick = async function () {
+        var val = v.value.trim(), lab = plain ? val : l.value.trim();
+        if (!ctValid(k[0], val)) return say(msg, k[0] === "email" ? tr("Enter a valid email.", "اكتب إيميل صحيح.") : k[0] === "whatsapp" ? tr("Enter the number with country code, digits only (e.g. +201000000000).", "اكتب الرقم بكود الدولة، أرقام بس (مثال +201000000000).") : tr("Enter a full https link on the right site.", "اكتب لينك https كامل من الموقع الصح."), "err");
+        if (!lab || /[<>]/.test(lab)) return say(msg, tr("Shown text is required (no < or >).", "النص الظاهر مطلوب (من غير < أو >)."), "err");
+        sv.disabled = true; var x = await sb.rpc("set_contact", { p_key: k[0], p_value: val, p_label: lab }); sv.disabled = false;
+        if (x.error) return say(msg, tr("Could not save: ", "ماتحفظش: ") + (x.error.message || ""), "err");
+        vals[k[0]] = { key: k[0], value: val, label: lab }; apply(); say(msg, tr("Saved.", "اتحفظ."), "ok");
+      };
+      panel.appendChild(h("div", { "class": "row", style: "display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0" }, h("b", { style: "min-width:90px", text: tr(k[1], k[2]) }), v, l, sv, msg));
+    });
+    box.parentNode.appendChild(panel);
+  }
   /* ---------- community ---------- */
   async function communityPage() {
     var app = $("app"); if (!me) return go("login.html"); clear(app);
@@ -691,11 +722,37 @@
       showBar();
       setTimeout(function () { document.addEventListener("mousedown", outPop, true); document.addEventListener("touchstart", outPop, true); document.addEventListener("keydown", escPop, true); }, 0);
     }
+    async function delMsg(scope, id) {
+      if (!confirm(tr("Delete this message?", "تمسح الرسالة دي؟"))) return;
+      var r = await sb.rpc("delete_message", { p_scope: scope, p_id: id });
+      if (r.error) return say(err, tr("Could not delete: ", "ماقدرتش أمسح: ") + (r.error.message || ""), "err");
+      say(err, ""); lastSig = ""; load();
+    }
+    async function openWho(anchor, scope, id, em) {
+      closePop(); var rect = anchor.getBoundingClientRect(), snap = { getBoundingClientRect: function () { return rect; } };
+      pop = h("div", { "class": "rxpop", role: "dialog", "aria-label": tr("Who reacted", "مين تفاعل") }); document.body.appendChild(pop);
+      pop.appendChild(h("p", { "class": "hint", style: "margin:8px", text: tr("Loading...", "بيحمّل...") })); placePop(snap);
+      setTimeout(function () { document.addEventListener("mousedown", outPop, true); document.addEventListener("touchstart", outPop, true); document.addEventListener("keydown", escPop, true); }, 0);
+      var r = await sb.rpc("reaction_users", { p_scope: scope, p_id: id }); var mine = pop; if (!mine) return;
+      clear(mine); if (r.error) { mine.appendChild(h("p", { "class": "hint", style: "margin:8px", text: tr("Could not load: ", "ماقدرتش أحمل: ") + (r.error.message || "") })); return placePop(snap); }
+      var rows = r.data || [], cur2 = "", wrap = h("div", { style: "width:min(280px,84vw)" }), tabsEl = h("div", { "class": "rxtabs" }), list = h("div", { style: "max-height:220px;overflow-y:auto" });
+      function draw() {
+        clear(list); rows.filter(function (x) { return !cur2 || x.emoji === cur2; }).forEach(function (x) {
+          list.appendChild(h("div", { style: "display:flex;align-items:center;gap:8px;padding:4px 6px" }, h("div", { "class": "av", style: "width:28px;height:28px;flex:none" }, avatarSvg(x.avatar, x.user_id)), h("span", { style: "flex:1", text: x.display_name + (x.user_id === me.id ? " (" + tr("You", "إنت") + ")" : "") }), h("span", { text: x.emoji })));
+        }); if (!list.firstChild) list.appendChild(h("p", { "class": "hint", style: "margin:8px", text: tr("No reactions yet.", "مفيش تفاعلات لسه.") }));
+      }
+      var ems = []; rows.forEach(function (x) { if (ems.indexOf(x.emoji) === -1) ems.push(x.emoji); });
+      [""].concat(ems).forEach(function (e) { tabsEl.appendChild(h("button", { type: "button", style: "font-size:14px;padding:3px 8px;white-space:nowrap", text: e ? e + " " + rows.filter(function (x) { return x.emoji === e; }).length : tr("All", "الكل") + " " + rows.length, on: { click: function () { cur2 = e; draw(); } } })); });
+      cur2 = em; draw(); wrap.appendChild(tabsEl); wrap.appendChild(list);
+      var has = rows.some(function (x) { return x.user_id === me.id && x.emoji === em; });
+      var tb = h("button", { type: "button", "class": "btn", style: "margin-top:6px;width:100%", text: has ? tr("Tap to remove ", "دوس عشان تشيل ") + em : tr("React with ", "تفاعل بـ ") + em, on: { click: function () { closePop(); toggle(scope, id, em); } } }); tb.disabled = !!myBlk; wrap.appendChild(tb);
+      mine.appendChild(wrap); placePop(snap);
+    }
     function paintPills(c) {
       var scope = c.getAttribute("data-s"), id = c.getAttribute("data-i"), o = rx[scope + ":" + id] || {}, sig = JSON.stringify(o) + (myBlk ? "b" : "");
       if (c.getAttribute("data-sig") === sig) return; c.setAttribute("data-sig", sig); clear(c);
       Object.keys(o).forEach(function (em) {
-        var e = o[em], b = h("button", { type: "button", "class": "rxp" + (e.mine ? " mine" : ""), text: em + " " + e.n, "aria-pressed": e.mine ? "true" : "false", "aria-label": em + " " + e.n + (e.mine ? " (" + tr("yours", "إنت") + ")" : ""), on: { click: function () { toggle(scope, Number(id), em); } } });
+        var e = o[em], b = h("button", { type: "button", "class": "rxp" + (e.mine ? " mine" : ""), text: em + " " + e.n, "aria-pressed": e.mine ? "true" : "false", "aria-label": em + " " + e.n + (e.mine ? " (" + tr("yours", "إنت") + ")" : ""), on: { click: function () { openWho(b, scope, Number(id), em); } } });
         c.appendChild(b);
       });
     }
@@ -728,11 +785,12 @@
     }
     function line(m) {
       var p = names[m.user_id] || { display_name: "?", avatar: "b1" }, del = null;
-      if (isStaff()) del = h("button", { "class": "btn", type: "button", text: "x", "aria-label": "delete", on: { click: async function () { await sb.from("chat_messages").delete().eq("id", m.id); load(); } } });
+      if (!m.deleted_at && (isStaff() || m.user_id === me.id)) del = h("button", { "class": "btn", type: "button", text: isStaff() ? "x" : tr("Delete", "احذف"), "aria-label": tr("Delete message", "احذف الرسالة"), on: { click: function () { delMsg("chat", m.id); } } });
       var av = h("div", { "class": "av", style: "cursor:pointer", title: tr("View profile", "شوف البروفايل"), on: { click: function () { openProfile(m.user_id); } } }, avatarSvg(p.avatar, p.id));
       var nm = h("b", { text: p.display_name, style: "cursor:pointer", on: { click: function () { openProfile(m.user_id); } } });
       var body = m.audio_path ? (urls[m.audio_path] ? voicePlayer(urls[m.audio_path], m.audio_secs) : h("p", { "class": "hint", text: tr("Voice message (loading)", "رسالة صوتية (بتحمّل)") })) : h("p", { text: m.body });
-      var hd = h("div", { style: "flex:1" }, nm, badgesEl(p.role, p.subscribed, p.plan_name)), el = h("div", { "class": "cm" }, av, hd, del);
+      var dby = m.deleted_by && names[m.deleted_by] ? names[m.deleted_by].display_name : "?", hd = h("div", { style: "flex:1" }, nm, badgesEl(p.role, p.subscribed, p.plan_name), m.deleted_at ? h("span", { "class": "tag", style: "margin-inline-start:8px;color:#e55", text: tr("Deleted", "محذوفة") + (m.deleted_by === m.user_id ? "" : " " + tr("by ", "بواسطة ") + dby) }) : null), el = h("div", { "class": "cm" }, av, hd, del);
+      if (m.deleted_at) body.style.opacity = ".55";
       var pills = reactUi("chat", m.id, hd, el); hd.appendChild(body); hd.appendChild(pills);
       el.setAttribute("data-id", m.id); return el;
     }
@@ -747,20 +805,20 @@
       rows.forEach(function (t, i) { var p = names[others[i]] || { display_name: "?", avatar: "b1" }; log.appendChild(h("div", { "class": "cm", style: "cursor:pointer", on: { click: function () { openDm(t.id); } } }, h("div", { "class": "av" }, avatarSvg(p.avatar, p.id)), h("div", { style: "flex:1" }, h("b", { text: p.display_name }), badgesEl(p.role, p.subscribed, p.plan_name), h("p", { "class": "hint", text: fmtTime(t.last_at) })))); });
     }
     async function loadDm() {
-      var tid = cur.slice(3), r = await sb.from("dm_messages").select("id,sender,body,created_at").eq("thread_id", tid).order("created_at", { ascending: false }).limit(60), rows = (r.data || []).reverse();
+      var tid = cur.slice(3), r = await sb.from("dm_messages").select("id,sender,body,created_at,deleted_at").eq("thread_id", tid).order("created_at", { ascending: false }).limit(60), rows = (r.data || []).reverse();
       var sg = cur + ":" + rows.map(function (x) { return x.id; }).join(","), changed = await syncRx("dm", rows.map(function (x) { return x.id; }));
       if (sg === lastSig) { if (changed) paintAll(); return; } lastSig = sg;
       var atEnd = log.scrollHeight - log.scrollTop - log.clientHeight < 80; await who(rows.map(function (x) { return x.sender; }));
       clear(log); log.appendChild(h("button", { "class": "btn", type: "button", text: tr("\u2190 All private chats", "\u2190 كل الشاتات الخاصة"), on: { click: function () { select("dmlist"); } } })); log.appendChild(dmNotice());
-      rows.forEach(function (m) { var p = names[m.sender] || { display_name: "?", avatar: "b1" }, hd = h("div", { style: "flex:1" }, h("b", { text: p.display_name }), badgesEl(p.role, p.subscribed, p.plan_name)), row = h("div", { "class": "cm" }, h("div", { "class": "av", style: "cursor:pointer", on: { click: function () { openProfile(m.sender); } } }, avatarSvg(p.avatar, p.id)), hd); var pl = reactUi("dm", m.id, hd, row); hd.appendChild(h("p", { text: m.body })); hd.appendChild(pl); log.appendChild(row); });
+      rows.forEach(function (m) { var p = names[m.sender] || { display_name: "?", avatar: "b1" }, hd = h("div", { style: "flex:1" }, h("b", { text: p.display_name }), badgesEl(p.role, p.subscribed, p.plan_name)), row = h("div", { "class": "cm" }, h("div", { "class": "av", style: "cursor:pointer", on: { click: function () { openProfile(m.sender); } } }, avatarSvg(p.avatar, p.id)), hd, m.sender === me.id ? h("button", { "class": "btn", type: "button", text: tr("Delete", "احذف"), "aria-label": tr("Delete message", "احذف الرسالة"), on: { click: function () { delMsg("dm", m.id); } } }) : null); var pl = reactUi("dm", m.id, hd, row); hd.appendChild(h("p", { text: m.body })); hd.appendChild(pl); log.appendChild(row); });
       if (atEnd || !log.getAttribute("data-dm")) { log.scrollTop = log.scrollHeight; log.setAttribute("data-dm", "1"); }
     }
     async function load() {
       if (cur === "dmlist") return loadDmList(); if (cur.indexOf("dm:") === 0) return loadDm();
-      var r = await sb.from("chat_messages").select("id,user_id,body,created_at,audio_path,audio_secs").eq("channel", cur).order("created_at", { ascending: false }).limit(60);
-      var rows = (r.data || []).reverse(), sg = cur + ":" + rows.map(function (x) { return x.id; }).join(","), changed = await syncRx("chat", rows.map(function (x) { return x.id; }));
+      var r = await sb.from("chat_messages").select("id,user_id,body,created_at,audio_path,audio_secs,deleted_at,deleted_by").eq("channel", cur).order("created_at", { ascending: false }).limit(60);
+      var rows = (r.data || []).reverse(), sg = cur + ":" + rows.map(function (x) { return x.id + (x.deleted_at ? "d" : ""); }).join(","), changed = await syncRx("chat", rows.map(function (x) { return x.id; }));
       if (sg === lastSig) { if (changed) paintAll(); return; } lastSig = sg;
-      var atEnd = log.scrollHeight - log.scrollTop - log.clientHeight < 80; await who(rows.map(function (x) { return x.user_id; }));
+      var atEnd = log.scrollHeight - log.scrollTop - log.clientHeight < 80; await who(rows.map(function (x) { return x.user_id; }).concat(rows.filter(function (x) { return x.deleted_by; }).map(function (x) { return x.deleted_by; })));
       if (Date.now() - urlsAt > 3000000) { urls = {}; urlsAt = Date.now(); }
       var needU = rows.filter(function (x) { return x.audio_path && !urls[x.audio_path]; }).map(function (x) { return x.audio_path; });
       if (needU.length) { var su = await sb.storage.from("chat-voice").createSignedUrls(needU, 3600); (su.data || []).forEach(function (s2) { if (s2.signedUrl && s2.path) urls[s2.path] = s2.signedUrl; }); }
@@ -1080,8 +1138,8 @@
     /* logs (owner and admins) */
     var lp = h("div", { "class": "panel", id: "logs" }, h("h2", { text: tr("Logs", "السجل") })), lmsg = h("div", { "class": "msg" }), ltb = h("tbody"), lsel = h("select", { "aria-label": "filter" });
     box.appendChild(lp);
-    var LBL = { signup: ["Sign up", "تسجيل جديد"], login: ["Login", "دخول"], view_dm: ["Owner viewed a private chat", "المالك فتح شات خاص"], block_user: ["Block", "حظر"], unblock_user: ["Unblock", "فك حظر"], ban_user: ["Ban", "حظر"], unban_user: ["Unban", "فك حظر"], admin_delete_user: ["Account deleted by admin", "حذف حساب بواسطة أدمن"], delete_account: ["Account deleted by user", "المستخدم حذف حسابه"], grant_plan: ["Free plan granted", "اشتراك مجاني اتمنح"], revoke_plan: ["Free plan revoked", "اشتراك مجاني اتسحب"], review_manual_payment: ["Payment reviewed", "مراجعة دفعة"], set_role: ["Role changed", "تغيير صلاحية"], claim_owner: ["Owner claimed", "استلام الأونر"], tool_price: ["Tool price", "سعر أداة"], set_manual_instructions: ["Wallet details changed", "تغيير بيانات المحفظة"] };
-    lsel.appendChild(h("option", { value: "", text: tr("All", "الكل") })); ["signup", "login", "view_dm", "block_user", "unblock_user", "ban_user", "unban_user", "admin_delete_user", "delete_account", "grant_plan", "revoke_plan", "review_manual_payment", "set_role"].forEach(function (k) { lsel.appendChild(h("option", { value: k, text: tr(LBL[k][0], LBL[k][1]) })); });
+    var LBL = { signup: ["Sign up", "تسجيل جديد"], login: ["Login", "دخول"], view_dm: ["Owner viewed a private chat", "المالك فتح شات خاص"], block_user: ["Block", "حظر"], unblock_user: ["Unblock", "فك حظر"], ban_user: ["Ban", "حظر"], unban_user: ["Unban", "فك حظر"], admin_delete_user: ["Account deleted by admin", "حذف حساب بواسطة أدمن"], delete_account: ["Account deleted by user", "المستخدم حذف حسابه"], grant_plan: ["Free plan granted", "اشتراك مجاني اتمنح"], revoke_plan: ["Free plan revoked", "اشتراك مجاني اتسحب"], review_manual_payment: ["Payment reviewed", "مراجعة دفعة"], set_role: ["Role changed", "تغيير صلاحية"], claim_owner: ["Owner claimed", "استلام الأونر"], tool_price: ["Tool price", "سعر أداة"], set_manual_instructions: ["Wallet details changed", "تغيير بيانات المحفظة"], delete_message: ["Message deleted", "رسالة اتمسحت"], contact_change: ["Contact details changed", "تعديل بيانات التواصل"] };
+    lsel.appendChild(h("option", { value: "", text: tr("All", "الكل") })); ["signup", "login", "view_dm", "block_user", "unblock_user", "ban_user", "unban_user", "admin_delete_user", "delete_account", "grant_plan", "revoke_plan", "review_manual_payment", "set_role", "delete_message", "contact_change"].forEach(function (k) { lsel.appendChild(h("option", { value: k, text: tr(LBL[k][0], LBL[k][1]) })); });
     lp.appendChild(h("div", { "class": "row" }, lsel)); lp.appendChild(h("table", { "class": "t" }, h("thead", null, h("tr", null, h("th", { text: tr("When", "الوقت") }), h("th", { text: tr("What", "إيه") }), h("th", { text: tr("By", "بواسطة") }), h("th", { text: tr("User", "المستخدم") }))), ltb)); lp.appendChild(lmsg);
     var allLogs = [];
     function drawLogs() { clear(ltb); allLogs.filter(function (l) { return !lsel.value || l.action === lsel.value; }).slice(0, 200).forEach(function (l) { var lb = LBL[l.action]; ltb.appendChild(h("tr", null, h("td", { text: new Date(l.at).toLocaleString(EN() ? "en-GB" : "ar-EG") }), h("td", { text: (lb ? tr(lb[0], lb[1]) : l.action) + (l.meta && l.meta.users ? " (" + l.meta.users + ")" : "") + (l.meta && l.meta.scope ? " (" + (l.meta.scope === "site" ? tr("site", "الموقع") : tr("chat", "الشات")) + (l.meta.reason ? ": " + l.meta.reason : "") + (l.meta.until ? ", " + tr("until ", "لحد ") + fmtTime(l.meta.until) : l.action === "block_user" ? ", " + tr("permanent", "دائم") : "") + ")" : "") }), h("td", { text: l.actor_name || "-" }), h("td", { text: l.target_name || "-" }))); }); }
@@ -1095,7 +1153,7 @@
         var lr2 = await sb.rpc("owner_list_dms"); if (lr2.error) return say(dmsg, tr("Could not load.", "ماقدرتش أحمل."), "err");
         (lr2.data || []).forEach(function (t) { dtb.appendChild(h("tr", null, h("td", { text: t.a_name + " & " + t.b_name }), h("td", { text: String(t.msgs) }), h("td", { text: fmtTime(t.last_at) }), h("td", null, h("button", { "class": "btn", type: "button", text: tr("Open (logged)", "افتح (بتتسجل)"), on: { click: async function () {
           var vr = await sb.rpc("owner_view_dm", { p_thread: t.thread_id }); if (vr.error) return say(dmsg, tr("Could not open.", "ماقدرتش أفتح."), "err");
-          clear(dview); dview.style.display = ""; (vr.data || []).forEach(function (m) { dview.appendChild(h("p", { style: "margin:4px 0" }, h("b", { text: m.sender_name + " " }), h("small", { "class": "hint", text: fmtTime(m.created_at) }), h("br"), document.createTextNode(m.body))); }); if (!(vr.data || []).length) dview.appendChild(h("p", { "class": "hint", text: tr("Empty.", "فاضية.") }));
+          clear(dview); dview.style.display = ""; (vr.data || []).forEach(function (m) { dview.appendChild(h("p", { style: "margin:4px 0" }, h("b", { text: m.sender_name + " " }), h("small", { "class": "hint", text: fmtTime(m.created_at) }), h("br"), document.createTextNode(m.body + (m.deleted_at ? "  [" + tr("deleted ", "محذوفة ") + fmtTime(m.deleted_at) + "]" : "")))); }); if (!(vr.data || []).length) dview.appendChild(h("p", { "class": "hint", text: tr("Empty.", "فاضية.") }));
         } } })))); });
         if (!(lr2.data || []).length) dtb.appendChild(h("tr", null, h("td", { text: tr("No private chats yet.", "مفيش شاتات خاصة لسه.") }), h("td"), h("td"), h("td")));
       })();
@@ -1263,7 +1321,7 @@
     if (!ok) return;
     if (!PAGE) { sideMenu(); return; }
     if (PAGE === "login") { if (recovering) return resetPage(); if (me) return go("account.html"); loginPage(); }
-    else { sideMenu(); if (PAGE === "account") accountPage(); else if (PAGE === "community") communityPage(); else if (PAGE === "admin") adminPage(); }
+    else { sideMenu(); if (PAGE === "account") accountPage(); else if (PAGE === "community") communityPage(); else if (PAGE === "contact") contactPage(); else if (PAGE === "admin") adminPage(); }
   })();
 })();
 
