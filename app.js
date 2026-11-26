@@ -664,32 +664,47 @@
       if (cur === "dmlist") return say(err, tr("Open a private chat first.", "افتح شات خاص الأول."), "err");
       if (cur.indexOf("dm:") === 0) { var dr = await sb.from("dm_messages").insert({ thread_id: cur.slice(3), sender: me.id, body: b }); if (dr.error) say(err, tr("Slow down or try again.", "على مهلك أو جرب تاني."), "err"); else { input.value = ""; say(err, ""); load(); } return; }
       var r = await sb.from("chat_messages").insert({ channel: cur, user_id: me.id, body: b });
-      if (r.error) say(err, tr("Slow down or try again.", "على مهلك أو جرب تاني."), "err"); else { input.value = ""; say(err, ""); load(); }
+      if (r.error) { try { console.error("chat insert", r.error); } catch (e) {} say(err, /row-level|policy/i.test(r.error.message || "") ? tr("You cannot send messages right now.", "مش مسموح تبعت دلوقتي.") : /rate|slow|many/i.test(r.error.message || "") ? tr("Slow down a little.", "على مهلك شوية.") : tr("Could not send: ", "ماقدرتش أبعت: ") + (r.error.message || ""), "err"); } else { input.value = ""; say(err, ""); load(); }
     });
-    /* voice messages: MediaRecorder, max 120 s, uploaded to the private chat-voice bucket */
-    var micBtn = h("button", { "class": "btn", type: "button", text: tr("\u25cf Voice", "\u25cf صوت"), "aria-label": tr("Record a voice message", "سجّل رسالة صوتية") }), recd = null, rchunks = [], rt0 = 0, rtick = null, rstop = null, rstream = null;
-    function micReset() { if (rtick) clearInterval(rtick); rtick = null; if (rstop) clearTimeout(rstop); rstop = null; if (rstream) rstream.getTracks().forEach(function (t) { t.stop(); }); rstream = null; recd = null; micBtn.textContent = tr("\u25cf Voice", "\u25cf صوت"); micBtn.style.color = ""; }
+    /* voice messages: WhatsApp-style recorder (live bars, timer, Cancel / Send), max 120 s, private chat-voice bucket */
+    var micBtn = h("button", { "class": "btn", type: "button", text: tr("\u25cf Voice", "\u25cf صوت"), "aria-label": tr("Record a voice message", "سجّل رسالة صوتية") }), vstate = null, vbusy = false;
+    function vErr(e) { var m = String((e && (e.message || e.error)) || e || ""), st = e && (e.statusCode || e.status); if (/row-level|policy|403|Unauthorized/i.test(m + st)) return tr("Not allowed to send voice messages right now (blocked or inactive account).", "مش مسموح تبعت رسائل صوتية دلوقتي (حساب محظور أو غير مفعل)."); if (/mime|type/i.test(m)) return tr("Audio format not supported.", "صيغة الصوت مش مدعومة."); if (/exceed|too large|size|413/i.test(m)) return tr("Recording is too big.", "التسجيل كبير أوي."); if (/limit|many|rate/i.test(m)) return tr("Too many voice messages, try again later.", "رسائل صوتية كتير، جرب بعد شوية."); return tr("Voice upload failed: ", "فشل رفع الصوت: ") + m; }
+    function vCleanup() { var s = vstate; vstate = null; if (!s) return; clearInterval(s.tick); clearTimeout(s.cap); cancelAnimationFrame(s.raf); try { s.stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {} try { s.ac && s.ac.close(); } catch (e) {} if (s.bar.parentNode) s.bar.parentNode.removeChild(s.bar); form.style.display = "flex"; }
     micBtn.addEventListener("click", async function () {
-      if (recd) { recd.stop(); return; }
+      if (vbusy || vstate) return;
       if (cur !== "general" && cur !== "admins") return say(err, tr("Voice messages are for the community chat only.", "الرسائل الصوتية للشات العام بس."), "err");
       if (!navigator.mediaDevices || !window.MediaRecorder) return say(err, tr("Voice recording is not supported in this browser.", "التسجيل الصوتي مش مدعوم في المتصفح ده."), "err");
-      try { rstream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (e) { return say(err, tr("Microphone permission was denied.", "إذن الميكروفون اترفض."), "err"); }
-      var mt = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4"].filter(function (x) { return MediaRecorder.isTypeSupported(x); })[0];
-      if (!mt) { micReset(); return say(err, tr("Voice recording is not supported in this browser.", "التسجيل الصوتي مش مدعوم في المتصفح ده."), "err"); }
-      var base = mt.split(";")[0], ext = base === "audio/webm" ? "webm" : base === "audio/ogg" ? "ogg" : "m4a";
-      rchunks = []; recd = new MediaRecorder(rstream, { mimeType: mt, audioBitsPerSecond: 24000 }); rt0 = Date.now();
-      recd.ondataavailable = function (e) { if (e.data && e.data.size) rchunks.push(e.data); };
-      recd.onstop = async function () {
-        var secs = Math.min(120, Math.round((Date.now() - rt0) / 1000)), blob = new Blob(rchunks, { type: base }); micReset();
-        if (secs < 1 || !blob.size) return;
+      var mt = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/mp4"].filter(function (x) { return MediaRecorder.isTypeSupported(x); })[0];
+      if (!mt) return say(err, tr("Voice recording is not supported in this browser.", "التسجيل الصوتي مش مدعوم في المتصفح ده."), "err");
+      vbusy = true; var stream; try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (e) { vbusy = false; return say(err, tr("Microphone permission was denied.", "إذن الميكروفون اترفض."), "err"); }
+      vbusy = false;
+      var base = mt.split(";")[0], ext = base === "audio/webm" ? "webm" : base === "audio/ogg" ? "ogg" : "m4a", chunks = [], rec = new MediaRecorder(stream, { mimeType: mt, audioBitsPerSecond: 24000 }), t0 = Date.now();
+      var cv = h("canvas", { width: 240, height: 36, style: "flex:1;min-width:0;height:36px;direction:ltr" }), tm = h("b", { text: "0:00", style: "min-width:42px;direction:ltr" }), bCancel = h("button", { "class": "btn", type: "button", text: tr("Cancel", "إلغاء") }), bSend = h("button", { "class": "btn", type: "button", text: tr("Send", "إرسال"), style: "background:#c9a227;color:#000" });
+      var bar = h("div", { "class": "row", style: "gap:8px;align-items:center;padding:8px;border:1px solid #e11d2e;border-radius:12px;margin-top:8px" }, h("span", { text: "\u25cf", style: "color:#e11d2e;animation:scarpulse 1s infinite" }), tm, cv, bCancel, bSend);
+      if (!document.getElementById("scarpulse")) { var stl = document.createElement("style"); stl.id = "scarpulse"; stl.textContent = "@keyframes scarpulse{50%{opacity:.2}}"; document.head.appendChild(stl); }
+      var s = vstate = { stream: stream, bar: bar, tick: null, cap: null, raf: 0, ac: null }, levels = [], an = null, data = null;
+      try { var AC = window.AudioContext || window.webkitAudioContext; s.ac = new AC(); var src = s.ac.createMediaStreamSource(stream); an = s.ac.createAnalyser(); an.fftSize = 256; src.connect(an); data = new Uint8Array(an.frequencyBinCount); } catch (e) { an = null; }
+      function draw() { var cx = cv.getContext("2d"), W = cv.width, H = cv.height, n = 40; if (an) { an.getByteTimeDomainData(data); var mx = 0; for (var i = 0; i < data.length; i++) mx = Math.max(mx, Math.abs(data[i] - 128)); levels.push(Math.min(1, mx / 90)); } else levels.push(0.2 + Math.random() * 0.3); if (levels.length > n) levels.shift(); cx.clearRect(0, 0, W, H); cx.fillStyle = "#e11d2e"; var bw = W / n; levels.forEach(function (l, i) { var bh = Math.max(3, l * H); cx.fillRect(W - (levels.length - i) * bw + 1, (H - bh) / 2, bw - 2, bh); }); s.raf = requestAnimationFrame(draw); }
+      rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+      var stopped = new Promise(function (res) { rec.onstop = res; });
+      rec.start(250); draw();
+      s.tick = setInterval(function () { var sec = Math.floor((Date.now() - t0) / 1000); tm.textContent = Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"); }, 250);
+      form.style.display = "none"; form.parentNode.insertBefore(bar, form.nextSibling);
+      async function finish(send) {
+        if (!vstate) return; bSend.disabled = bCancel.disabled = true; var secs = Math.min(120, Math.round((Date.now() - t0) / 1000));
+        try { if (rec.state !== "inactive") rec.stop(); } catch (e) {} await Promise.race([stopped, new Promise(function (r) { setTimeout(r, 3000); })]);
+        vCleanup(); if (!send) return;
+        var blob = new Blob(chunks, { type: base });
+        if (secs < 1 || !blob.size) return say(err, tr("Recording too short.", "التسجيل قصير أوي."), "err");
         if (blob.size > 1572864) return say(err, tr("Recording is too big.", "التسجيل كبير أوي."), "err");
         say(err, tr("Sending...", "بيتبعت..."), "");
         var path = me.id + "/" + crypto.randomUUID() + "." + ext, up = await sb.storage.from("chat-voice").upload(path, blob, { contentType: base, upsert: false });
-        if (up.error) return say(err, tr("Voice upload failed (limit: 20 per hour).", "فشل رفع الصوت (الحد 20 في الساعة)."), "err");
+        if (up.error) { try { console.error("voice upload", up.error); } catch (e) {} return say(err, vErr(up.error), "err"); }
         var r = await sb.from("chat_messages").insert({ channel: cur, user_id: me.id, body: "", audio_path: path, audio_secs: secs });
-        if (r.error) say(err, tr("Could not send the voice message.", "ماقدرتش أبعت الرسالة الصوتية."), "err"); else { say(err, ""); load(); }
-      };
-      recd.start(); micBtn.style.color = "#e11d2e"; rtick = setInterval(function () { micBtn.textContent = "\u25a0 " + Math.round((Date.now() - rt0) / 1000) + "s"; }, 500); rstop = setTimeout(function () { if (recd) recd.stop(); }, 120000);
+        if (r.error) { try { console.error("voice insert", r.error); } catch (e) {} say(err, tr("Could not send the voice message: ", "ماقدرتش أبعت الرسالة الصوتية: ") + (r.error.message || ""), "err"); } else { say(err, ""); load(); }
+      }
+      bSend.addEventListener("click", function () { finish(true); }); bCancel.addEventListener("click", function () { finish(false); });
+      s.cap = setTimeout(function () { finish(true); }, 120000);
     });
     form.insertBefore(micBtn, form.lastChild);
     if (myBlk) { input.disabled = true; micBtn.disabled = true; Array.prototype.forEach.call(form.querySelectorAll("button"), function (b) { b.disabled = true; }); say(err, tr("You are blocked from chat. Reason: ", "إنت محظور من الشات. السبب: ") + myBlk.reason + (myBlk.expires_at ? " (" + tr("until ", "لحد ") + fmtTime(myBlk.expires_at) + ")" : " (" + tr("no end date", "من غير مدة") + ")"), "err"); }
