@@ -326,9 +326,10 @@
       var e = await sb.auth.mfa.enroll({ factorType: "totp", friendlyName: "SCARHUB " + Date.now() });
       if (e.error) return say(msg, e.error.message, "err");
       start.remove();
-      var img = h("img", { src: e.data.totp.qr_code, alt: "QR", width: "180", height: "180" });
+      var qr = String(e.data.totp.qr_code || ""), qi = qr.indexOf("<svg"), qsrc = qi >= 0 ? "data:image/svg+xml;charset=utf-8," + encodeURIComponent(qr.slice(qi)) : qr;
+      var img = h("img", { src: qsrc, alt: "QR", width: "200", height: "200", style: "display:block;background:#fff;padding:12px;border-radius:8px;margin:8px 0;width:200px;height:200px" });
       p.appendChild(h("p", { "class": "hint", text: tr("Scan this in Google Authenticator / Microsoft Authenticator, then enter the code.", "اعمل سكان في Google Authenticator أو Microsoft Authenticator وبعدين اكتب الكود.") }));
-      p.appendChild(img); p.appendChild(h("p", { "class": "hint", text: tr("Or type this key by hand: ", "أو اكتب المفتاح ده بإيدك: ") + e.data.totp.secret }));
+      p.appendChild(img); p.appendChild(h("p", { "class": "hint", style: "direction:ltr;user-select:all;word-break:break-all", text: tr("Or type this key by hand: ", "أو اكتب المفتاح ده بإيدك: ") + e.data.totp.secret }));
       var ok = h("button", { type: "button", "class": "btn", text: tr("Confirm", "تأكيد") });
       ok.addEventListener("click", async function () {
         var r = await sb.auth.mfa.challengeAndVerify({ factorId: e.data.id, code: code.value.trim() });
