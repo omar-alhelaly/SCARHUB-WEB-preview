@@ -29,14 +29,19 @@ Deno.serve(async (req) => {
   const gu = Deno.env.get("GMAIL_USER"), gp = Deno.env.get("GMAIL_APP_PASSWORD");
   const tr = gu && gp ? nodemailer.createTransport({ host: "smtp.gmail.com", port: 465, secure: true, auth: { user: gu, pass: gp } }) : null;
   let sent = 0, failed = 0;
-  for (const n of (rows ?? []) as Array<{ id: number; kind: string; to_email: string; to_name: string | null; reason: string }>) {
+  for (const n of (rows ?? []) as Array<{ id: number; kind: string; to_email: string; to_name: string | null; reason: string; by_name: string | null; by_email: string | null; by_role: string | null }>) {
     try {
       if (!tr) throw new Error("smtp not configured");
       const t = T[n.kind];
       const name = n.to_name ? esc(n.to_name) : "";
-      const text = `Hi ${n.to_name ?? ""},\n\n${t.en}\nReason: ${n.reason}\n\nIf you think this is a mistake, contact us: ${SITE}contact.html\n\n---\n\nأهلا ${n.to_name ?? ""}،\n\n${t.ar}\nالسبب: ${n.reason}\n\nلو شايف إن ده حصل بالغلط، كلمنا من هنا: ${SITE}contact.html\n\nSCAR by Zenoth`;
-      const html = `<div style="font-family:system-ui,Segoe UI,Tahoma,sans-serif;max-width:560px;line-height:1.7"><p>Hi ${name},</p><p>${t.en}</p><p><b>Reason:</b> ${esc(n.reason)}</p><p>If you think this is a mistake, <a href="${SITE}contact.html">contact us</a>.</p><hr><div dir="rtl"><p>أهلا ${name}،</p><p>${t.ar}</p><p><b>السبب:</b> ${esc(n.reason)}</p><p>لو شايف إن ده حصل بالغلط، <a href="${SITE}contact.html">كلمنا من هنا</a>.</p></div><p style="color:#777">SCAR by Zenoth</p></div>`;
-      await tr.sendMail({ from: `"SCAR by Zenoth" <${gu}>`, to: n.to_email, subject: t.sub, text, html });
+      const adm = n.by_role === "admin" && n.by_name;
+      const byEn = adm ? `\nSent by admin ${n.by_name}.` : "", byAr = adm ? `\nاتبعت من الأدمن ${n.by_name}.` : "";
+      const byHtmlEn = adm ? `<p style="color:#555">Sent by admin ${esc(n.by_name!)}.</p>` : "", byHtmlAr = adm ? `<p style="color:#555">اتبعت من الأدمن ${esc(n.by_name!)}.</p>` : "";
+      const text = `Hi ${n.to_name ?? ""},\n\n${t.en}\nReason: ${n.reason}\n${byEn}\nIf you think this is a mistake, contact us: ${SITE}contact.html\n\n---\n\nأهلا ${n.to_name ?? ""}،\n\n${t.ar}\nالسبب: ${n.reason}\n${byAr}\nلو شايف إن ده حصل بالغلط، كلمنا من هنا: ${SITE}contact.html\n\nSCAR by Zenoth`;
+      const html = `<div style="font-family:system-ui,Segoe UI,Tahoma,sans-serif;max-width:560px;line-height:1.7"><p>Hi ${name},</p><p>${t.en}</p><p><b>Reason:</b> ${esc(n.reason)}</p>${byHtmlEn}<p>If you think this is a mistake, <a href="${SITE}contact.html">contact us</a>.</p><hr><div dir="rtl"><p>أهلا ${name}،</p><p>${t.ar}</p><p><b>السبب:</b> ${esc(n.reason)}</p>${byHtmlAr}<p>لو شايف إن ده حصل بالغلط، <a href="${SITE}contact.html">كلمنا من هنا</a>.</p></div><p style="color:#777">SCAR by Zenoth</p></div>`;
+      const fromName = adm ? `${String(n.by_name).replace(/["\r\n<>]/g, "")} via SCAR` : "SCAR by Zenoth";
+      const okReply = adm && n.by_email && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(n.by_email) ? n.by_email : undefined;
+      await tr.sendMail({ from: `"${fromName}" <${gu}>`, replyTo: okReply, to: n.to_email, subject: t.sub, text, html });
       await admin.rpc("finish_notice", { p_id: n.id, p_ok: true, p_err: null });
       sent++;
     } catch (e) {
