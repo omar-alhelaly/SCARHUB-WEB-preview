@@ -156,7 +156,7 @@ nav .brand{font-size:16px;letter-spacing:.1em;gap:6px;min-width:0}
 nav .brand svg{width:26px;height:26px}
 nav>button,nav>a.lang,nav button.burger{min-height:40px;min-width:40px;padding:6px 10px;font-size:14px;margin-inline-start:0;white-space:nowrap}
 nav>a.back,nav>button.back,nav .back{display:none}
-nav .chip span{display:none}nav .chip{padding:3px;min-height:40px}nav .chip svg,nav .chip img{width:32px;height:32px}
+nav .uchip .nm{display:none}nav .uchip{height:40px;padding:3px;margin-inline-start:0}nav .uchip .av{width:34px;height:34px}
 nav .links{max-height:calc(100vh - 56px);overflow-y:auto}
 nav .links a{padding:14px 12px;font-size:16px;min-height:44px}
 header,.hero .wrap{padding-left:16px;padding-right:16px}
