@@ -570,23 +570,79 @@
   }
 
 
+  /* ---------- small QR code encoder (byte mode, error correction M, versions 1-10), written for SCAR ---------- */
+  function qrMatrix(text) {
+    var ECC = [0, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26], NB = [0, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5];
+    var bytes = Array.prototype.slice.call(new TextEncoder().encode(text));
+    function align(v) { if (v === 1) return []; var n = Math.floor(v / 7) + 2, step = Math.floor((v * 8 + n * 3 + 5) / (n * 4 - 4)) * 2, r = [6], size = v * 4 + 17; for (var p = size - 7; r.length < n; p -= step) r.splice(1, 0, p); return r; }
+    function raw(v) { var r = (16 * v + 128) * v + 64; if (v >= 2) { var n = Math.floor(v / 7) + 2; r -= (25 * n - 10) * n - 55; if (v >= 7) r -= 36; } return r; }
+    var ver = 0, i, j, k;
+    for (var v = 1; v <= 10; v++) { var cap = (Math.floor(raw(v) / 8) - ECC[v] * NB[v]) * 8; if (4 + (v < 10 ? 8 : 16) + bytes.length * 8 <= cap) { ver = v; break; } }
+    if (!ver) return null;
+    var bits = []; function put(val, len) { for (var b = len - 1; b >= 0; b--) bits.push((val >>> b) & 1); }
+    put(4, 4); put(bytes.length, ver < 10 ? 8 : 16); bytes.forEach(function (b) { put(b, 8); });
+    var capBits = (Math.floor(raw(ver) / 8) - ECC[ver] * NB[ver]) * 8;
+    put(0, Math.min(4, capBits - bits.length)); while (bits.length % 8) bits.push(0);
+    for (var pad = 0xEC; bits.length < capBits; pad ^= 0xEC ^ 0x11) put(pad, 8);
+    var data = []; for (i = 0; i < bits.length; i += 8) { var by = 0; for (j = 0; j < 8; j++) by = by * 2 + bits[i + j]; data.push(by); }
+    function mul(x, y) { var z = 0; for (var q = 7; q >= 0; q--) { z = (z << 1) ^ ((z >>> 7) * 0x11D); z ^= ((y >>> q) & 1) * x; } return z; }
+    function divisor(deg) { var r = []; for (var q = 0; q < deg - 1; q++) r.push(0); r.push(1); var root = 1; for (q = 0; q < deg; q++) { for (var w = 0; w < r.length; w++) { r[w] = mul(r[w], root); if (w + 1 < r.length) r[w] ^= r[w + 1]; } root = mul(root, 2); } return r; }
+    function rem(d, dv) { var r = dv.map(function () { return 0; }); d.forEach(function (b) { var f = b ^ r.shift(); r.push(0); dv.forEach(function (c, q) { r[q] ^= mul(c, f); }); }); return r; }
+    var nb = NB[ver], el = ECC[ver], rawCw = Math.floor(raw(ver) / 8), numShort = nb - rawCw % nb, shortLen = Math.floor(rawCw / nb), blocks = [], dv = divisor(el);
+    for (i = 0, k = 0; i < nb; i++) { var dat = data.slice(k, k + shortLen - el + (i < numShort ? 0 : 1)); k += dat.length; var ecc = rem(dat, dv); if (i < numShort) dat.push(0); blocks.push(dat.concat(ecc)); }
+    var all = []; for (i = 0; i < blocks[0].length; i++) for (j = 0; j < blocks.length; j++) if (i !== shortLen - el || j >= numShort) all.push(blocks[j][i]);
+    var size = ver * 4 + 17, M = [], F = []; for (i = 0; i < size; i++) { M.push(new Array(size).fill(false)); F.push(new Array(size).fill(false)); }
+    function setF(x, y, d) { M[y][x] = d; F[y][x] = true; }
+    for (i = 0; i < size; i++) { setF(6, i, i % 2 === 0); setF(i, 6, i % 2 === 0); }
+    function finder(cx, cy) { for (var dy = -4; dy <= 4; dy++) for (var dx = -4; dx <= 4; dx++) { var d = Math.max(Math.abs(dx), Math.abs(dy)), x = cx + dx, y = cy + dy; if (x >= 0 && x < size && y >= 0 && y < size) setF(x, y, d !== 2 && d !== 4); } }
+    finder(3, 3); finder(size - 4, 3); finder(3, size - 4);
+    var ap = align(ver); ap.forEach(function (a, ai) { ap.forEach(function (b, bi) { if ((ai === 0 && bi === 0) || (ai === 0 && bi === ap.length - 1) || (ai === ap.length - 1 && bi === 0)) return; for (var dy = -2; dy <= 2; dy++) for (var dx = -2; dx <= 2; dx++) setF(a + dx, b + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1); }); });
+    function fmt(mask) { var d = (0 << 3) | mask, r = d; for (var q = 0; q < 10; q++) r = (r << 1) ^ ((r >>> 9) * 0x537); var b = ((d << 10) | r) ^ 0x5412; function g(q) { return ((b >>> q) & 1) !== 0; }
+      for (q = 0; q <= 5; q++) setF(8, q, g(q)); setF(8, 7, g(6)); setF(8, 8, g(7)); setF(7, 8, g(8)); for (q = 9; q < 15; q++) setF(14 - q, 8, g(q));
+      for (q = 0; q < 8; q++) setF(size - 1 - q, 8, g(q)); for (q = 8; q < 15; q++) setF(8, size - 15 + q, g(q)); setF(8, size - 8, true); }
+    fmt(0);
+    if (ver >= 7) { var r2 = ver; for (i = 0; i < 12; i++) r2 = (r2 << 1) ^ ((r2 >>> 11) * 0x1F25); var vb = (ver << 12) | r2; for (i = 0; i < 18; i++) { var bt = ((vb >>> i) & 1) !== 0, a = size - 11 + i % 3, b2 = Math.floor(i / 3); setF(a, b2, bt); setF(b2, a, bt); } }
+    var n = 0; for (var right = size - 1; right >= 1; right -= 2) { if (right === 6) right = 5; for (var vert = 0; vert < size; vert++) for (j = 0; j < 2; j++) { var x = right - j, up = ((right + 1) & 2) === 0, y = up ? size - 1 - vert : vert; if (!F[y][x] && n < all.length * 8) { M[y][x] = ((all[n >>> 3] >>> (7 - (n & 7))) & 1) !== 0; n++; } } }
+    function masked(mask) { var C = M.map(function (r) { return r.slice(); }); for (var y = 0; y < size; y++) for (var x = 0; x < size; x++) { if (F[y][x]) continue; var inv; switch (mask) { case 0: inv = (x + y) % 2 === 0; break; case 1: inv = y % 2 === 0; break; case 2: inv = x % 3 === 0; break; case 3: inv = (x + y) % 3 === 0; break; case 4: inv = (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0; break; case 5: inv = x * y % 2 + x * y % 3 === 0; break; case 6: inv = (x * y % 2 + x * y % 3) % 2 === 0; break; default: inv = ((x + y) % 2 + x * y % 3) % 2 === 0; } if (inv) C[y][x] = !C[y][x]; } return C; }
+    function penalty(C) { var p = 0, y, x, run; for (var pass = 0; pass < 2; pass++) for (y = 0; y < size; y++) { run = 1; for (x = 1; x < size; x++) { var a = pass ? C[x][y] : C[y][x], b = pass ? C[x - 1][y] : C[y][x - 1]; if (a === b) { run++; if (run === 5) p += 3; else if (run > 5) p++; } else run = 1; } }
+      for (y = 0; y < size - 1; y++) for (x = 0; x < size - 1; x++) if (C[y][x] === C[y][x + 1] && C[y][x] === C[y + 1][x] && C[y][x] === C[y + 1][x + 1]) p += 3;
+      var dark = 0; C.forEach(function (r) { r.forEach(function (c) { if (c) dark++; }); }); p += Math.floor(Math.abs(dark * 20 - size * size * 10) / (size * size)) * 10; return p; }
+    var best = null, bm = 0, bp = 1e9; for (var mk = 0; mk < 8; mk++) { var C = masked(mk), pp = penalty(C); if (pp < bp) { bp = pp; best = C; bm = mk; } }
+    var saveM = M; M = best; fmt(bm); return M;
+  }
+  function qrSvg(text, px) {
+    var m = qrMatrix(text); if (!m) return null; var n = m.length, q = 4, d = "";
+    for (var y = 0; y < n; y++) for (var x = 0; x < n; x++) if (m[y][x]) d += "M" + (x + q) + "," + (y + q) + "h1v1h-1z";
+    var ns = "http://www.w3.org/2000/svg", s = document.createElementNS(ns, "svg"); s.setAttribute("viewBox", "0 0 " + (n + q * 2) + " " + (n + q * 2)); s.setAttribute("width", px); s.setAttribute("height", px); s.setAttribute("shape-rendering", "crispEdges"); s.setAttribute("role", "img");
+    var bg = document.createElementNS(ns, "rect"); bg.setAttribute("width", n + q * 2); bg.setAttribute("height", n + q * 2); bg.setAttribute("fill", "#fff"); s.appendChild(bg);
+    var p = document.createElementNS(ns, "path"); p.setAttribute("d", d); p.setAttribute("fill", "#000"); s.appendChild(p); return s;
+  }
   /* ---------- learning paths + completion certificates ---------- */
   var MINS = 5;
   function pathStats(p) { var t = 0, s = 0, pts = 0; p.rooms.forEach(function (r) { t += r.tasks; s += r.solved; pts += r.points; }); return { tasks: t, solved: s, pts: pts, mins: t * MINS, done: p.rooms.length > 0 && p.rooms.every(function (r) { return r.tasks > 0 && r.solved >= r.tasks; }) }; }
   function fmtMins(m) { return m >= 60 ? Math.floor(m / 60) + tr(" h ", " س ") + (m % 60 ? (m % 60) + tr(" min", " د") : "") : m + tr(" min", " د"); }
+  var PMETA = { "cyber-foundations": { lv: "easy", hue: 160, ic: "shield" }, "networking-basics": { lv: "easy", hue: 205, ic: "net" }, "soc-analyst-start": { lv: "medium", hue: 35, ic: "eye" }, "junior-pentester": { lv: "medium", hue: 350, ic: "bug" } };
+  var ICONS = { shield: '<path d="M12 2.5l8 3v6c0 5-3.4 8.6-8 10.5-4.6-1.9-8-5.5-8-10.5v-6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>', net: '<circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/><path d="M12 7.5v4M12 11.5l-6 5.5M12 11.5l6 5.5"/>', eye: '<path d="M2 12s3.7-7 10-7 10 7 10 7-3.7 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>', bug: '<rect x="8" y="8" width="8" height="11" rx="4"/><path d="M9 8a3 3 0 016 0M4 12h4M16 12h4M5 19l3-2M19 19l-3-2M5 6l3 3M19 6l-3 3"/>' };
+  function pcover(m) { var d = h("div", { "class": "pcov", style: "--ph:" + m.hue }); var sv = document.createElementNS("http://www.w3.org/2000/svg", "svg"); sv.setAttribute("viewBox", "0 0 24 24"); sv.setAttribute("width", "54"); sv.setAttribute("height", "54"); sv.setAttribute("fill", "none"); sv.setAttribute("stroke", "currentColor"); sv.setAttribute("stroke-width", "1.5"); sv.setAttribute("stroke-linecap", "round"); sv.setAttribute("stroke-linejoin", "round"); sv.innerHTML = ICONS[m.ic] || ICONS.shield; d.appendChild(sv); return d; }
   async function pagePaths() {
     var ps = await rpc("ch_paths_list");
     clear(root); root.appendChild(setTabs("paths"));
     root.appendChild(h("div", { "class": "roomh" }, h("h2", { text: tr("Learning paths", "مسارات التعلم") }), h("p", { text: tr("Each path is an ordered list of rooms: theory first, then practice that eases in. Finish every room in a path to earn a SCAR completion certificate.", "كل مسار قايمة غرف مترتبة: النظري الأول وبعدين تطبيق بيتدرج. خلّص كل غرف المسار وخد شهادة إتمام من SCAR.") })));
-    var g = h("div", { "class": "rooms" });
-    ps.forEach(function (p, i) {
-      var st = pathStats(p);
-      g.appendChild(h("button", { "class": "room", type: "button", style: "--sh:" + [210, 150, 340][i % 3], onclick: function () { location.hash = "#/path/" + p.slug; } },
-        h("div", { "class": "meta" }, h("span", { "class": "stag", text: p.rooms.length + " " + tr("rooms", "غرف") }), h("span", { "class": "pill easy", text: "~" + fmtMins(st.mins) }), st.done ? h("span", { "class": "pill", text: tr("Completed", "مكتمل") }) : null),
-        h("h3", { text: pick(p, "title") }), h("p", { text: pick(p, "summary") }), progress(st.solved, st.tasks),
-        h("div", { "class": "meta", text: st.solved + " / " + st.tasks + " " + tr("tasks", "مهمة") + " · " + st.pts + " " + tr("pts", "نقطة") })));
+    ["easy", "medium", "hard"].forEach(function (lv) {
+      var grp = ps.filter(function (p) { return ((PMETA[p.slug] || {}).lv || "easy") === lv; }); if (!grp.length) return;
+      root.appendChild(h("div", { "class": "sec" }, h("h2", { text: tr(DIFF[lv][0], DIFF[lv][1]) }), h("small", { text: grp.length + " " + tr("paths", "مسارات") })));
+      var g = h("div", { "class": "ptiles" });
+      grp.forEach(function (p) {
+        var st = pathStats(p), m = PMETA[p.slug] || { lv: lv, hue: 210, ic: "shield" }, pct = st.tasks ? Math.round(100 * st.solved / st.tasks) : 0;
+        g.appendChild(h("button", { "class": "ptile", type: "button", onclick: function () { location.hash = "#/path/" + p.slug; } },
+          pcover(m),
+          h("div", { "class": "pbody" }, h("div", { "class": "meta" }, diffPill(lv), st.done ? h("span", { "class": "pill", text: tr("Completed", "مكتمل") }) : null),
+            h("h3", { text: pick(p, "title") }), h("p", { text: pick(p, "summary") }),
+            h("div", { "class": "meta" }, h("span", { text: p.rooms.length + " " + tr("rooms", "غرف") }), h("span", { text: "~" + fmtMins(st.mins) }), h("span", { text: st.pts + " " + tr("pts", "نقطة") })),
+            progress(st.solved, st.tasks), h("div", { "class": "meta", text: pct + "% · " + st.solved + " / " + st.tasks + " " + tr("tasks", "مهمة") }))));
+      });
+      root.appendChild(g);
     });
-    root.appendChild(g);
     var vin = ltr(h("input", { type: "text", placeholder: "SCAR-XXXX-XXXX-XXXX", maxlength: "20", "class": "cinp" }));
     root.appendChild(h("div", { "class": "box verify" }, h("h3", { text: tr("Verify a certificate", "اتأكد من شهادة") }), h("div", { "class": "rowb" }, vin, h("button", { "class": "btn2 f", type: "button", text: tr("Verify", "تحقق"), onclick: function () { var v = vin.value.trim().toUpperCase(); if (v) location.hash = "#/cert/" + encodeURIComponent(v); } }))));
   }
@@ -627,18 +683,22 @@
     clear(root); root.appendChild(setTabs("paths"));
     root.appendChild(h("button", { "class": "back", type: "button", onclick: function () { location.hash = "#/paths"; }, text: tr("< All paths", "< كل المسارات") }));
     if (!c) { root.appendChild(h("div", { "class": "empty", text: tr("No certificate with this ID was found. Check the ID and try again.", "مفيش شهادة بالرقم ده. اتأكد من الرقم وجرب تاني.") })); return; }
-    var d = new Date(c.issued_at), ds = d.toLocaleDateString(EN() ? "en-GB" : "ar-EG", { year: "numeric", month: "long", day: "numeric" });
+    var d = new Date(c.issued_at), ds = d.toLocaleDateString("en-GB", { year: "numeric", month: "long", day: "numeric" });
+    var vurl = location.href.split("#")[0].split("?")[0] + "#/cert/" + c.id;
     root.appendChild(h("div", { "class": "okv", text: "\u2713 " + tr("Verified: this certificate was issued by SCAR.", "تم التحقق: الشهادة دي صادرة من SCAR.") }));
-    root.appendChild(h("div", { "class": "certp" },
+    var qrBox = h("div", { "class": "cqr" }); var qs = qrSvg(vurl, 132); if (qs) qrBox.appendChild(qs);
+    var cert = h("div", { "class": "certp" },
       h("div", { "class": "cin" },
-        h("div", { "class": "ck", text: "SCAR" }), h("div", { "class": "ct", text: tr("Certificate of Completion", "شهادة إتمام") }),
-        h("div", { "class": "cs", text: tr("This certifies that", "تشهد هذه الشهادة بأن") }), h("div", { "class": "cn", text: c.holder }),
-        h("div", { "class": "cs", text: tr("completed all " + c.rooms + " rooms of the learning path", "أتمّ كل " + c.rooms + " غرف من مسار التعلم") }),
-        h("div", { "class": "cp", text: pick(c, "title") }),
-        h("div", { "class": "cf", text: tr("Issued " + ds, "تاريخ الإصدار " + ds) }),
+        h("div", { "class": "ck", text: "SCAR" }), h("div", { "class": "ct", text: "Certificate of Completion" }),
+        h("div", { "class": "cs", text: "This certifies that" }), h("div", { "class": "cn", text: c.holder }),
+        h("div", { "class": "cs", text: "has completed all " + c.rooms + " rooms of the learning path" }),
+        h("div", { "class": "cp", text: c.title_en }),
+        h("div", { "class": "cf", text: "Issued " + ds }),
+        qrBox, h("div", { "class": "cs", text: "Scan to verify" }),
         ltr(h("div", { "class": "ci", text: c.id })),
-        h("div", { "class": "cd", text: tr("SCAR completion certificate. It shows the learner finished this SCAR course. It is not an official accreditation or a professional qualification. Verify at this page with the ID above.", "شهادة إتمام من SCAR. بتثبت إن المتعلم خلّص الكورس ده على SCAR. مش اعتماد رسمي ولا مؤهل مهني. تقدر تتحقق منها من الصفحة دي بالرقم اللي فوق.") }))));
-    root.appendChild(h("div", { "class": "rowb noprint" }, h("button", { "class": "btn2 f", type: "button", text: tr("Print / save as PDF", "اطبع / احفظ PDF"), onclick: function () { window.print(); } }), h("button", { "class": "btn2", type: "button", text: tr("Copy verify link", "انسخ لينك التحقق"), onclick: function () { try { navigator.clipboard.writeText(location.href.split("#")[0] + "#/cert/" + c.id); toast(tr("Copied", "اتنسخ")); } catch (e) {} } })));
+        h("div", { "class": "cd", text: "SCAR completion certificate. It shows the learner finished this SCAR learning path. It is not an official accreditation or a professional qualification. Verify it at the address the QR code opens, using the ID above." })));
+    cert.setAttribute("dir", "ltr"); root.appendChild(cert);
+    root.appendChild(h("div", { "class": "rowb noprint" }, h("button", { "class": "btn2 f", type: "button", text: tr("Print / save as PDF", "اطبع / احفظ PDF"), onclick: function () { window.print(); } }), h("button", { "class": "btn2", type: "button", text: tr("Copy verify link", "انسخ لينك التحقق"), onclick: function () { try { navigator.clipboard.writeText(vurl); toast(tr("Copied", "اتنسخ")); } catch (e) {} } })));
   }
   /* ---------- router ---------- */
   var busy = 0;
