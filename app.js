@@ -1311,8 +1311,8 @@
         return;
       }
       var grid = document.querySelector("#c-" + t.class + " .grid"); if (!grid) return;
-      var locked = !!LK[t.id], cmds = h("div", { "class": "cmds" }); if (t.coming_soon) cmds.appendChild(h("div", { "class": "lockmsg", text: soonText() })); else if (locked) cmds.appendChild(h("div", { "class": "lockmsg", text: lockText() })); else (t.commands || []).forEach(function (c) { cmds.appendChild(h("code", { text: c })); });
-      var p = h("p", { text: t.description_en }); if (t.description_ar) { p.setAttribute("data-en", t.description_en); p.setAttribute("data-ar", t.description_ar); }
+      var locked = !!LK[t.id], cmds = h("div", { "class": "cmds" }); if (t.coming_soon) cmds.appendChild(h("div", { "class": "lockmsg", style: "margin:8px 0;padding:8px 10px;border:1px dashed currentColor;border-radius:8px;font-size:13px;opacity:.8", text: soonText() })); else if (locked) cmds.appendChild(h("div", { "class": "lockmsg", text: lockText() })); else (t.commands || []).forEach(function (c) { cmds.appendChild(h("code", { text: c })); });
+      var p = h("p", { text: (EN() || !t.description_ar) ? t.description_en : t.description_ar }); if (t.description_ar) { p.setAttribute("data-en", t.description_en); p.setAttribute("data-ar", t.description_ar); }
       var tagc = t.third_party ? h("span", { "class": "tag third", text: "THIRD-PARTY" }) : t.coming_soon ? h("span", { "class": "tag", text: tr("COMING SOON", "قريبا") }) : t.visibility === "private" ? h("span", { "class": "tag", text: locked ? tr("LOCKED", "مقفول") : "PRO" }) : h("span", { "class": "tag new", text: "NEW" });
       var priceEl = null;
       if (t.price_minor != null && !t.third_party) { var on = t.discount_percent > 0 && (!t.discount_until || new Date(t.discount_until) > new Date()), eff = on ? Math.floor(t.price_minor * (100 - t.discount_percent) / 100) : t.price_minor;
