@@ -227,7 +227,7 @@
   var root, state = { stats: null };
   function setTabs(active) {
     var t = h("div", { "class": "chtabs" });
-    [["rooms", "#/", tr("Rooms", "الغرف")], ["board", "#/board", tr("Leaderboard", "المتصدرين")], ["me", "#/me", tr("My progress", "تقدمي")]].concat(isStaff() ? [["admin", "#/admin", tr("Manage", "الإدارة")]] : []).forEach(function (x) {
+    [["rooms", "#/", tr("Rooms", "الغرف")], ["paths", "#/paths", tr("Learning paths", "مسارات التعلم")], ["board", "#/board", tr("Leaderboard", "المتصدرين")], ["me", "#/me", tr("My progress", "تقدمي")]].concat(isStaff() ? [["admin", "#/admin", tr("Manage", "الإدارة")]] : []).forEach(function (x) {
       t.appendChild(h("button", { "class": "tab" + (active === x[0] ? " on" : ""), type: "button", onclick: function () { location.hash = x[1]; } , text: x[2] }));
     });
     return t;
@@ -417,6 +417,77 @@
     }
   }
 
+
+  /* ---------- learning paths + completion certificates ---------- */
+  var MINS = 5;
+  function pathStats(p) { var t = 0, s = 0, pts = 0; p.rooms.forEach(function (r) { t += r.tasks; s += r.solved; pts += r.points; }); return { tasks: t, solved: s, pts: pts, mins: t * MINS, done: p.rooms.length > 0 && p.rooms.every(function (r) { return r.tasks > 0 && r.solved >= r.tasks; }) }; }
+  function fmtMins(m) { return m >= 60 ? Math.floor(m / 60) + tr(" h ", " س ") + (m % 60 ? (m % 60) + tr(" min", " د") : "") : m + tr(" min", " د"); }
+  async function pagePaths() {
+    var ps = await rpc("ch_paths_list");
+    clear(root); root.appendChild(setTabs("paths"));
+    root.appendChild(h("div", { "class": "roomh" }, h("h2", { text: tr("Learning paths", "مسارات التعلم") }), h("p", { text: tr("Each path is an ordered list of rooms: theory first, then practice that eases in. Finish every room in a path to earn a SCAR completion certificate.", "كل مسار قايمة غرف مترتبة: النظري الأول وبعدين تطبيق بيتدرج. خلّص كل غرف المسار وخد شهادة إتمام من SCAR.") })));
+    var g = h("div", { "class": "rooms" });
+    ps.forEach(function (p, i) {
+      var st = pathStats(p);
+      g.appendChild(h("button", { "class": "room", type: "button", style: "--sh:" + [210, 150, 340][i % 3], onclick: function () { location.hash = "#/path/" + p.slug; } },
+        h("div", { "class": "meta" }, h("span", { "class": "stag", text: p.rooms.length + " " + tr("rooms", "غرف") }), h("span", { "class": "pill easy", text: "~" + fmtMins(st.mins) }), st.done ? h("span", { "class": "pill", text: tr("Completed", "مكتمل") }) : null),
+        h("h3", { text: pick(p, "title") }), h("p", { text: pick(p, "summary") }), progress(st.solved, st.tasks),
+        h("div", { "class": "meta", text: st.solved + " / " + st.tasks + " " + tr("tasks", "مهمة") + " · " + st.pts + " " + tr("pts", "نقطة") })));
+    });
+    root.appendChild(g);
+    var vin = ltr(h("input", { type: "text", placeholder: "SCAR-XXXX-XXXX-XXXX", maxlength: "20", "class": "cinp" }));
+    root.appendChild(h("div", { "class": "box verify" }, h("h3", { text: tr("Verify a certificate", "اتأكد من شهادة") }), h("div", { "class": "rowb" }, vin, h("button", { "class": "btn2 f", type: "button", text: tr("Verify", "تحقق"), onclick: function () { var v = vin.value.trim().toUpperCase(); if (v) location.hash = "#/cert/" + encodeURIComponent(v); } }))));
+  }
+  async function pagePath(slug) {
+    var ps = await rpc("ch_paths_list"), p = ps.filter(function (x) { return x.slug === slug; })[0];
+    clear(root); root.appendChild(setTabs("paths"));
+    root.appendChild(h("button", { "class": "back", type: "button", onclick: function () { location.hash = "#/paths"; }, text: tr("< All paths", "< كل المسارات") }));
+    if (!p) { root.appendChild(h("div", { "class": "empty", text: tr("Path not found.", "المسار مش موجود.") })); return; }
+    var st = pathStats(p);
+    root.appendChild(h("div", { "class": "roomh" }, h("div", { "class": "meta" }, h("span", { "class": "pill easy", text: p.rooms.length + " " + tr("rooms", "غرف") }), h("span", { "class": "pill medium", text: "~" + fmtMins(st.mins) }), h("span", { "class": "pill", text: st.pts + " " + tr("pts", "نقطة") })), h("h2", { text: pick(p, "title") }), h("p", { text: pick(p, "summary") }), progress(st.solved, st.tasks), h("div", { "class": "meta", text: st.solved + " / " + st.tasks + " " + tr("tasks done", "مهمة اتحلت") })));
+    root.appendChild(h("div", { "class": "box" }, h("h3", { text: tr("What this path prepares you for", "المسار ده بيجهزك لإيه") }), h("p", { text: pick(p, "prepares") })));
+    var list = h("div", { "class": "plist" }), nextSet = false;
+    p.rooms.forEach(function (r, i) {
+      var done = r.tasks > 0 && r.solved >= r.tasks, isNext = !done && !nextSet; if (isNext) nextSet = true;
+      list.appendChild(h("button", { "class": "prow" + (done ? " done" : "") + (isNext ? " next" : ""), type: "button", onclick: function () { location.hash = "#/room/" + r.slug; } },
+        h("span", { "class": "pn", text: done ? "\u2713" : String(i + 1) }),
+        h("span", { "class": "pt" }, h("b", { text: pick(r, "title") }), h("small", { text: r.solved + " / " + r.tasks + " " + tr("tasks", "مهمة") + " · ~" + fmtMins(r.tasks * MINS) }), progress(r.solved, r.tasks)),
+        diffPill(r.difficulty), isNext ? h("span", { "class": "pill", text: tr("Next", "التالي") }) : null));
+    });
+    root.appendChild(list);
+    var cb = h("div", { "class": "box certbox" });
+    if (p.cert) {
+      cb.appendChild(h("h3", { text: tr("You completed this path", "خلّصت المسار ده") }));
+      cb.appendChild(h("button", { "class": "btn2 f", type: "button", text: tr("View your certificate", "اعرض شهادتك"), onclick: function () { location.hash = "#/cert/" + p.cert; } }));
+    } else if (st.done && me) {
+      var nm = h("input", { type: "text", maxlength: "60", placeholder: tr("Name to print on the certificate", "الاسم اللي هيتكتب على الشهادة"), "class": "cinp" });
+      cb.appendChild(h("h3", { text: tr("Path complete. Get your certificate", "خلّصت المسار. خد شهادتك") }));
+      cb.appendChild(h("p", { "class": "note", text: tr("Use the name you want shown publicly. Anyone with the certificate ID can verify the name, path and date.", "اكتب الاسم اللي عايزه يظهر علنًا. أي حد معاه رقم الشهادة يقدر يتأكد من الاسم والمسار والتاريخ.") }));
+      cb.appendChild(h("div", { "class": "rowb" }, nm, h("button", { "class": "btn2 f", type: "button", text: tr("Issue certificate", "اطلع الشهادة"), onclick: async function () { try { var id = await rpc("ch_issue_cert", { p_path: p.slug, p_name: nm.value }); location.hash = "#/cert/" + id; } catch (e) { toast(tr("Could not issue: check the name (2-60 characters).", "مقدرتش أطلعها: اتأكد من الاسم (2 لـ 60 حرف).")); } } })));
+    } else {
+      cb.appendChild(h("h3", { text: tr("Completion certificate", "شهادة الإتمام") }));
+      cb.appendChild(h("p", { "class": "note", text: me ? tr("Solve every task in every room above to unlock it.", "حل كل مهمة في كل الغرف اللي فوق عشان تتفتح.") : tr("Sign in and solve every task in every room to unlock it.", "سجّل دخول وحل كل مهمة في كل الغرف عشان تتفتح.") }));
+    }
+    root.appendChild(cb);
+  }
+  async function pageCert(id) {
+    var c = null; try { c = await rpc("ch_verify_cert", { p_id: id }); } catch (e) {}
+    clear(root); root.appendChild(setTabs("paths"));
+    root.appendChild(h("button", { "class": "back", type: "button", onclick: function () { location.hash = "#/paths"; }, text: tr("< All paths", "< كل المسارات") }));
+    if (!c) { root.appendChild(h("div", { "class": "empty", text: tr("No certificate with this ID was found. Check the ID and try again.", "مفيش شهادة بالرقم ده. اتأكد من الرقم وجرب تاني.") })); return; }
+    var d = new Date(c.issued_at), ds = d.toLocaleDateString(EN() ? "en-GB" : "ar-EG", { year: "numeric", month: "long", day: "numeric" });
+    root.appendChild(h("div", { "class": "okv", text: "\u2713 " + tr("Verified: this certificate was issued by SCAR.", "تم التحقق: الشهادة دي صادرة من SCAR.") }));
+    root.appendChild(h("div", { "class": "certp" },
+      h("div", { "class": "cin" },
+        h("div", { "class": "ck", text: "SCAR" }), h("div", { "class": "ct", text: tr("Certificate of Completion", "شهادة إتمام") }),
+        h("div", { "class": "cs", text: tr("This certifies that", "تشهد هذه الشهادة بأن") }), h("div", { "class": "cn", text: c.holder }),
+        h("div", { "class": "cs", text: tr("completed all " + c.rooms + " rooms of the learning path", "أتمّ كل " + c.rooms + " غرف من مسار التعلم") }),
+        h("div", { "class": "cp", text: pick(c, "title") }),
+        h("div", { "class": "cf", text: tr("Issued " + ds, "تاريخ الإصدار " + ds) }),
+        ltr(h("div", { "class": "ci", text: c.id })),
+        h("div", { "class": "cd", text: tr("SCAR completion certificate. It shows the learner finished this SCAR course. It is not an official accreditation or a professional qualification. Verify at this page with the ID above.", "شهادة إتمام من SCAR. بتثبت إن المتعلم خلّص الكورس ده على SCAR. مش اعتماد رسمي ولا مؤهل مهني. تقدر تتحقق منها من الصفحة دي بالرقم اللي فوق.") }))));
+    root.appendChild(h("div", { "class": "rowb noprint" }, h("button", { "class": "btn2 f", type: "button", text: tr("Print / save as PDF", "اطبع / احفظ PDF"), onclick: function () { window.print(); } }), h("button", { "class": "btn2", type: "button", text: tr("Copy verify link", "انسخ لينك التحقق"), onclick: function () { try { navigator.clipboard.writeText(location.href.split("#")[0] + "#/cert/" + c.id); toast(tr("Copied", "اتنسخ")); } catch (e) {} } })));
+  }
   /* ---------- router ---------- */
   var busy = 0;
   async function render() {
@@ -426,6 +497,9 @@
       if (my !== busy) return;
       var hs = location.hash || "#/", m;
       if ((m = hs.match(/^#\/room\/([a-z0-9-]+)/))) await pageRoom(m[1]);
+      else if ((m = hs.match(/^#\/path\/([a-z0-9-]+)/))) await pagePath(m[1]);
+      else if ((m = hs.match(/^#\/cert\/([A-Za-z0-9-]+)/))) await pageCert(decodeURIComponent(m[1]));
+      else if (hs.indexOf("#/paths") === 0) await pagePaths();
       else if (hs.indexOf("#/board") === 0) await pageBoard(BSEC);
       else if (hs.indexOf("#/me") === 0) await pageMe();
       else if (hs.indexOf("#/admin") === 0) await pageAdmin(null);
