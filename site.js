@@ -22,7 +22,7 @@ window.addEventListener('DOMContentLoaded',function(){
 
  try{var lk=document.querySelector('#nav .links'),upd=lk&&lk.querySelector('a[href="updates.html"]');
   if(lk&&upd&&!lk.querySelector('a[href="research.html"]')){var pg=location.pathname.split('/').pop();
-   [['research.html','Research','\u0628\u062d\u0648\u062b'],['incidents.html','Incidents','\u0642\u0635\u0635 \u0627\u0644\u062d\u0648\u0627\u062f\u062b']].reverse().forEach(function(x){var na=document.createElement('a');na.href=x[0];na.dataset.en=x[1];na.dataset.ar=x[2];na.textContent=x[1];if(pg===x[0])na.className='on';upd.parentNode.insertBefore(na,upd.nextSibling)})}}catch(e){}
+   [['research.html','Research','\u0628\u062d\u0648\u062b'],['incidents.html','Incidents','\u0642\u0635\u0635 \u0627\u0644\u062d\u0648\u0627\u062f\u062b'],['challenges.html','Challenges','\u0627\u0644\u062a\u062d\u062f\u064a\u0627\u062a']].reverse().forEach(function(x){var na=document.createElement('a');na.href=x[0];na.dataset.en=x[1];na.dataset.ar=x[2];na.textContent=x[1];if(pg===x[0])na.className='on';upd.parentNode.insertBefore(na,upd.nextSibling)})}}catch(e){}
  try{var nv2=document.getElementById('nav'),an2=document.getElementById('loginlink')||document.getElementById('lang');
   if(nv2&&an2&&!document.getElementById('commlink')){var cl=document.createElement('a');cl.id='commlink';cl.href='community.html';cl.className='lang'+(location.pathname.split('/').pop()==='community.html'?' on':'');cl.dataset.en='Community';cl.dataset.ar='\u0627\u0644\u0645\u062c\u062a\u0645\u0639';cl.textContent=cl.dataset.en;cl.style.cssText='text-decoration:none;display:inline-flex;align-items:center';an2.parentNode.insertBefore(cl,an2)}}catch(e){}
  setLang(L);
