@@ -277,7 +277,7 @@
       else if (b.t === "tip") read.appendChild(h("div", { "class": "tipb", text: (EN() ? b.en : (b.ar || b.en)) }));
       else if (b.t === "code") read.appendChild(h("pre", { "class": "cb", text: b.text }));
     });
-    left.appendChild(read);
+    right.appendChild(read);
     var arts = body.artifacts || [];
     if (arts.length) {
       var holder = h("div", { "class": "box" }), tabs = h("div", { "class": "atabs" }), view = h("div");
