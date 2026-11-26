@@ -117,6 +117,7 @@
     if (s) {
       var r = await sb.from("profiles").select("id,email,username,alias,avatar,role,status").eq("id", s.user.id).maybeSingle();
       me = r.data && r.data.status === "active" ? r.data : null;
+      if (me) { try { if (!sessionStorage.getItem("lg_" + s.user.id)) { sessionStorage.setItem("lg_" + s.user.id, "1"); sb.rpc("log_login").then(function () {}, function () {}); } } catch (e) {} }
       if (!me) await sb.auth.signOut();
     }
     return true;
@@ -129,6 +130,7 @@
     var m = n.meta || {}, plan = m.plan ? " (" + m.plan + ")" : "", until = m.until ? new Date(m.until).toLocaleDateString(EN() ? "en-GB" : "ar-EG") : "";
     if (n.kind === "free_plan_granted") return tr("You received a free subscription from the owner" + plan + "." + (until ? " Valid until " + until + "." : ""), "حصلت على اشتراك مجاني من المالك" + plan + "." + (until ? " صالح لحد " + until + "." : ""));
     if (n.kind === "free_plan_revoked") return tr("The owner ended your free subscription" + plan + ".", "المالك أنهى اشتراكك المجاني" + plan + ".");
+    if (n.kind === "new_user") return tr("New user registered: " + (m.user || ""), "مستخدم جديد سجل: " + (m.user || ""));
     if (n.kind === "payment_pending") return tr("Your payment" + plan + " was received. Waiting for confirmation from the team.", "دفعتك" + plan + " اتسلمت. مستنية تأكيد الفريق.");
     if (n.kind === "payment_approved") return tr("Your payment" + plan + " was approved. Your subscription is active.", "دفعتك" + plan + " اتقبلت. اشتراكك اتفعّل.");
     if (n.kind === "payment_rejected") return tr("Your payment" + plan + " was rejected." + (m.reason ? " Reason: " + m.reason : ""), "دفعتك" + plan + " اترفضت." + (m.reason ? " السبب: " + m.reason : ""));
@@ -704,6 +706,16 @@
       });
     cp.appendChild(cmsg);
     }
+    /* logs (owner and admins) */
+    var lp = h("div", { "class": "panel", id: "logs" }, h("h2", { text: tr("Logs", "السجل") })), lmsg = h("div", { "class": "msg" }), ltb = h("tbody"), lsel = h("select", { "aria-label": "filter" });
+    box.appendChild(lp);
+    var LBL = { signup: ["Sign up", "تسجيل جديد"], login: ["Login", "دخول"], ban_user: ["Ban", "حظر"], unban_user: ["Unban", "فك حظر"], admin_delete_user: ["Account deleted by admin", "حذف حساب بواسطة أدمن"], delete_account: ["Account deleted by user", "المستخدم حذف حسابه"], grant_plan: ["Free plan granted", "اشتراك مجاني اتمنح"], revoke_plan: ["Free plan revoked", "اشتراك مجاني اتسحب"], review_manual_payment: ["Payment reviewed", "مراجعة دفعة"], set_role: ["Role changed", "تغيير صلاحية"], claim_owner: ["Owner claimed", "استلام الأونر"], tool_price: ["Tool price", "سعر أداة"], set_manual_instructions: ["Wallet details changed", "تغيير بيانات المحفظة"] };
+    lsel.appendChild(h("option", { value: "", text: tr("All", "الكل") })); ["signup", "login", "ban_user", "unban_user", "admin_delete_user", "delete_account", "grant_plan", "revoke_plan", "review_manual_payment", "set_role"].forEach(function (k) { lsel.appendChild(h("option", { value: k, text: tr(LBL[k][0], LBL[k][1]) })); });
+    lp.appendChild(h("div", { "class": "row" }, lsel)); lp.appendChild(h("table", { "class": "t" }, h("thead", null, h("tr", null, h("th", { text: tr("When", "الوقت") }), h("th", { text: tr("What", "إيه") }), h("th", { text: tr("By", "بواسطة") }), h("th", { text: tr("User", "المستخدم") }))), ltb)); lp.appendChild(lmsg);
+    var allLogs = [];
+    function drawLogs() { clear(ltb); allLogs.filter(function (l) { return !lsel.value || l.action === lsel.value; }).slice(0, 200).forEach(function (l) { var lb = LBL[l.action]; ltb.appendChild(h("tr", null, h("td", { text: new Date(l.at).toLocaleString(EN() ? "en-GB" : "ar-EG") }), h("td", { text: lb ? tr(lb[0], lb[1]) : l.action }), h("td", { text: l.actor_name || "-" }), h("td", { text: l.target_name || "-" }))); }); }
+    lsel.addEventListener("change", drawLogs);
+    (async function () { var lr = await sb.rpc("admin_logs", { p_limit: 500 }); if (lr.error) return say(lmsg, tr("Could not load logs.", "ماقدرتش أحمل السجل."), "err"); allLogs = lr.data || []; drawLogs(); })();
     if (!owner) return;
     /* plans (owner only) */
     var pp = h("div", { "class": "panel" }, h("h2", { text: tr("Payments", "المدفوعات") })), pmsg = h("div", { "class": "msg" }); box.appendChild(pp);
