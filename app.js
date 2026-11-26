@@ -502,7 +502,8 @@
     var chans = [["general", tr("General chat", "الشات العام"), true], ["admins", tr("Admins only", "للإدارة فقط"), isStaff()]].filter(function (c) { return c[2]; });
     var box = h("div", { "class": "wide" }), tabs = h("div", { "class": "tabs" }), log = h("div", { "class": "chatbox", role: "log", "aria-live": "polite" });
     var input = h("input", { type: "text", maxlength: "1000", "aria-label": tr("Message", "رسالة"), style: "flex:1;padding:11px;border-radius:10px;border:1px solid var(--b);background:var(--bg);color:var(--t)" });
-    var err = h("div", { "class": "msg" }), cur = "general", names = {}, sub = null;
+    var err = h("div", { "class": "msg" }), cur = "general", names = {}, sub = null, lastSig = "";
+    setInterval(function () { if (!document.hidden) load(); }, 4000);
     async function who(ids) {
       var need = ids.filter(function (i) { return !names[i]; }); if (!need.length) return;
       var r = await sb.from("public_profiles").select("id,display_name,avatar,subscribed").in("id", need);
@@ -516,11 +517,13 @@
     }
     async function load() {
       var r = await sb.from("chat_messages").select("id,user_id,body,created_at").eq("channel", cur).order("created_at", { ascending: false }).limit(60);
-      var rows = (r.data || []).reverse(); await who(rows.map(function (x) { return x.user_id; }));
-      clear(log); rows.forEach(function (m) { log.appendChild(line(m)); }); log.scrollTop = log.scrollHeight;
+      var rows = (r.data || []).reverse(), sg = cur + ":" + rows.map(function (x) { return x.id; }).join(",");
+      if (sg === lastSig) return; lastSig = sg;
+      var atEnd = log.scrollHeight - log.scrollTop - log.clientHeight < 80; await who(rows.map(function (x) { return x.user_id; }));
+      clear(log); rows.forEach(function (m) { log.appendChild(line(m)); }); if (atEnd || !log.getAttribute("data-init")) { log.scrollTop = log.scrollHeight; log.setAttribute("data-init", "1"); }
     }
     function select(c) {
-      cur = c; if (sub) sb.removeChannel(sub);
+      cur = c; lastSig = ""; if (sub) sb.removeChannel(sub);
       sub = sb.channel("chat-" + c).on("postgres_changes", { event: "*", schema: "public", table: "chat_messages", filter: "channel=eq." + c }, load).subscribe();
       Array.prototype.forEach.call(tabs.children, function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-c") === c); }); load();
     }
