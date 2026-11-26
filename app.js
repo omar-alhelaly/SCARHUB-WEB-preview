@@ -241,7 +241,7 @@
     st.textContent = "html.in body{background:radial-gradient(1100px 560px at 15% -10%,#3b2c0a 0,transparent 55%),radial-gradient(900px 500px at 90% 0,#2a0b10 0,transparent 60%),#0b0a08}html.in #loginlink{display:none!important}html.in nav{border-bottom:1px solid #c9a22799;box-shadow:0 2px 18px #c9a22722}.uchip{display:inline-flex;align-items:center;gap:6px;height:36px;box-sizing:border-box;padding:2px 10px 2px 2px;border:1px solid #c9a227;border-radius:30px;color:#f0d98a;text-decoration:none;font-size:13px;white-space:nowrap;max-width:150px;flex:none;margin-inline-start:6px}.uchip .av{display:block;flex:none;width:30px;height:30px;border-radius:50%;overflow:hidden}.uchip .av>*{display:block;width:100%!important;height:100%!important;max-width:none;object-fit:cover;border-radius:50%}.uchip .nm{overflow:hidden;text-overflow:ellipsis;max-width:90px}.uchip:hover{background:#c9a22722}";
     document.head.appendChild(st); document.documentElement.classList.add("in");
     var nav = document.getElementById("nav"); if (!nav) return;
-    var chip = h("a", { "class": "uchip", href: "account.html", title: (isStaff() ? me.alias : me.username) + " - " + tr("My account", "حسابي") }, h("span", { "class": "av" }, avatarSvg(me.avatar, me.id)), h("span", { "class": "nm", text: isStaff() ? me.alias : me.username }));
+    var chip = h("a", { "class": "uchip" + (isStaff() ? " " + me.role : ""), href: "account.html", title: (isStaff() ? me.alias : me.username) + " - " + tr("My account", "حسابي") }, h("span", { "class": "av" }, avatarSvg(me.avatar, me.id)), h("span", { "class": "nm", text: isStaff() ? me.alias : me.username }), isStaff() ? h("span", { "class": "bdg " + me.role, text: me.role === "owner" ? tr("Owner", "المالك") : tr("Admin", "أدمن") }) : null);
     var lg = document.getElementById("lang"); if (lg && lg.parentNode === nav) nav.insertBefore(chip, lg); else nav.appendChild(chip);
     bellInit(nav, chip);
   }
@@ -512,30 +512,117 @@
     if (location.hash) { var t = $(location.hash.slice(1)); if (t) t.scrollIntoView(); }
   }
 
+  /* ---------- badges, public profile, moderation, voice ---------- */
+  function badgesEl(role, sub) {
+    var w = h("span", { "class": "bdgs" });
+    if (role === "owner") w.appendChild(h("span", { "class": "bdg owner", text: tr("Owner", "المالك") }));
+    else if (role === "admin") w.appendChild(h("span", { "class": "bdg admin", text: tr("Admin", "أدمن") }));
+    if (sub) w.appendChild(h("span", { "class": "bdg sub", text: "\u2605 " + tr("Subscriber", "مشترك") }));
+    return w;
+  }
+  function fmtDate(v) { return v ? new Date(v).toLocaleDateString(EN() ? "en-GB" : "ar-EG") : "-"; }
+  function fmtTime(v) { return v ? new Date(v).toLocaleString(EN() ? "en-GB" : "ar-EG") : "-"; }
+  var ACT_LBL = { signup: ["Sign up", "تسجيل جديد"], block_user: ["Blocked", "حظر"], unblock_user: ["Unblocked", "فك حظر"], ban_user: ["Banned", "حظر"], unban_user: ["Unbanned", "فك حظر"], grant_plan: ["Free plan granted", "اشتراك مجاني اتمنح"], revoke_plan: ["Free plan revoked", "اشتراك مجاني اتسحب"], review_manual_payment: ["Payment reviewed", "مراجعة دفعة"], set_role: ["Role changed", "تغيير صلاحية"] };
+  async function openProfile(id) {
+    var old = $("profmodal"); if (old) old.remove();
+    var ov = h("div", { id: "profmodal", role: "dialog", "aria-modal": "true", style: "position:fixed;inset:0;z-index:1000;background:#000c;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:4vh 12px" });
+    var card = h("div", { "class": "panel", style: "max-width:580px;width:100%;position:relative;margin:0" });
+    var close = h("button", { "class": "btn", type: "button", text: "\u00d7", "aria-label": "close", style: "position:absolute;top:10px;inset-inline-end:10px", on: { click: function () { ov.remove(); } } });
+    ov.addEventListener("click", function (e) { if (e.target === ov) ov.remove(); });
+    card.appendChild(h("p", { "class": "hint", text: "..." })); ov.appendChild(card); document.body.appendChild(ov);
+    var r = await sb.rpc("get_profile", { target: id });
+    clear(card); card.appendChild(close);
+    if (r.error || !r.data) return card.appendChild(h("p", { text: tr("Profile not available.", "البروفايل مش متاح.") }));
+    var d = r.data;
+    function row(k, v) { return h("p", { style: "margin:4px 0" }, h("b", { text: k + ": " }), typeof v === "string" ? document.createTextNode(v) : v); }
+    var av = h("div", { "class": "av", style: "width:64px;height:64px;flex:none" }, avatarSvg(d.avatar, d.id));
+    card.appendChild(h("div", { style: "display:flex;gap:14px;align-items:center;margin-bottom:10px;padding-inline-end:40px" }, av, h("div", null, h("h2", { text: d.name, style: "margin:0" }), badgesEl(d.role, d.subscribed))));
+    card.appendChild(row(tr("Joined", "انضم"), fmtDate(d.joined)));
+    var pl = (d.plans || []).slice(); if (d.all_access) pl.unshift(tr("All tools", "كل الأدوات"));
+    card.appendChild(row(tr("Plan", "الاشتراك"), pl.length ? pl.join(", ") : tr("None", "مفيش")));
+    card.appendChild(row(tr("Chat messages", "رسايل الشات"), String(d.messages) + (d.voice ? " (" + d.voice + " " + tr("voice", "صوتية") + ")" : "")));
+    card.appendChild(row(tr("Last post", "آخر مشاركة"), d.last_post ? fmtTime(d.last_post) : "-"));
+    if ((d.posts || []).length) {
+      card.appendChild(h("h3", { text: tr("Recent posts", "آخر المشاركات"), style: "margin:14px 0 4px" }));
+      d.posts.forEach(function (p) { card.appendChild(h("p", { "class": "hint", style: "margin:2px 0", text: fmtDate(p.created_at) + " - " + (p.body ? p.body.slice(0, 140) : tr("Voice message", "رسالة صوتية") + " " + p.audio_secs + "s") })); });
+    }
+    if (!d.staff) return;
+    var s = d.staff;
+    card.appendChild(h("h3", { text: tr("Staff only", "للإدارة فقط"), style: "margin:18px 0 4px;color:#d4a017" }));
+    card.appendChild(row("Email", s.email || "-"));
+    if (s.username) card.appendChild(row(tr("Username", "اسم المستخدم"), s.username));
+    card.appendChild(row(tr("Status", "الحالة"), s.status));
+    card.appendChild(h("h3", { text: tr("Payments and plans", "الدفعات والاشتراكات"), style: "margin:12px 0 4px" }));
+    if (!(s.payments || []).length) card.appendChild(h("p", { "class": "hint", text: tr("No payments.", "مفيش دفعات.") }));
+    (s.payments || []).forEach(function (p) { card.appendChild(h("p", { "class": "hint", style: "margin:2px 0", text: fmtDate(p.created_at) + " - " + (p.plan || "-") + " - " + (p.amount_minor / 100).toFixed(2) + " " + p.currency + " - " + p.method + " - " + p.status })); });
+    card.appendChild(h("h3", { text: tr("Block history", "سجل الحظر"), style: "margin:12px 0 4px" }));
+    var nowD = new Date(), act = (s.blocks || []).filter(function (b) { return !b.lifted_at && (!b.expires_at || new Date(b.expires_at) > nowD); });
+    if (!(s.blocks || []).length) card.appendChild(h("p", { "class": "hint", text: tr("No blocks.", "مفيش حظر.") }));
+    (s.blocks || []).forEach(function (b) { card.appendChild(h("p", { "class": "hint", style: "margin:2px 0", text: fmtDate(b.created_at) + " - " + (b.scope === "site" ? tr("Whole site", "الموقع كله") : tr("Chat", "الشات")) + " - " + b.reason + " - " + (b.lifted_at ? tr("lifted ", "اتفك ") + fmtDate(b.lifted_at) : b.expires_at ? tr("until ", "لحد ") + fmtTime(b.expires_at) : tr("permanent", "دائم")) + " (" + (b.by || "?") + ")" })); });
+    card.appendChild(h("h3", { text: tr("Logs", "السجل"), style: "margin:12px 0 4px" }));
+    (s.logs || []).forEach(function (l) { var lb = ACT_LBL[l.action]; card.appendChild(h("p", { "class": "hint", style: "margin:2px 0", text: fmtTime(l.at) + " - " + (lb ? tr(lb[0], lb[1]) : l.action) })); });
+    var can = d.role !== "owner" && d.id !== me.id && s.status === "active" && (me.role === "owner" || d.role === "user");
+    if (!can) return;
+    var msg = h("div", { "class": "msg" });
+    card.appendChild(h("h3", { text: tr("Block this user", "احظر المستخدم"), style: "margin:16px 0 6px;color:#e11d2e" }));
+    act.forEach(function (b) {
+      card.appendChild(h("p", { style: "margin:4px 0" }, h("span", { "class": "tag", text: (b.scope === "site" ? tr("Blocked from the whole site", "محظور من الموقع كله") : tr("Blocked from chat", "محظور من الشات")) + (b.expires_at ? " " + tr("until ", "لحد ") + fmtTime(b.expires_at) : " " + tr("(permanent)", "(دائم)")) }), " ",
+        h("button", { "class": "btn", type: "button", text: tr("Unblock", "فك الحظر"), on: { click: async function () { var x = await sb.rpc("admin_unblock_user", { target: d.id, p_scope: b.scope }); if (x.error) return say(msg, tr("You cannot lift this block.", "ماينفعش تفك الحظر ده."), "err"); openProfile(id); } } })));
+    });
+    var sc = h("select", { "aria-label": "scope" }, h("option", { value: "chat", text: tr("Chat only", "الشات بس") }), h("option", { value: "site", text: tr("Whole website", "الموقع كله") }));
+    var du = h("select", { "aria-label": "duration" }); [["24", tr("1 day", "يوم")], ["48", tr("2 days", "يومين")], ["72", tr("3 days", "3 أيام")], ["96", tr("4 days", "4 أيام")], ["custom", tr("Custom days", "عدد أيام مخصص")], ["perm", tr("Permanent", "دائم")]].forEach(function (o) { du.appendChild(h("option", { value: o[0], text: o[1] })); });
+    var cd = h("input", { type: "number", min: "1", max: "365", value: "7", style: "width:80px;display:none", "aria-label": "days" });
+    du.addEventListener("change", function () { cd.style.display = du.value === "custom" ? "" : "none"; });
+    var why = h("input", { type: "text", maxlength: "200", placeholder: tr("Reason (shown to the user)", "السبب (هيظهر للمستخدم)"), style: "width:100%;margin:6px 0" });
+    card.appendChild(h("div", { "class": "row", style: "display:flex;gap:8px;flex-wrap:wrap" }, sc, du, cd)); card.appendChild(why);
+    card.appendChild(h("button", { "class": "btn f", type: "button", style: "background:#e11d2e", text: tr("Block", "حظر"), on: { click: async function () {
+      var hrs = du.value === "perm" ? null : du.value === "custom" ? Math.round(+cd.value * 24) : +du.value;
+      if (du.value === "custom" && !(hrs >= 24 && hrs <= 8760)) return say(msg, tr("Days must be 1 to 365.", "الأيام من 1 لـ 365."), "err");
+      if (why.value.trim().length < 3) return say(msg, tr("Write a reason (3+ characters).", "اكتب السبب (3 حروف على الأقل)."), "err");
+      if (!confirm(tr("Block ", "تحظر ") + d.name + " (" + sc.options[sc.selectedIndex].text + ", " + du.options[du.selectedIndex].text + ")?")) return;
+      var x = await sb.rpc("admin_block_user", { target: d.id, p_scope: sc.value, p_reason: why.value.trim(), p_hours: hrs });
+      if (x.error) return say(msg, tr("Could not block: ", "ماقدرتش أحظر: ") + x.error.message, "err"); openProfile(id);
+    } } })); card.appendChild(msg);
+  }
+  /* whole-site block: the account stays signed in but sees only this notice */
+  function blockedScreen(b) {
+    var ov = h("div", { style: "position:fixed;inset:0;z-index:2000;background:#0a0708;display:flex;align-items:center;justify-content:center;padding:20px" });
+    ov.appendChild(h("div", { "class": "panel", style: "max-width:480px;text-align:center" }, h("h2", { text: tr("Your account is blocked", "حسابك محظور") }),
+      h("p", { text: tr("Reason: ", "السبب: ") + b.reason }), h("p", { "class": "hint", text: b.expires_at ? tr("The block ends on ", "الحظر بينتهي في ") + fmtTime(b.expires_at) + "." : tr("This block has no end date. Contact the owner.", "الحظر ده من غير مدة. كلم المالك.") }),
+      h("button", { "class": "btn", type: "button", text: tr("Sign out", "تسجيل خروج"), on: { click: async function () { await sb.auth.signOut(); location.href = "index.html"; } } })));
+    document.body.appendChild(ov);
+  }
+
   /* ---------- community ---------- */
   async function communityPage() {
     var app = $("app"); if (!me) return go("login.html"); clear(app);
     var chans = [["general", tr("General chat", "الشات العام"), true], ["admins", tr("Admins only", "للإدارة فقط"), isStaff()]].filter(function (c) { return c[2]; });
     var box = h("div", { "class": "wide" }), tabs = h("div", { "class": "tabs" }), log = h("div", { "class": "chatbox", role: "log", "aria-live": "polite" });
     var input = h("input", { type: "text", maxlength: "1000", "aria-label": tr("Message", "رسالة"), style: "flex:1;padding:11px;border-radius:10px;border:1px solid var(--b);background:var(--bg);color:var(--t)" });
-    var err = h("div", { "class": "msg" }), cur = "general", names = {}, sub = null, lastSig = "";
+    var err = h("div", { "class": "msg" }), cur = "general", names = {}, urls = {}, urlsAt = Date.now(), sub = null, lastSig = "", myBlk = ((await sb.rpc("my_blocks")).data || [])[0] || null;
     setInterval(function () { if (!document.hidden) load(); }, 2000);
     async function who(ids) {
       var need = ids.filter(function (i) { return !names[i]; }); if (!need.length) return;
-      var r = await sb.from("public_profiles").select("id,display_name,avatar,subscribed").in("id", need);
+      var r = await sb.from("public_profiles").select("id,display_name,avatar,subscribed,role,joined").in("id", need);
       (r.data || []).forEach(function (p) { names[p.id] = p; });
     }
     function line(m) {
       var p = names[m.user_id] || { display_name: "?", avatar: "b1" }, del = null;
       if (isStaff()) del = h("button", { "class": "btn", type: "button", text: "x", "aria-label": "delete", on: { click: async function () { await sb.from("chat_messages").delete().eq("id", m.id); load(); } } });
-      var el = h("div", { "class": "cm" }, h("div", { "class": "av" }, avatarSvg(p.avatar, p.id)), h("div", { style: "flex:1" }, h("b", p.subscribed ? { text: "\u2605 " + p.display_name, style: "color:#d4a017", title: tr("Subscriber", "مشترك") } : { text: p.display_name }), h("p", { text: m.body })), del);
+      var av = h("div", { "class": "av", style: "cursor:pointer", title: tr("View profile", "شوف البروفايل"), on: { click: function () { openProfile(m.user_id); } } }, avatarSvg(p.avatar, p.id));
+      var nm = h("b", { text: p.display_name, style: "cursor:pointer", on: { click: function () { openProfile(m.user_id); } } });
+      var body = m.audio_path ? (urls[m.audio_path] ? h("div", null, h("audio", { controls: "", preload: "none", src: urls[m.audio_path], style: "max-width:100%;height:38px" }), h("small", { "class": "hint", text: " " + m.audio_secs + "s" })) : h("p", { "class": "hint", text: tr("Voice message (loading)", "رسالة صوتية (بتحمّل)") })) : h("p", { text: m.body });
+      var el = h("div", { "class": "cm" }, av, h("div", { style: "flex:1" }, nm, badgesEl(p.role, p.subscribed), body), del);
       el.setAttribute("data-id", m.id); return el;
     }
     async function load() {
-      var r = await sb.from("chat_messages").select("id,user_id,body,created_at").eq("channel", cur).order("created_at", { ascending: false }).limit(60);
+      var r = await sb.from("chat_messages").select("id,user_id,body,created_at,audio_path,audio_secs").eq("channel", cur).order("created_at", { ascending: false }).limit(60);
       var rows = (r.data || []).reverse(), sg = cur + ":" + rows.map(function (x) { return x.id; }).join(",");
       if (sg === lastSig) return; lastSig = sg;
       var atEnd = log.scrollHeight - log.scrollTop - log.clientHeight < 80; await who(rows.map(function (x) { return x.user_id; }));
+      if (Date.now() - urlsAt > 3000000) { urls = {}; urlsAt = Date.now(); }
+      var needU = rows.filter(function (x) { return x.audio_path && !urls[x.audio_path]; }).map(function (x) { return x.audio_path; });
+      if (needU.length) { var su = await sb.storage.from("chat-voice").createSignedUrls(needU, 3600); (su.data || []).forEach(function (s2) { if (s2.signedUrl && s2.path) urls[s2.path] = s2.signedUrl; }); }
       clear(log); rows.forEach(function (m) { log.appendChild(line(m)); }); if (atEnd || !log.getAttribute("data-init")) { log.scrollTop = log.scrollHeight; log.setAttribute("data-init", "1"); }
     }
     function select(c) {
@@ -550,6 +637,32 @@
       var r = await sb.from("chat_messages").insert({ channel: cur, user_id: me.id, body: b });
       if (r.error) say(err, tr("Slow down or try again.", "على مهلك أو جرب تاني."), "err"); else { input.value = ""; say(err, ""); load(); }
     });
+    /* voice messages: MediaRecorder, max 120 s, uploaded to the private chat-voice bucket */
+    var micBtn = h("button", { "class": "btn", type: "button", text: tr("\u25cf Voice", "\u25cf صوت"), "aria-label": tr("Record a voice message", "سجّل رسالة صوتية") }), recd = null, rchunks = [], rt0 = 0, rtick = null, rstop = null, rstream = null;
+    function micReset() { if (rtick) clearInterval(rtick); rtick = null; if (rstop) clearTimeout(rstop); rstop = null; if (rstream) rstream.getTracks().forEach(function (t) { t.stop(); }); rstream = null; recd = null; micBtn.textContent = tr("\u25cf Voice", "\u25cf صوت"); micBtn.style.color = ""; }
+    micBtn.addEventListener("click", async function () {
+      if (recd) { recd.stop(); return; }
+      if (!navigator.mediaDevices || !window.MediaRecorder) return say(err, tr("Voice recording is not supported in this browser.", "التسجيل الصوتي مش مدعوم في المتصفح ده."), "err");
+      try { rstream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (e) { return say(err, tr("Microphone permission was denied.", "إذن الميكروفون اترفض."), "err"); }
+      var mt = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4"].filter(function (x) { return MediaRecorder.isTypeSupported(x); })[0];
+      if (!mt) { micReset(); return say(err, tr("Voice recording is not supported in this browser.", "التسجيل الصوتي مش مدعوم في المتصفح ده."), "err"); }
+      var base = mt.split(";")[0], ext = base === "audio/webm" ? "webm" : base === "audio/ogg" ? "ogg" : "m4a";
+      rchunks = []; recd = new MediaRecorder(rstream, { mimeType: mt, audioBitsPerSecond: 24000 }); rt0 = Date.now();
+      recd.ondataavailable = function (e) { if (e.data && e.data.size) rchunks.push(e.data); };
+      recd.onstop = async function () {
+        var secs = Math.min(120, Math.round((Date.now() - rt0) / 1000)), blob = new Blob(rchunks, { type: base }); micReset();
+        if (secs < 1 || !blob.size) return;
+        if (blob.size > 1572864) return say(err, tr("Recording is too big.", "التسجيل كبير أوي."), "err");
+        say(err, tr("Sending...", "بيتبعت..."), "");
+        var path = me.id + "/" + crypto.randomUUID() + "." + ext, up = await sb.storage.from("chat-voice").upload(path, blob, { contentType: base, upsert: false });
+        if (up.error) return say(err, tr("Voice upload failed (limit: 20 per hour).", "فشل رفع الصوت (الحد 20 في الساعة)."), "err");
+        var r = await sb.from("chat_messages").insert({ channel: cur, user_id: me.id, body: "", audio_path: path, audio_secs: secs });
+        if (r.error) say(err, tr("Could not send the voice message.", "ماقدرتش أبعت الرسالة الصوتية."), "err"); else { say(err, ""); load(); }
+      };
+      recd.start(); micBtn.style.color = "#e11d2e"; rtick = setInterval(function () { micBtn.textContent = "\u25a0 " + Math.round((Date.now() - rt0) / 1000) + "s"; }, 500); rstop = setTimeout(function () { if (recd) recd.stop(); }, 120000);
+    });
+    form.insertBefore(micBtn, form.lastChild);
+    if (myBlk) { input.disabled = true; micBtn.disabled = true; Array.prototype.forEach.call(form.querySelectorAll("button"), function (b) { b.disabled = true; }); say(err, tr("You are blocked from chat. Reason: ", "إنت محظور من الشات. السبب: ") + myBlk.reason + (myBlk.expires_at ? " (" + tr("until ", "لحد ") + fmtTime(myBlk.expires_at) + ")" : " (" + tr("no end date", "من غير مدة") + ")"), "err"); }
     box.appendChild(h("div", { "class": "panel" }, h("h2", { text: tr("Community", "المجتمع") }), tabs, log, form, err)); app.appendChild(box); select("general");
   }
 
@@ -592,8 +705,8 @@
         }
         if (owner && u.role !== "owner" && u.status !== "deleted") {
           var banned = u.status === "banned", dn = u.username || u.alias || "";
-          act.appendChild(h("button", { "class": "btn", type: "button", text: banned ? tr("Unblock", "فك الحظر") : tr("Block", "حظر"), on: { click: async function () {
-            if (!banned && !confirm(tr("Block this user? They will be signed out and cannot log in again until you unblock them.", "تحظر المستخدم ده؟ هيتسجل خروج ومش هيقدر يدخل تاني لحد ما تفك الحظر."))) return;
+          act.appendChild(h("button", { "class": "btn", type: "button", text: banned ? tr("Unblock", "فك الحظر") : tr("Block...", "حظر..."), on: { click: async function () {
+            if (!banned) return openProfile(u.id);
             var x = await sb.rpc("admin_set_ban", { target: u.id, ban: !banned }); if (x.error) alert(x.error.message); users();
           } } }));
           act.appendChild(h("button", { "class": "btn", type: "button", style: "color:#e11d2e", text: tr("Delete", "حذف"), on: { click: async function () {
@@ -601,6 +714,8 @@
             var x = await sb.rpc("admin_delete_user", { target: u.id }); if (x.error) alert(x.error.message); users();
           } } }));
         }
+        if (!owner && u.status === "active" && u.role === "user") act.appendChild(h("button", { "class": "btn", type: "button", text: tr("Profile / block", "البروفايل / حظر"), on: { click: function () { openProfile(u.id); } } }));
+        if (owner && u.status === "active") act.appendChild(h("button", { "class": "btn", type: "button", text: tr("Profile", "البروفايل"), on: { click: function () { openProfile(u.id); } } }));
         var mine = gm[u.id] || [], subCell = h("td", { text: u.subscribed ? "yes" : "-" });
         if (mine.length) { clear(subCell); subCell.appendChild(h("span", { "class": "tag", text: tr("Free (owner)", "مجاني (من المالك)") })); mine.forEach(function (g) { subCell.appendChild(h("div", { "class": "hint", text: (g.plan_name || tr("All tools", "كل الأدوات")) + " " + endTxt(g.ends) })); }); }
         if (owner && u.role !== "owner" && u.status === "active") {
@@ -806,11 +921,11 @@
     /* logs (owner and admins) */
     var lp = h("div", { "class": "panel", id: "logs" }, h("h2", { text: tr("Logs", "السجل") })), lmsg = h("div", { "class": "msg" }), ltb = h("tbody"), lsel = h("select", { "aria-label": "filter" });
     box.appendChild(lp);
-    var LBL = { signup: ["Sign up", "تسجيل جديد"], login: ["Login", "دخول"], ban_user: ["Ban", "حظر"], unban_user: ["Unban", "فك حظر"], admin_delete_user: ["Account deleted by admin", "حذف حساب بواسطة أدمن"], delete_account: ["Account deleted by user", "المستخدم حذف حسابه"], grant_plan: ["Free plan granted", "اشتراك مجاني اتمنح"], revoke_plan: ["Free plan revoked", "اشتراك مجاني اتسحب"], review_manual_payment: ["Payment reviewed", "مراجعة دفعة"], set_role: ["Role changed", "تغيير صلاحية"], claim_owner: ["Owner claimed", "استلام الأونر"], tool_price: ["Tool price", "سعر أداة"], set_manual_instructions: ["Wallet details changed", "تغيير بيانات المحفظة"] };
-    lsel.appendChild(h("option", { value: "", text: tr("All", "الكل") })); ["signup", "login", "ban_user", "unban_user", "admin_delete_user", "delete_account", "grant_plan", "revoke_plan", "review_manual_payment", "set_role"].forEach(function (k) { lsel.appendChild(h("option", { value: k, text: tr(LBL[k][0], LBL[k][1]) })); });
+    var LBL = { signup: ["Sign up", "تسجيل جديد"], login: ["Login", "دخول"], block_user: ["Block", "حظر"], unblock_user: ["Unblock", "فك حظر"], ban_user: ["Ban", "حظر"], unban_user: ["Unban", "فك حظر"], admin_delete_user: ["Account deleted by admin", "حذف حساب بواسطة أدمن"], delete_account: ["Account deleted by user", "المستخدم حذف حسابه"], grant_plan: ["Free plan granted", "اشتراك مجاني اتمنح"], revoke_plan: ["Free plan revoked", "اشتراك مجاني اتسحب"], review_manual_payment: ["Payment reviewed", "مراجعة دفعة"], set_role: ["Role changed", "تغيير صلاحية"], claim_owner: ["Owner claimed", "استلام الأونر"], tool_price: ["Tool price", "سعر أداة"], set_manual_instructions: ["Wallet details changed", "تغيير بيانات المحفظة"] };
+    lsel.appendChild(h("option", { value: "", text: tr("All", "الكل") })); ["signup", "login", "block_user", "unblock_user", "ban_user", "unban_user", "admin_delete_user", "delete_account", "grant_plan", "revoke_plan", "review_manual_payment", "set_role"].forEach(function (k) { lsel.appendChild(h("option", { value: k, text: tr(LBL[k][0], LBL[k][1]) })); });
     lp.appendChild(h("div", { "class": "row" }, lsel)); lp.appendChild(h("table", { "class": "t" }, h("thead", null, h("tr", null, h("th", { text: tr("When", "الوقت") }), h("th", { text: tr("What", "إيه") }), h("th", { text: tr("By", "بواسطة") }), h("th", { text: tr("User", "المستخدم") }))), ltb)); lp.appendChild(lmsg);
     var allLogs = [];
-    function drawLogs() { clear(ltb); allLogs.filter(function (l) { return !lsel.value || l.action === lsel.value; }).slice(0, 200).forEach(function (l) { var lb = LBL[l.action]; ltb.appendChild(h("tr", null, h("td", { text: new Date(l.at).toLocaleString(EN() ? "en-GB" : "ar-EG") }), h("td", { text: lb ? tr(lb[0], lb[1]) : l.action }), h("td", { text: l.actor_name || "-" }), h("td", { text: l.target_name || "-" }))); }); }
+    function drawLogs() { clear(ltb); allLogs.filter(function (l) { return !lsel.value || l.action === lsel.value; }).slice(0, 200).forEach(function (l) { var lb = LBL[l.action]; ltb.appendChild(h("tr", null, h("td", { text: new Date(l.at).toLocaleString(EN() ? "en-GB" : "ar-EG") }), h("td", { text: (lb ? tr(lb[0], lb[1]) : l.action) + (l.meta && l.meta.scope ? " (" + (l.meta.scope === "site" ? tr("site", "الموقع") : tr("chat", "الشات")) + (l.meta.reason ? ": " + l.meta.reason : "") + (l.meta.until ? ", " + tr("until ", "لحد ") + fmtTime(l.meta.until) : l.action === "block_user" ? ", " + tr("permanent", "دائم") : "") + ")" : "") }), h("td", { text: l.actor_name || "-" }), h("td", { text: l.target_name || "-" }))); }); }
     lsel.addEventListener("change", drawLogs);
     (async function () { var lr = await sb.rpc("admin_logs", { p_limit: 500 }); if (lr.error) return say(lmsg, tr("Could not load logs.", "ماقدرتش أحمل السجل."), "err"); allLogs = lr.data || []; drawLogs(); })();
     if (!owner) return;
@@ -969,6 +1084,7 @@
   }
   (async function () {
     var ok = await load();
+    if (ok && me) { var sbk = ((await sb.rpc("my_blocks")).data || []).filter(function (x) { return x.scope === "site"; })[0]; if (sbk) { blockedScreen(sbk); return; } }
     if (ok) inMode();
     if (PAGE === "tool") { if (ok) { sideMenu(); toolPage(); } return; }
     if (PAGE === "tools") { if (ok) { dynTools(); sideMenu(); } return; }
