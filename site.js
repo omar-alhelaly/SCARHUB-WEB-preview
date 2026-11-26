@@ -46,3 +46,6 @@ window.addEventListener('DOMContentLoaded',function(){
 });
 })();
 ;(function(){if(/tool-scar[a-z]+\.html$/.test(location.pathname)){var s=document.createElement('script');s.src='tool-guide.js';document.head.appendChild(s)}})();
+
+/* signed-in visitors on pages without the account script: load it so the header shows their avatar */
+window.addEventListener('DOMContentLoaded',function(){try{var k=Object.keys(localStorage).some(function(x){return /^sb-.*-auth-token$/.test(x)});if(!k||document.querySelector('script[src*="app.js"]'))return;['vendor-supabase.js','config.js','app.js'].forEach(function(f){var e=document.createElement('script');e.src=f;e.async=false;document.head.appendChild(e)})}catch(e){}});
