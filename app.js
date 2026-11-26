@@ -129,6 +129,10 @@
     var m = n.meta || {}, plan = m.plan ? " (" + m.plan + ")" : "", until = m.until ? new Date(m.until).toLocaleDateString(EN() ? "en-GB" : "ar-EG") : "";
     if (n.kind === "free_plan_granted") return tr("You received a free subscription from the owner" + plan + "." + (until ? " Valid until " + until + "." : ""), "حصلت على اشتراك مجاني من المالك" + plan + "." + (until ? " صالح لحد " + until + "." : ""));
     if (n.kind === "free_plan_revoked") return tr("The owner ended your free subscription" + plan + ".", "المالك أنهى اشتراكك المجاني" + plan + ".");
+    if (n.kind === "payment_pending") return tr("Your payment" + plan + " was received. Waiting for confirmation from the team.", "دفعتك" + plan + " اتسلمت. مستنية تأكيد الفريق.");
+    if (n.kind === "payment_approved") return tr("Your payment" + plan + " was approved. Your subscription is active.", "دفعتك" + plan + " اتقبلت. اشتراكك اتفعّل.");
+    if (n.kind === "payment_rejected") return tr("Your payment" + plan + " was rejected." + (m.reason ? " Reason: " + m.reason : ""), "دفعتك" + plan + " اترفضت." + (m.reason ? " السبب: " + m.reason : ""));
+    if (n.kind === "payment_submitted") return tr("New payment proof from " + (m.user || "a user") + ": " + (m.amount / 100).toFixed(2) + " " + m.currency + (m.plan ? " (" + m.plan + ")" : "") + ". Review it in Admin > Payments.", "إثبات دفع جديد من " + (m.user || "مستخدم") + ": " + (m.amount / 100).toFixed(2) + " " + m.currency + (m.plan ? " (" + m.plan + ")" : "") + ". راجعه في Admin > المدفوعات.");
     return "";
   }
   async function loadNotes() {
@@ -282,20 +286,20 @@
   async function manualForm(p, box, msg) {
     clear(box); var ins = await sb.rpc("manual_instructions"), i = (ins.data || [])[0];
     if (!i) return say(msg, tr("Manual payment is not available right now.", "الدفع اليدوي مش متاح دلوقتي."), "err");
-    var ref = h("input", { type: "text", maxlength: "40", placeholder: tr("Transaction id or your sending number", "رقم العملية أو رقم الموبايل اللي حولت منه") }), file = h("input", { type: "file", accept: "image/jpeg,image/png,image/webp" });
+    var ref = h("input", { type: "text", maxlength: "40", placeholder: tr("Optional: transaction id or sending number", "اختياري: رقم العملية أو رقم الموبايل") }), file = h("input", { type: "file", accept: "image/jpeg,image/png,image/webp" });
     box.appendChild(h("div", { "class": "panel" },
       h("p", { text: tr("1. Send exactly ", "1. حوّل بالظبط ") + (p.price_minor / 100).toFixed(2) + " " + p.currency + tr(" by Vodafone Cash to ", " بفودافون كاش على ") + i.wallet_number + " (" + i.holder_name + ")" }),
       i.note ? h("p", { "class": "hint", text: i.note }) : null,
-      h("p", { text: tr("2. Enter the transaction id and attach a screenshot (JPG, PNG or WebP, max 5 MB).", "2. اكتب رقم العملية وارفق صورة التحويل (JPG أو PNG أو WebP، 5 ميجا بحد أقصى).") }), ref, file,
+      h("p", { text: tr("2. Attach a screenshot of the transfer (JPG, PNG or WebP, max 5 MB).", "2. ارفق صورة التحويل (JPG أو PNG أو WebP، 5 ميجا بحد أقصى).") }), ref, file,
       h("div", { "class": "row" }, h("button", { "class": "btn f", type: "button", text: tr("Send for approval", "ابعت للمراجعة"), on: { click: async function () {
         var f = file.files[0]; if (!f || !/^image\/(jpeg|png|webp)$/.test(f.type) || f.size > 5242880) return say(msg, tr("Attach a JPG, PNG or WebP image up to 5 MB.", "ارفق صورة JPG أو PNG أو WebP لحد 5 ميجا."), "err");
-        if (!/^[A-Za-z0-9 -]{4,40}$/.test(ref.value.trim())) return say(msg, tr("Enter the transaction id (4 to 40 letters or numbers).", "اكتب رقم العملية (4 لـ 40 حرف أو رقم)."), "err");
+        if (ref.value.trim() && !/^[A-Za-z0-9 -]{4,40}$/.test(ref.value.trim())) return say(msg, tr("The optional note must be 4 to 40 letters or numbers, or leave it empty.", "الملاحظة (اختياري) 4 لـ 40 حرف أو رقم، أو سيبها فاضية."), "err");
         var path = me.id + "/" + Date.now() + "-" + Math.random().toString(36).slice(2, 10) + "." + { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" }[f.type];
         var up = await sb.storage.from("payment-proofs").upload(path, f, { contentType: f.type, upsert: false });
         if (up.error) return say(msg, tr("Upload failed.", "فشل رفع الصورة."), "err");
-        var r = await sb.rpc("submit_manual_payment", { p_plan: p.id, p_reference: ref.value.trim(), p_proof: path });
+        var r = await sb.rpc("submit_manual_payment", { p_plan: p.id, p_reference: ref.value.trim() || null, p_proof: path });
         if (r.error) return say(msg, /one_pending/.test(r.error.message) ? tr("You already have a payment waiting for approval.", "عندك دفعة مستنية المراجعة.") : tr("Could not submit.", "ماقدرتش أبعت."), "err");
-        clear(box); say(msg, tr("Sent. The owner will review it and activate your subscription.", "اتبعتت. المالك هيراجعها ويفعّل اشتراكك."), "ok");
+        clear(box); say(msg, tr("Received. Your subscription is NOT active yet: waiting for confirmation from the team. You will get a message in your inbox.", "اتسلمت. اشتراكك لسه مش شغال: مستني تأكيد الفريق. هتوصلك رسالة في الإنبوكس."), "ok");
       } } }))));
   }
   /* ---------- 2-step login (TOTP) for owner/admin ---------- */
@@ -390,7 +394,7 @@
     plansBox.appendChild(manualBox); plansBox.appendChild(payMsg);
     var mine = await sb.from("payment_requests").select("method,status,amount_minor,currency,created_at,reject_reason").order("created_at", { ascending: false }).limit(5);
     if ((mine.data || []).length) { plansBox.appendChild(h("h3", { text: tr("My payments", "مدفوعاتي") })); mine.data.forEach(function (q) {
-      plansBox.appendChild(h("p", { "class": "hint", text: new Date(q.created_at).toLocaleDateString() + " - " + q.method + " - " + (q.amount_minor / 100).toFixed(2) + " " + q.currency + " - " + q.status + (q.reject_reason ? " (" + q.reject_reason + ")" : "") }));
+      plansBox.appendChild(h("p", { "class": "hint", text: new Date(q.created_at).toLocaleDateString() + " - " + q.method + " - " + (q.amount_minor / 100).toFixed(2) + " " + q.currency + " - " + ({ pending: tr("waiting for confirmation", "مستني التأكيد"), approved: tr("approved", "اتقبلت"), rejected: tr("rejected", "اترفضت") }[q.status] || q.status) + (q.reject_reason ? " (" + q.reject_reason + ")" : "") }));
     }); }
     var dpw = h("input", { type: "password", autocomplete: "current-password", maxlength: "64" }), dmsg = h("div", { "class": "msg" });
     box.appendChild(h("div", { "class": "panel", id: "delete" }, h("h2", { text: tr("Delete account", "حذف الحساب") }), h("p", { text: tr("This signs you out and removes your login. It cannot be undone.", "ده هيطلعك ويمسح الدخول بتاعك. ماينفعش يتراجع.") }), h("label", { text: tr("Confirm with your password", "أكد بالباسورد") }), dpw,
@@ -677,6 +681,29 @@
       tp.appendChild(row);
     });
     tp.appendChild(tpmsg);
+    /* payment confirmations (owner and admins) */
+    var cp = h("div", { "class": "panel" }), cmsg = h("div", { "class": "msg" }); box.appendChild(cp);
+    {
+      cp.appendChild(h("h3", { text: tr("Payments waiting for confirmation", "دفعات مستنية التأكيد") }));
+      var rq = await sb.from("payment_requests").select("id,user_id,amount_minor,currency,period,reference,proof_path,created_at").eq("method", "manual").eq("status", "pending").order("created_at");
+      if (!(rq.data || []).length) cp.appendChild(h("p", { "class": "hint", text: tr("None.", "مفيش.") }));
+      (rq.data || []).forEach(function (q) {
+        var rowEl = h("div", { "class": "row" }, h("span", { text: new Date(q.created_at).toLocaleString() + " - " + (q.amount_minor / 100).toFixed(2) + " " + q.currency + "/" + q.period + (q.reference ? " - ref " + q.reference : "") + " - user " + q.user_id.slice(0, 8) + "  " }));
+        rowEl.appendChild(h("button", { "class": "btn", type: "button", text: tr("View proof", "اعرض الإثبات"), on: { click: async function () {
+          var u = await sb.storage.from("payment-proofs").createSignedUrl(q.proof_path, 60); if (u.data) window.open(u.data.signedUrl, "_blank", "noopener"); else say(cmsg, tr("Could not open the proof.", "ماقدرتش أفتح الإثبات."), "err");
+        } } }));
+        rowEl.appendChild(h("button", { "class": "btn f", type: "button", text: tr("Approve", "اقبل"), on: { click: async function () {
+          if (!confirm(tr("Approve and activate this subscription?", "تقبل وتفعّل الاشتراك؟"))) return;
+          var x = await sb.rpc("review_manual_payment", { p_id: q.id, p_approve: true }); if (x.error) say(cmsg, tr("Failed.", "فشل."), "err"); else { say(cmsg, tr("Approved.", "اتقبلت."), "ok"); rowEl.remove(); }
+        } } }));
+        rowEl.appendChild(h("button", { "class": "btn", type: "button", text: tr("Reject", "ارفض"), on: { click: async function () {
+          var why = prompt(tr("Reason (shown to the customer)", "السبب (هيظهر للعميل)")); if (why === null) return;
+          var x = await sb.rpc("review_manual_payment", { p_id: q.id, p_approve: false, p_reason: why.slice(0, 200) }); if (x.error) say(cmsg, tr("Failed.", "فشل."), "err"); else { say(cmsg, tr("Rejected.", "اترفضت."), "ok"); rowEl.remove(); }
+        } } }));
+        cp.appendChild(rowEl);
+      });
+    cp.appendChild(cmsg);
+    }
     if (!owner) return;
     /* plans (owner only) */
     var pp = h("div", { "class": "panel" }, h("h2", { text: tr("Payments", "المدفوعات") })), pmsg = h("div", { "class": "msg" }); box.appendChild(pp);
@@ -757,25 +784,6 @@
         var x = await sb.rpc("set_manual_instructions", { w: wn.value.trim(), holder: wh.value.trim(), n: wt.value.trim() });
         say(pmsg, x.error ? tr("Could not save.", "ماتحفظش.") : tr("Saved.", "اتحفظ."), x.error ? "err" : "ok");
       } } })));
-      /* pending manual payments */
-      pp.appendChild(h("h3", { text: tr("Manual payments waiting", "دفعات يدوية مستنية") }));
-      var rq = await sb.from("payment_requests").select("id,user_id,amount_minor,currency,period,reference,proof_path,created_at").eq("method", "manual").eq("status", "pending").order("created_at");
-      if (!(rq.data || []).length) pp.appendChild(h("p", { "class": "hint", text: tr("None.", "مفيش.") }));
-      (rq.data || []).forEach(function (q) {
-        var rowEl = h("div", { "class": "row" }, h("span", { text: new Date(q.created_at).toLocaleString() + " - " + (q.amount_minor / 100).toFixed(2) + " " + q.currency + "/" + q.period + " - ref " + q.reference + " - user " + q.user_id.slice(0, 8) + "  " }));
-        rowEl.appendChild(h("button", { "class": "btn", type: "button", text: tr("View proof", "اعرض الإثبات"), on: { click: async function () {
-          var u = await sb.storage.from("payment-proofs").createSignedUrl(q.proof_path, 60); if (u.data) window.open(u.data.signedUrl, "_blank", "noopener"); else say(pmsg, tr("Could not open the proof.", "ماقدرتش أفتح الإثبات."), "err");
-        } } }));
-        rowEl.appendChild(h("button", { "class": "btn f", type: "button", text: tr("Approve", "اقبل"), on: { click: async function () {
-          if (!confirm(tr("Approve and activate this subscription?", "تقبل وتفعّل الاشتراك؟"))) return;
-          var x = await sb.rpc("review_manual_payment", { p_id: q.id, p_approve: true }); if (x.error) say(pmsg, tr("Failed.", "فشل."), "err"); else { say(pmsg, tr("Approved.", "اتقبلت."), "ok"); rowEl.remove(); }
-        } } }));
-        rowEl.appendChild(h("button", { "class": "btn", type: "button", text: tr("Reject", "ارفض"), on: { click: async function () {
-          var why = prompt(tr("Reason (shown to the customer)", "السبب (هيظهر للعميل)")); if (why === null) return;
-          var x = await sb.rpc("review_manual_payment", { p_id: q.id, p_approve: false, p_reason: why.slice(0, 200) }); if (x.error) say(pmsg, tr("Failed.", "فشل."), "err"); else { say(pmsg, tr("Rejected.", "اترفضت."), "ok"); rowEl.remove(); }
-        } } }));
-        pp.appendChild(rowEl);
-      });
     } else pp.appendChild(h("p", { "class": "hint", text: tr("Only the owner can change payment settings.", "المالك بس يقدر يغيّر إعدادات الدفع.") }));
     pp.appendChild(pmsg);
   }
@@ -861,3 +869,4 @@
     else { sideMenu(); if (PAGE === "account") accountPage(); else if (PAGE === "community") communityPage(); else if (PAGE === "admin") adminPage(); }
   })();
 })();
+
