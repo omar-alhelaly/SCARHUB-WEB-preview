@@ -101,3 +101,10 @@ html[data-theme=light] #ch .legend i.l1{background:#9be9a8}html[data-theme=light
 #ch .howto{background:var(--p);border:1px dashed var(--b);border-radius:8px;padding:8px 12px;margin:0 0 10px}
 #ch .howto ol{margin:0;padding-inline-start:20px;font-size:14px;line-height:1.7}
 #ch .wbar input{direction:ltr;text-align:left;unicode-bidi:plaintext}
+#ch .learn p{color:var(--t)}
+#ch .mod{margin:0 0 18px}
+#ch .mod .mh{margin:14px 0 8px;font-size:17px}
+#ch .mod .mk{display:inline-block;font-size:12px;padding:2px 10px;border-radius:20px;border:1px solid var(--r);color:var(--r2);margin-inline-end:6px;vertical-align:middle}
+#ch .mod.theory .mk{border-color:#3b82f6;color:#60a5fa}
+#ch .howto ul{margin:0;padding-inline-start:20px;font-size:14px;line-height:1.7}
+html[data-theme=light] #ch .mod.theory .mk{color:#1d4ed8}
