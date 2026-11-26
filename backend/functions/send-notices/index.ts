@@ -24,9 +24,6 @@ Deno.serve(async (req) => {
   const { data: { user: me } } = await user.auth.getUser();
   if (!me) return json({ error: "auth" }, 401);
   const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const { data: prof } = await admin.from("profiles").select("role,status").eq("id", me.id).maybeSingle();
-  if (!prof || prof.status !== "active" || !["owner", "admin"].includes(prof.role)) return json({ error: "forbidden" }, 403);
-
   const { data: rows, error } = await admin.rpc("claim_notices", { p_actor: me.id });
   if (error) return json({ error: "claim" }, 500);
   const gu = Deno.env.get("GMAIL_USER"), gp = Deno.env.get("GMAIL_APP_PASSWORD");
