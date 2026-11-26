@@ -591,7 +591,7 @@
     var pm = $("profmodal"); if (pm) pm.remove();
     if (window.__scarOpenDm) window.__scarOpenDm(r.data); else location.href = "community.html#dm=" + r.data;
   }
-  var DM_NOTICE = function () { return tr("Private chat. Only you and the other person can read it, except that the site owner may review private chats for safety and abuse reports. Every owner review is logged. Do not share passwords or payment details.", "شات خاص. إنت والشخص التاني بس اللي تقروه، إلا إن مالك الموقع ممكن يراجع الشاتات الخاصة لأسباب الأمان وبلاغات الإساءة. أي مراجعة من المالك بتتسجل. ماتشاركش باسووردات أو بيانات دفع."); };
+  var DM_NOTICE = function () { return tr("Private chat between the two of you.", "شات خاص بينكم الاتنين."); };
   /* whole-site block: the account stays signed in but sees only this notice */
   function blockedScreen(b) {
     var ov = h("div", { style: "position:fixed;inset:0;z-index:2000;background:#0a0708;display:flex;align-items:center;justify-content:center;padding:20px" });
