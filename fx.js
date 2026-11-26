@@ -85,3 +85,11 @@ function hover(card,make){
 }
 if(document.readyState=='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
+/* click-to-zoom lightbox for images marked data-zoom (the poster is a vector SVG, so it stays sharp at any size) */
+(function(){document.addEventListener("click",function(e){var t=e.target;if(!t||!t.getAttribute||!t.getAttribute("data-zoom"))return;
+var o=document.createElement("div");o.setAttribute("role","dialog");o.setAttribute("aria-label","Image");
+o.style.cssText="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:12px;cursor:zoom-out;overflow:auto";
+var i=document.createElement("img");i.src=t.currentSrc||t.src;i.alt=t.alt||"";i.style.cssText="max-width:96vw;max-height:96vh;width:auto;height:auto;min-height:60vh;object-fit:contain;background:#0c0c0e;border-radius:6px";
+var x=document.createElement("button");x.type="button";x.textContent="\u00d7";x.setAttribute("aria-label","Close");x.style.cssText="position:fixed;top:10px;inset-inline-end:14px;font:700 30px/1 sans-serif;color:#fff;background:transparent;border:0;cursor:pointer";
+function c(){document.removeEventListener("keydown",k);if(o.parentNode)o.parentNode.removeChild(o)}function k(ev){if(ev.key==="Escape")c()}
+o.addEventListener("click",c);document.addEventListener("keydown",k);o.appendChild(i);o.appendChild(x);document.body.appendChild(o)});})();
