@@ -621,18 +621,110 @@
     document.body.appendChild(ov);
   }
 
+
+  /* ---------- emoji reactions (General chat, Admins chat and private chats) ---------- */
+  var RX_QUICK = ["\ud83d\udc4d", "\u2764\ufe0f", "\ud83d\ude02", "\ud83d\udd25", "\ud83d\ude2e", "\ud83d\ude22"];
+  var RX_CATS = [
+    ["\ud83d\ude00", "Smileys", "\u0648\u062c\u0648\u0647", "\ud83d\ude00 \ud83d\ude03 \ud83d\ude04 \ud83d\ude01 \ud83d\ude06 \ud83d\ude05 \ud83e\udd23 \ud83d\ude02 \ud83d\ude42 \ud83d\ude43 \ud83d\ude09 \ud83d\ude0a \ud83d\ude07 \ud83e\udd70 \ud83d\ude0d \ud83e\udd29 \ud83d\ude18 \ud83d\ude17 \ud83d\ude1a \ud83d\ude19 \ud83d\ude0b \ud83d\ude1b \ud83d\ude1c \ud83e\udd2a \ud83d\ude1d \ud83e\udd11 \ud83e\udd17 \ud83e\udd2d \ud83e\udd2b \ud83e\udd14 \ud83e\udd10 \ud83e\udd28 \ud83d\ude10 \ud83d\ude11 \ud83d\ude36 \ud83d\ude0f \ud83d\ude12 \ud83d\ude44 \ud83d\ude2c \ud83e\udd25 \ud83d\ude0c \ud83d\ude14 \ud83d\ude2a \ud83e\udd24 \ud83d\ude34 \ud83d\ude37 \ud83e\udd12 \ud83e\udd15 \ud83e\udd22 \ud83e\udd2e \ud83e\udd27 \ud83e\udd75 \ud83e\udd76 \ud83e\udd74 \ud83d\ude35 \ud83e\udd2f \ud83e\udd20 \ud83e\udd73 \ud83d\ude0e \ud83e\udd13 \ud83e\uddd0 \ud83d\ude15 \ud83d\ude1f \ud83d\ude41 \ud83d\ude2e \ud83d\ude2f \ud83d\ude32 \ud83d\ude33 \ud83e\udd7a \ud83d\ude26 \ud83d\ude27 \ud83d\ude28 \ud83d\ude30 \ud83d\ude25 \ud83d\ude22 \ud83d\ude2d \ud83d\ude31 \ud83d\ude16 \ud83d\ude23 \ud83d\ude1e \ud83d\ude13 \ud83d\ude29 \ud83d\ude2b \ud83e\udd71 \ud83d\ude24 \ud83d\ude21 \ud83d\ude20 \ud83e\udd2c \ud83d\ude08 \ud83d\udc7f \ud83d\udc80 \ud83d\udca9 \ud83e\udd21 \ud83d\udc7b \ud83d\udc7d \ud83e\udd16"],
+    ["\ud83d\udc4d", "Hands", "\u0623\u064a\u062f\u064a", "\ud83d\udc4d \ud83d\udc4e \ud83d\udc4c \u270c\ufe0f \ud83e\udd1e \ud83e\udd1f \ud83e\udd18 \ud83e\udd19 \ud83d\udc48 \ud83d\udc49 \ud83d\udc46 \ud83d\udc47 \u261d\ufe0f \u270b \ud83e\udd1a \ud83d\udd90\ufe0f \ud83d\udd96 \ud83d\udc4b \ud83e\udd1d \ud83d\ude4f \ud83d\udcaa \u270d\ufe0f \ud83d\udc4f \ud83d\ude4c \ud83d\udc50 \ud83e\udd32 \ud83e\udd1c \ud83e\udd1b \u270a \ud83d\udc4a \ud83d\udc40 \ud83e\udde0"],
+    ["\u2764\ufe0f", "Hearts", "\u0642\u0644\u0648\u0628", "\u2764\ufe0f \ud83e\udde1 \ud83d\udc9b \ud83d\udc9a \ud83d\udc99 \ud83d\udc9c \ud83d\udda4 \ud83e\udd0d \ud83e\udd0e \ud83d\udc94 \u2763\ufe0f \ud83d\udc95 \ud83d\udc9e \ud83d\udc93 \ud83d\udc97 \ud83d\udc96 \ud83d\udc98 \ud83d\udc9d \ud83d\udcaf \ud83d\udca2 \ud83d\udca5 \ud83d\udcab \ud83d\udca6 \ud83d\udca8 \u2728 \ud83d\udd25 \u2b50 \ud83c\udf1f \u26a1 \ud83c\udf89 \ud83c\udf8a \ud83c\udf88 \ud83c\udf81 \ud83c\udfc6 \ud83e\udd47 \ud83c\udfaf"],
+    ["\ud83d\udc36", "Nature", "\u0637\u0628\u064a\u0639\u0629", "\ud83d\udc36 \ud83d\udc31 \ud83d\udc2d \ud83d\udc39 \ud83d\udc30 \ud83e\udd8a \ud83d\udc3b \ud83d\udc3c \ud83d\udc28 \ud83d\udc2f \ud83e\udd81 \ud83d\udc2e \ud83d\udc37 \ud83d\udc38 \ud83d\udc35 \ud83d\ude48 \ud83d\ude49 \ud83d\ude4a \ud83d\udc14 \ud83d\udc27 \ud83d\udc26 \ud83e\udd86 \ud83e\udd85 \ud83e\udd89 \ud83d\udc3a \ud83d\udc34 \ud83e\udd84 \ud83d\udc1d \ud83e\udd8b \ud83d\udc22 \ud83d\udc0d \ud83d\udc19 \ud83d\udc2c \ud83d\udc33 \ud83e\udd88 \ud83c\udf39 \ud83c\udf38 \ud83c\udf3b \ud83c\udf32 \ud83c\udf34 \ud83c\udf40 \ud83c\udf0d \ud83c\udf19 \u2600\ufe0f \u26c5 \ud83c\udf08 \u2744\ufe0f \ud83c\udf0a"],
+    ["\ud83c\udf55", "Food", "\u0623\u0643\u0644", "\ud83c\udf4e \ud83c\udf4c \ud83c\udf49 \ud83c\udf47 \ud83c\udf53 \ud83c\udf52 \ud83c\udf51 \ud83c\udf4d \ud83e\udd6d \ud83c\udf45 \ud83e\udd51 \ud83c\udf3d \ud83e\udd55 \ud83c\udf5e \ud83e\uddc0 \ud83c\udf73 \ud83e\udd5e \ud83c\udf54 \ud83c\udf5f \ud83c\udf55 \ud83c\udf2d \ud83c\udf2e \ud83c\udf2f \ud83c\udf57 \ud83c\udf56 \ud83c\udf63 \ud83c\udf5c \ud83c\udf5d \ud83c\udf69 \ud83c\udf6a \ud83c\udf82 \ud83c\udf70 \ud83c\udf6b \ud83c\udf6c \ud83c\udf6d \u2615 \ud83c\udf75 \ud83e\udd64 \ud83c\udf7a \ud83c\udf77"],
+    ["\ud83d\udcbb", "Objects", "\u0623\u0634\u064a\u0627\u0621", "\u26bd \ud83c\udfc0 \ud83c\udfc8 \ud83c\udfbe \ud83c\udfd0 \ud83c\udfae \ud83d\udd79\ufe0f \ud83c\udfb2 \ud83c\udfa7 \ud83c\udfa4 \ud83c\udfb5 \ud83c\udfb6 \ud83c\udfac \ud83d\udcf7 \ud83d\udcbb \ud83d\udda5\ufe0f \u2328\ufe0f \ud83d\uddb1\ufe0f \ud83d\udcf1 \ud83d\udd0b \ud83d\udd0c \ud83d\udca1 \ud83d\udd12 \ud83d\udd13 \ud83d\udd11 \ud83d\udee1\ufe0f \u2694\ufe0f \ud83d\udd75\ufe0f \ud83d\udc1b \ud83e\uddea \ud83d\udd2c \ud83d\udd2d \ud83d\udce1 \ud83d\udcbe \ud83d\udcc1 \ud83d\udccc \ud83d\udcce \u270f\ufe0f \ud83d\udcdd \ud83d\udcda \ud83d\udcb0 \ud83d\udcb3 \ud83d\ude80 \u2708\ufe0f \ud83d\ude97 \ud83c\udfe0 \u23f0 \u231b"],
+    ["\u2705", "Symbols", "\u0631\u0645\u0648\u0632", "\u2705 \u274c \u2753 \u2757 \u26a0\ufe0f \ud83d\udeab \u26d4 \u2714\ufe0f \u2795 \u2796 \u27a1\ufe0f \u2b05\ufe0f \u2b06\ufe0f \u2b07\ufe0f \ud83d\udd34 \ud83d\udfe2 \ud83d\udd35 \ud83d\udfe1 \u26aa \u26ab \ud83d\udd14 \ud83d\udd15 \u267b\ufe0f \ud83c\udd97 \ud83c\udd95 \ud83d\udd1d"]
+  ];
+  var RX_KW = [["like thumbs up good ok yes agree \u062a\u0645\u0627\u0645 \u0644\u0627\u064a\u0643 \u0645\u0648\u0627\u0641\u0642", "\ud83d\udc4d"], ["dislike thumbs down bad no \u0644\u0627 \u0633\u064a\u0621", "\ud83d\udc4e"], ["love heart \u062d\u0628 \u0642\u0644\u0628", "\u2764\ufe0f \ud83d\udc95 \ud83d\ude0d \ud83d\ude18"], ["laugh lol funny haha \u0636\u062d\u0643 \u0647\u0647\u0647", "\ud83d\ude02 \ud83e\udd23 \ud83d\ude06"], ["fire hot lit \u0646\u0627\u0631 \u0634\u063a\u0627\u0644", "\ud83d\udd25"], ["wow surprise shock \u0645\u0641\u0627\u062c\u0623\u0629", "\ud83d\ude2e \ud83d\ude32 \ud83e\udd2f"], ["sad cry \u062d\u0632\u064a\u0646 \u0628\u064a\u0628\u0643\u064a", "\ud83d\ude22 \ud83d\ude2d \ud83d\ude1e"], ["angry mad \u0632\u0639\u0644\u0627\u0646", "\ud83d\ude21 \ud83d\ude20 \ud83e\udd2c"], ["smile happy \u0633\u0639\u064a\u062f \u0627\u0628\u062a\u0633\u0627\u0645\u0629", "\ud83d\ude00 \ud83d\ude0a \ud83d\ude04"], ["cool sunglasses", "\ud83d\ude0e"], ["clap applause bravo \u062a\u0635\u0641\u064a\u0642", "\ud83d\udc4f"], ["pray thanks please \u0634\u0643\u0631\u0627 \u062f\u0639\u0627\u0621", "\ud83d\ude4f"], ["strong muscle power \u0642\u0648\u0629", "\ud83d\udcaa"], ["party celebrate congrats \u0645\u0628\u0631\u0648\u0643 \u062d\u0641\u0644\u0629", "\ud83c\udf89 \ud83e\udd73 \ud83c\udf8a"], ["100 perfect \u0645\u0645\u062a\u0627\u0632", "\ud83d\udcaf"], ["check done correct \u062a\u0645", "\u2705 \u2714\ufe0f"], ["wrong cross no", "\u274c"], ["think thinking hmm \u0645\u0645\u0645", "\ud83e\udd14"], ["eyes look see \u0639\u064a\u0648\u0646", "\ud83d\udc40"], ["skull dead \u0645\u0627\u062a", "\ud83d\udc80"], ["rocket launch fast", "\ud83d\ude80"], ["lock security secure \u0623\u0645\u0627\u0646 \u0642\u0641\u0644", "\ud83d\udd12 \ud83d\udee1\ufe0f"], ["bug", "\ud83d\udc1b"], ["computer laptop \u0643\u0645\u0628\u064a\u0648\u062a\u0631", "\ud83d\udcbb"], ["star", "\u2b50 \ud83c\udf1f"], ["coffee tea \u0642\u0647\u0648\u0629 \u0634\u0627\u064a", "\u2615 \ud83c\udf75"], ["pizza food \u0623\u0643\u0644", "\ud83c\udf55 \ud83c\udf54"], ["cat \u0642\u0637\u0629", "\ud83d\udc31"], ["dog \u0643\u0644\u0628", "\ud83d\udc36"], ["trophy win \u0643\u0623\u0633", "\ud83c\udfc6 \ud83e\udd47"], ["money cash \u0641\u0644\u0648\u0633", "\ud83d\udcb0"], ["sleep tired \u0646\u0648\u0645", "\ud83d\ude34 \ud83e\udd71"], ["hello hi wave \u0645\u0631\u062d\u0628\u0627", "\ud83d\udc4b"], ["shake deal handshake", "\ud83e\udd1d"]];
+  var rxCss = false;
+  function rxStyle() {
+    if (rxCss) return; rxCss = true;
+    var st = document.createElement("style");
+    st.textContent = ".cm{position:relative}.rxbtn{opacity:0;border:1px solid var(--b);background:transparent;color:inherit;border-radius:999px;font-size:13px;line-height:1;padding:2px 6px;margin-inline-start:8px;cursor:pointer;transition:opacity .12s}.cm:hover .rxbtn,.rxbtn:focus-visible{opacity:.85}@media (hover:none){.rxbtn{opacity:.55}}.rx{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}.rx:empty{display:none}.rxp{border:1px solid var(--b);background:transparent;color:inherit;border-radius:999px;padding:1px 8px;font-size:13px;cursor:pointer;line-height:1.5}.rxp.mine{border-color:#d4a017;background:rgba(212,160,23,.18)}.rxp:disabled{opacity:.5;cursor:not-allowed}.rxpop{position:fixed;z-index:1500;background:#17110f;border:1px solid var(--b);border-radius:14px;box-shadow:0 8px 28px rgba(0,0,0,.55);padding:6px}.rxq{display:flex;gap:2px;align-items:center}.rxq button,.rxg button{border:0;background:transparent;border-radius:8px;cursor:pointer;font-size:22px;line-height:1;padding:5px;color:inherit}.rxq button:hover,.rxg button:hover{background:rgba(255,255,255,.1)}.rxq button.mine{background:rgba(212,160,23,.3)}.rxfull{width:min(320px,86vw)}.rxfull input{width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid var(--b);background:var(--bg);color:var(--t);margin-bottom:6px}.rxtabs{display:flex;gap:2px;margin-bottom:4px;overflow-x:auto}.rxg{display:grid;grid-template-columns:repeat(8,1fr);max-height:210px;overflow-y:auto}.rxg button{font-size:20px}";
+    document.head.appendChild(st);
+  }
+  function rxEmojis(q) {
+    q = (q || "").trim().toLowerCase(); var out = [];
+    RX_KW.forEach(function (k) { if (k[0].toLowerCase().indexOf(q) !== -1) k[1].split(" ").forEach(function (e) { if (out.indexOf(e) === -1) out.push(e); }); });
+    RX_CATS.forEach(function (c) { c[3].split(" ").forEach(function (e) { if (e.indexOf(q) !== -1 && out.indexOf(e) === -1) out.push(e); }); });
+    return out;
+  }
+
   /* ---------- community ---------- */
   async function communityPage() {
     var app = $("app"); if (!me) return go("login.html"); clear(app);
     var chans = [["general", tr("General chat", "الشات العام"), true], ["admins", tr("Admins only", "للإدارة فقط"), isStaff()], ["dmlist", tr("Private", "خاص"), true]].filter(function (c) { return c[2]; });
     var box = h("div", { "class": "wide" }), tabs = h("div", { "class": "tabs" }), log = h("div", { "class": "chatbox", role: "log", "aria-live": "polite" });
     var input = h("input", { type: "text", maxlength: "1000", "aria-label": tr("Message", "رسالة"), style: "flex:1;padding:11px;border-radius:10px;border:1px solid var(--b);background:var(--bg);color:var(--t)" });
-    var err = h("div", { "class": "msg" }), cur = "general", names = {}, urls = {}, urlsAt = Date.now(), sub = null, lastSig = "", myBlk = ((await sb.rpc("my_blocks")).data || [])[0] || null;
+    var err = h("div", { "class": "msg" }), cur = "general", names = {}, urls = {}, urlsAt = Date.now(), sub = null, lastSig = "", lastRsig = "", rx = {}, pop = null, rxBusy = 0, myBlk = ((await sb.rpc("my_blocks")).data || [])[0] || null;
     setInterval(function () { if (!document.hidden) load(); }, 2000);
     async function who(ids) {
       var need = ids.filter(function (i) { return !names[i]; }); if (!need.length) return;
       var r = await sb.from("public_profiles").select("id,display_name,avatar,subscribed,role,joined,plan_name").in("id", need);
       (r.data || []).forEach(function (p) { names[p.id] = p; });
+    }
+    rxStyle();
+    function rxScope() { return cur.indexOf("dm:") === 0 ? "dm" : "chat"; }
+    function rxBlockedMsg() { return tr("You are blocked from chat, so you cannot react.", "إنت محظور من الشات، فماينفعش تتفاعل."); }
+    function closePop() { if (pop) { pop.remove(); pop = null; } document.removeEventListener("mousedown", outPop, true); document.removeEventListener("touchstart", outPop, true); document.removeEventListener("keydown", escPop, true); }
+    function outPop(e) { if (pop && !pop.contains(e.target)) closePop(); }
+    function escPop(e) { if (e.key === "Escape") closePop(); }
+    function placePop(anchor) {
+      var r = anchor.getBoundingClientRect(), w = pop.offsetWidth, ph = pop.offsetHeight, left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)), top = r.top - ph - 6;
+      if (top < 8) top = Math.min(r.bottom + 6, window.innerHeight - ph - 8); pop.style.left = left + "px"; pop.style.top = Math.max(8, top) + "px";
+    }
+    function openPicker(anchor, scope, id) {
+      if (myBlk) return say(err, rxBlockedMsg(), "err");
+      closePop(); var mine = (rx[scope + ":" + id] || {});
+      pop = h("div", { "class": "rxpop", role: "dialog", "aria-label": tr("React", "تفاعل") }); document.body.appendChild(pop);
+      function pickEmoji(em) { closePop(); toggle(scope, id, em); }
+      function showBar() {
+        clear(pop); var bar = h("div", { "class": "rxq" });
+        RX_QUICK.forEach(function (em) { bar.appendChild(h("button", { type: "button", "class": mine[em] && mine[em].mine ? "mine" : "", text: em, "aria-label": em, on: { click: function () { pickEmoji(em); } } })); });
+        bar.appendChild(h("button", { type: "button", text: "+", style: "font-size:20px;font-weight:700;width:34px", "aria-label": tr("More emojis", "إيموجي أكتر"), on: { click: showFull } })); pop.appendChild(bar); placePop(anchor);
+      }
+      function showFull() {
+        clear(pop); var box = h("div", { "class": "rxfull" }), q = h("input", { type: "search", maxlength: "30", placeholder: tr("Search emoji", "دوّر على إيموجي"), "aria-label": tr("Search emoji", "دوّر على إيموجي") }), tabsEl = h("div", { "class": "rxtabs" }), grid = h("div", { "class": "rxg" });
+        function fill(list) { clear(grid); list.forEach(function (em) { grid.appendChild(h("button", { type: "button", text: em, "aria-label": em, on: { click: function () { pickEmoji(em); } } })); }); if (!list.length) grid.appendChild(h("p", { "class": "hint", style: "grid-column:1/-1", text: tr("No match", "مفيش نتيجة") })); }
+        RX_CATS.forEach(function (c, i) { tabsEl.appendChild(h("button", { type: "button", text: c[0], title: tr(c[1], c[2]), "aria-label": tr(c[1], c[2]), on: { click: function () { q.value = ""; fill(c[3].split(" ")); grid.scrollTop = 0; } } })); });
+        q.addEventListener("input", function () { if (q.value.trim()) fill(rxEmojis(q.value)); else fill(RX_CATS[0][3].split(" ")); });
+        box.appendChild(q); box.appendChild(tabsEl); box.appendChild(grid); pop.appendChild(box); fill(RX_CATS[0][3].split(" ")); placePop(anchor); q.focus();
+      }
+      showBar();
+      setTimeout(function () { document.addEventListener("mousedown", outPop, true); document.addEventListener("touchstart", outPop, true); document.addEventListener("keydown", escPop, true); }, 0);
+    }
+    function paintPills(c) {
+      var scope = c.getAttribute("data-s"), id = c.getAttribute("data-i"), o = rx[scope + ":" + id] || {}, sig = JSON.stringify(o) + (myBlk ? "b" : "");
+      if (c.getAttribute("data-sig") === sig) return; c.setAttribute("data-sig", sig); clear(c);
+      Object.keys(o).forEach(function (em) {
+        var e = o[em], b = h("button", { type: "button", "class": "rxp" + (e.mine ? " mine" : ""), text: em + " " + e.n, "aria-pressed": e.mine ? "true" : "false", "aria-label": em + " " + e.n + (e.mine ? " (" + tr("yours", "إنت") + ")" : ""), on: { click: function () { toggle(scope, Number(id), em); } } });
+        c.appendChild(b);
+      });
+    }
+    function paintAll() { Array.prototype.forEach.call(log.querySelectorAll(".rx"), paintPills); }
+    function reactUi(scope, id, headerEl, rowEl) {
+      var btn = h("button", { type: "button", "class": "rxbtn", text: "\u263a", title: tr("React", "تفاعل"), "aria-label": tr("React to message", "تفاعل مع الرسالة"), on: { click: function (e) { e.stopPropagation(); openPicker(btn, scope, id); } } });
+      var pills = h("div", { "class": "rx", "data-s": scope, "data-i": String(id) }); paintPills(pills);
+      var t = null; rowEl.addEventListener("touchstart", function (e) { if (e.target.closest && e.target.closest("button,audio,a,input")) return; t = setTimeout(function () { t = null; openPicker(btn, scope, id); }, 500); }, { passive: true });
+      ["touchend", "touchmove", "touchcancel"].forEach(function (ev) { rowEl.addEventListener(ev, function () { if (t) { clearTimeout(t); t = null; } }, { passive: true }); });
+      rowEl.addEventListener("contextmenu", function (e) { if (t !== null || e.pointerType === "touch") e.preventDefault(); });
+      headerEl.appendChild(btn); return pills;
+    }
+    async function fetchRx(scope, ids) {
+      if (!ids.length) return {};
+      var r = await sb.rpc("reaction_counts", { p_scope: scope, p_ids: ids }), o = {};
+      if (r.error) return null;
+      (r.data || []).forEach(function (x) { var k = scope + ":" + x.message_id; (o[k] = o[k] || {})[x.emoji] = { n: Number(x.n), mine: !!x.mine }; });
+      return o;
+    }
+    async function syncRx(scope, ids) { if (rxBusy) return false; var o = await fetchRx(scope, ids); if (o === null) return false; var s2 = JSON.stringify(o); if (s2 === lastRsig) return false; lastRsig = s2; rx = o; return true; }
+    async function toggle(scope, id, em) {
+      if (myBlk) return say(err, rxBlockedMsg(), "err");
+      var k = scope + ":" + id, o = (rx[k] = rx[k] || {}), e = o[em], was = !!(e && e.mine);
+      if (was) { e.n--; e.mine = false; if (e.n <= 0) delete o[em]; } else { if (!e) e = o[em] = { n: 0, mine: false }; e.n++; e.mine = true; }
+      paintAll(); rxBusy++;
+      var r = was ? await sb.from("chat_reactions").delete().eq("scope", scope).eq("message_id", id).eq("user_id", me.id).eq("emoji", em) : await sb.from("chat_reactions").insert({ scope: scope, message_id: id, user_id: me.id, emoji: em });
+      if (r.error && r.error.code !== "23505") { try { console.error("reaction", r.error); } catch (x) {} say(err, tr("Could not react: ", "ماقدرتش أتفاعل: ") + (r.error.message || ""), "err"); }
+      else say(err, "");
+      rxBusy--; lastRsig = ""; load();
     }
     function line(m) {
       var p = names[m.user_id] || { display_name: "?", avatar: "b1" }, del = null;
@@ -640,10 +732,11 @@
       var av = h("div", { "class": "av", style: "cursor:pointer", title: tr("View profile", "شوف البروفايل"), on: { click: function () { openProfile(m.user_id); } } }, avatarSvg(p.avatar, p.id));
       var nm = h("b", { text: p.display_name, style: "cursor:pointer", on: { click: function () { openProfile(m.user_id); } } });
       var body = m.audio_path ? (urls[m.audio_path] ? voicePlayer(urls[m.audio_path], m.audio_secs) : h("p", { "class": "hint", text: tr("Voice message (loading)", "رسالة صوتية (بتحمّل)") })) : h("p", { text: m.body });
-      var el = h("div", { "class": "cm" }, av, h("div", { style: "flex:1" }, nm, badgesEl(p.role, p.subscribed, p.plan_name), body), del);
+      var hd = h("div", { style: "flex:1" }, nm, badgesEl(p.role, p.subscribed, p.plan_name)), el = h("div", { "class": "cm" }, av, hd, del);
+      var pills = reactUi("chat", m.id, hd, el); hd.appendChild(body); hd.appendChild(pills);
       el.setAttribute("data-id", m.id); return el;
     }
-    function openDm(id) { cur = "dm:" + id; lastSig = ""; Array.prototype.forEach.call(tabs.children, function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-c") === "dmlist"); }); say(err, ""); load(); }
+    function openDm(id) { closePop(); cur = "dm:" + id; lastSig = ""; lastRsig = ""; rx = {}; Array.prototype.forEach.call(tabs.children, function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-c") === "dmlist"); }); say(err, ""); load(); }
     window.__scarOpenDm = openDm;
     function dmNotice() { return h("p", { "class": "hint", style: "border:1px solid #d4a017;border-radius:8px;padding:8px;margin:0 0 8px;color:#d4a017", text: DM_NOTICE() }); }
     async function loadDmList() {
@@ -655,17 +748,18 @@
     }
     async function loadDm() {
       var tid = cur.slice(3), r = await sb.from("dm_messages").select("id,sender,body,created_at").eq("thread_id", tid).order("created_at", { ascending: false }).limit(60), rows = (r.data || []).reverse();
-      var sg = cur + ":" + rows.map(function (x) { return x.id; }).join(","); if (sg === lastSig) return; lastSig = sg;
+      var sg = cur + ":" + rows.map(function (x) { return x.id; }).join(","), changed = await syncRx("dm", rows.map(function (x) { return x.id; }));
+      if (sg === lastSig) { if (changed) paintAll(); return; } lastSig = sg;
       var atEnd = log.scrollHeight - log.scrollTop - log.clientHeight < 80; await who(rows.map(function (x) { return x.sender; }));
       clear(log); log.appendChild(h("button", { "class": "btn", type: "button", text: tr("\u2190 All private chats", "\u2190 كل الشاتات الخاصة"), on: { click: function () { select("dmlist"); } } })); log.appendChild(dmNotice());
-      rows.forEach(function (m) { var p = names[m.sender] || { display_name: "?", avatar: "b1" }; log.appendChild(h("div", { "class": "cm" }, h("div", { "class": "av", style: "cursor:pointer", on: { click: function () { openProfile(m.sender); } } }, avatarSvg(p.avatar, p.id)), h("div", { style: "flex:1" }, h("b", { text: p.display_name }), badgesEl(p.role, p.subscribed, p.plan_name), h("p", { text: m.body })))); });
+      rows.forEach(function (m) { var p = names[m.sender] || { display_name: "?", avatar: "b1" }, hd = h("div", { style: "flex:1" }, h("b", { text: p.display_name }), badgesEl(p.role, p.subscribed, p.plan_name)), row = h("div", { "class": "cm" }, h("div", { "class": "av", style: "cursor:pointer", on: { click: function () { openProfile(m.sender); } } }, avatarSvg(p.avatar, p.id)), hd); var pl = reactUi("dm", m.id, hd, row); hd.appendChild(h("p", { text: m.body })); hd.appendChild(pl); log.appendChild(row); });
       if (atEnd || !log.getAttribute("data-dm")) { log.scrollTop = log.scrollHeight; log.setAttribute("data-dm", "1"); }
     }
     async function load() {
       if (cur === "dmlist") return loadDmList(); if (cur.indexOf("dm:") === 0) return loadDm();
       var r = await sb.from("chat_messages").select("id,user_id,body,created_at,audio_path,audio_secs").eq("channel", cur).order("created_at", { ascending: false }).limit(60);
-      var rows = (r.data || []).reverse(), sg = cur + ":" + rows.map(function (x) { return x.id; }).join(",");
-      if (sg === lastSig) return; lastSig = sg;
+      var rows = (r.data || []).reverse(), sg = cur + ":" + rows.map(function (x) { return x.id; }).join(","), changed = await syncRx("chat", rows.map(function (x) { return x.id; }));
+      if (sg === lastSig) { if (changed) paintAll(); return; } lastSig = sg;
       var atEnd = log.scrollHeight - log.scrollTop - log.clientHeight < 80; await who(rows.map(function (x) { return x.user_id; }));
       if (Date.now() - urlsAt > 3000000) { urls = {}; urlsAt = Date.now(); }
       var needU = rows.filter(function (x) { return x.audio_path && !urls[x.audio_path]; }).map(function (x) { return x.audio_path; });
@@ -673,8 +767,8 @@
       clear(log); rows.forEach(function (m) { log.appendChild(line(m)); }); if (atEnd || !log.getAttribute("data-init")) { log.scrollTop = log.scrollHeight; log.setAttribute("data-init", "1"); }
     }
     function select(c) {
-      cur = c; lastSig = ""; log.removeAttribute("data-dm"); log.removeAttribute("data-init"); if (sub) sb.removeChannel(sub);
-      sub = sb.channel("chat-" + c).on("postgres_changes", { event: "*", schema: "public", table: "chat_messages", filter: "channel=eq." + c }, load).subscribe();
+      closePop(); cur = c; lastSig = ""; lastRsig = ""; rx = {}; log.removeAttribute("data-dm"); log.removeAttribute("data-init"); if (sub) sb.removeChannel(sub);
+      sub = sb.channel("chat-" + c).on("postgres_changes", { event: "*", schema: "public", table: "chat_messages", filter: "channel=eq." + c }, load).on("postgres_changes", { event: "*", schema: "public", table: "chat_reactions" }, load).subscribe();
       Array.prototype.forEach.call(tabs.children, function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-c") === c); }); load();
     }
     chans.forEach(function (c) { tabs.appendChild(h("button", { "class": "btn", type: "button", "data-c": c[0], text: c[1], on: { click: function () { select(c[0]); } } })); });
@@ -1172,5 +1266,6 @@
     else { sideMenu(); if (PAGE === "account") accountPage(); else if (PAGE === "community") communityPage(); else if (PAGE === "admin") adminPage(); }
   })();
 })();
+
 
 
