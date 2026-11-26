@@ -668,10 +668,15 @@
       cb.appendChild(h("h3", { text: tr("You completed this path", "خلّصت المسار ده") }));
       cb.appendChild(h("button", { "class": "btn2 f", type: "button", text: tr("View your certificate", "اعرض شهادتك"), onclick: function () { location.hash = "#/cert/" + p.cert; } }));
     } else if (st.done && me) {
-      var nm = h("input", { type: "text", maxlength: "60", placeholder: tr("Name to print on the certificate", "الاسم اللي هيتكتب على الشهادة"), "class": "cinp" });
+      var nm = ltr(h("input", { type: "text", maxlength: "60", placeholder: tr("Full real name in English letters", "اسمك الكامل الحقيقي بحروف إنجليزي"), "class": "cinp", autocomplete: "name" })), er = h("div", { "class": "st warn" });
       cb.appendChild(h("h3", { text: tr("Path complete. Get your certificate", "خلّصت المسار. خد شهادتك") }));
-      cb.appendChild(h("p", { "class": "note", text: tr("Use the name you want shown publicly. Anyone with the certificate ID can verify the name, path and date.", "اكتب الاسم اللي عايزه يظهر علنًا. أي حد معاه رقم الشهادة يقدر يتأكد من الاسم والمسار والتاريخ.") }));
-      cb.appendChild(h("div", { "class": "rowb" }, nm, h("button", { "class": "btn2 f", type: "button", text: tr("Issue certificate", "اطلع الشهادة"), onclick: async function () { try { var id = await rpc("ch_issue_cert", { p_path: p.slug, p_name: nm.value }); location.hash = "#/cert/" + id; } catch (e) { toast(tr("Could not issue: check the name (2-60 characters).", "مقدرتش أطلعها: اتأكد من الاسم (2 لـ 60 حرف).")); } } })));
+      cb.appendChild(h("p", { "class": "note", text: tr("Enter your full real name in English letters (first and last name). It will be printed on the certificate and shown on the public verify page. It is not your username, and it cannot be changed freely after you issue it, so check the spelling.", "اكتب اسمك الكامل الحقيقي بحروف إنجليزي (الاسم الأول والأخير). هيتطبع على الشهادة وهيظهر في صفحة التحقق العامة. مش اسم المستخدم، ومينفعش يتغير بسهولة بعد ما تطلعها، فراجع الإملاء.") }));
+      cb.appendChild(h("div", { "class": "rowb" }, nm, h("button", { "class": "btn2 f", type: "button", text: tr("Issue certificate", "اطلع الشهادة"), onclick: async function () {
+        var v = nm.value.trim().replace(/\s+/g, " ");
+        if (!/^[A-Za-z][A-Za-z.'-]*( [A-Za-z][A-Za-z.'-]*)+$/.test(v) || v.length < 5 || v.length > 60) { er.textContent = tr("Use your first and last name, English letters only (letters, spaces, dots, hyphens, apostrophes).", "اكتب الاسم الأول والأخير بحروف إنجليزي بس (حروف ومسافات ونقط وشرطات)."); return; }
+        if (!confirm(tr("This name will be printed on your certificate and cannot be changed freely:\n\n" + v + "\n\nIssue it?", "الاسم ده هيتطبع على شهادتك ومينفعش يتغير بسهولة:\n\n" + v + "\n\nأطلعها؟"))) return;
+        try { var id = await rpc("ch_issue_cert", { p_path: p.slug, p_name: v }); location.hash = "#/cert/" + id; } catch (e) { er.textContent = tr("Could not issue the certificate. Check the name and try again.", "مقدرتش أطلع الشهادة. راجع الاسم وجرب تاني."); } } })));
+      cb.appendChild(er);
     } else {
       cb.appendChild(h("h3", { text: tr("Completion certificate", "شهادة الإتمام") }));
       cb.appendChild(h("p", { "class": "note", text: me ? tr("Solve every task in every room above to unlock it.", "حل كل مهمة في كل الغرف اللي فوق عشان تتفتح.") : tr("Sign in and solve every task in every room to unlock it.", "سجّل دخول وحل كل مهمة في كل الغرف عشان تتفتح.") }));
