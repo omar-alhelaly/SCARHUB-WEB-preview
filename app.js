@@ -34,10 +34,10 @@
       var ta = h("textarea", { rows: "3", maxlength: "500", style: "width:100%;box-sizing:border-box", "aria-label": tr("Reason (optional)", "السبب (اختياري)"), placeholder: tr("Reason (optional)", "السبب (اختياري)") });
       var cb = h("input", { type: "checkbox", id: "rmNotify" }); cb.disabled = true;
       var lbl = h("label", { "for": "rmNotify", style: "display:flex;gap:8px;align-items:flex-start;margin:10px 0" }, cb, h("span", { text: tr("Send to the user by email", "ابعت للمستخدم بالإيميل") }));
-      var hint = h("p", { "class": "hint", text: tr("Optional. The reason is saved in Admin > Logs. An email goes out only if you write a reason AND tick this box.", "اختياري. السبب بيتسجل في سجل الإدارة. الإيميل بيتبعت بس لو كتبت سبب وعلّمت على الخانة دي.") });
+      var hint = h("p", { "class": "hint", text: (me && me.role === "owner") ? tr("Optional. The reason is saved in Admin > Logs. An email goes out only if you write a reason AND tick this box.", "اختياري. السبب بيتسجل في سجل الإدارة. الإيميل بيتبعت بس لو كتبت سبب وعلّمت على الخانة دي.") : tr("Optional. The reason is saved in Admin > Logs. Emailing the user is owner-only for now.", "اختياري. السبب بيتسجل في سجل الإدارة. إرسال إيميل للمستخدم للمالك بس دلوقتي.") });
       function fin(v) { document.removeEventListener("keydown", esc, true); ov.remove(); resolve(v); }
       function esc(e) { if (e.key === "Escape") fin(null); }
-      ta.addEventListener("input", function () { var has = !!ta.value.trim(); cb.disabled = !has; if (!has) cb.checked = false; });
+      var canMail = me && me.role === "owner"; ta.addEventListener("input", function () { var has = !!ta.value.trim() && canMail; cb.disabled = !has; if (!has) cb.checked = false; });
       var ok = h("button", { "class": "btn", type: "button", style: "color:#e11d2e", text: tr("Confirm", "تأكيد"), on: { click: function () { var rs = ta.value.trim(); fin({ reason: rs || null, notify: !!(rs && cb.checked) }); } } });
       var no = h("button", { "class": "btn", type: "button", text: tr("Cancel", "إلغاء"), on: { click: function () { fin(null); } } });
       box.appendChild(h("h3", { text: title })); if (who) box.appendChild(h("p", { text: who })); box.appendChild(ta); box.appendChild(lbl); box.appendChild(hint);
@@ -1338,7 +1338,7 @@
         var rows = lr.data || [], map = {}, changed = firstLoad;
         allLogs.forEach(function (l) { if (l.meta && l.meta._id != null) map[l.meta._id] = l; });
         rows.forEach(function (l) { var id = l.meta && l.meta._id; if (id == null || map[id]) return; map[id] = l; changed = true; if (!firstLoad) { fresh[id] = 1; setTimeout(function () { delete fresh[id]; }, 8000); } });
-        if (changed) { allLogs = Object.keys(map).map(function (k) { return map[k]; }).sort(function (a, b) { return (new Date(b.at) - new Date(a.at)) || (b.meta._id - a.meta._id); }).slice(0, 500); drawLogs(); }
+        if (changed) { allLogs = Object.keys(map).map(function (k) { return map[k]; }).sort(function (a, b) { return (new Date(b.at) - new Date(a.at)) || (String(b.meta._id) < String(a.meta._id) ? -1 : 1); }).slice(0, 500); drawLogs(); }
         firstLoad = false; llive.textContent = tr("Live", "مباشر") + " \u25CF";
       } finally { liveBusy = false; }
     }
