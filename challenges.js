@@ -111,23 +111,25 @@
 
   /* simulated web page: sandboxed iframe, no network (CSP), links and forms are routed by the lab, not by the browser */
   function viewWeb(a) {
-    var cur = a.start || "/", srcOn = false;
-    var bar = h("input", { type: "text", value: cur, spellcheck: "false", autocomplete: "off", "aria-label": "address" });
+    var cur = a.start || "/", srcOn = false, drafts = {};
+    var bar = h("input", { type: "text", value: cur, spellcheck: "false", autocomplete: "off", autocapitalize: "off", autocorrect: "off", dir: "ltr", "aria-label": "address" });
     var frame = h("iframe", { "class": "wframe", sandbox: "allow-scripts allow-forms", referrerpolicy: "no-referrer", title: "lab page" });
     var src = h("pre", { "class": "src" }); src.style.display = "none";
     function pageOf(u) { return (a.pages && a.pages[u]) || null; }
-    var glue = "<script>document.addEventListener('click',function(e){var x=e.target.closest&&e.target.closest('a[href]');if(x){e.preventDefault();parent.postMessage({ch:1,go:x.getAttribute('href')},'*')}});document.addEventListener('submit',function(e){e.preventDefault();var f=e.target,d={};[].forEach.call(f.elements,function(i){if(i.name)d[i.name]=i.value});parent.postMessage({ch:1,form:f.getAttribute('action')||'/',data:d},'*')},true)<\/script>";
+    var glue = "<script>document.addEventListener('click',function(e){var x=e.target.closest&&e.target.closest('a[href]');if(x){e.preventDefault();parent.postMessage({ch:1,go:x.getAttribute('href')},'*')}});document.addEventListener('input',function(e){var i=e.target;if(i&&i.name)parent.postMessage({ch:1,draft:[i.name,i.value]},'*')});document.addEventListener('submit',function(e){e.preventDefault();var f=e.target,d={};[].forEach.call(f.elements,function(i){if(i.name)d[i.name]=i.value});parent.postMessage({ch:1,form:f.getAttribute('action')||'/',data:d},'*')},true)<\/script>";
     var csp = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'unsafe-inline'; form-action 'none'\">";
     function show(u) {
       cur = u; bar.value = u; var p = pageOf(u);
       var html = p ? p.html : (a.notfound || "<h2>404</h2>");
       src.textContent = html;
-      frame.srcdoc = csp + "<meta charset=utf-8>" + html + glue;
+      var dk = u.split("?")[0], dv = drafts[dk] || {}, rs = Object.keys(dv).length ? "<script>(function(){var D=" + JSON.stringify(dv).replace(/</g, "\\u003c") + ";[].forEach.call(document.querySelectorAll('input[name]'),function(i){if(D[i.name]!=null)i.value=D[i.name]})})()<\/script>" : "";
+      frame.srcdoc = csp + "<meta charset=utf-8>" + html + rs + glue;
     }
     function norm(u) { u = String(u || "/").trim(); if (/^[a-z]+:\/\//i.test(u)) { try { var x = new URL(u); u = x.pathname + x.search; } catch (e) {} } if (u[0] !== "/") u = "/" + u; return u; }
     function onMsg(ev) {
       if (ev.source !== frame.contentWindow || !ev.data || ev.data.ch !== 1) return;
-      if (ev.data.go) show(norm(ev.data.go));
+      if (ev.data.draft) { var dk2 = cur.split("?")[0]; (drafts[dk2] = drafts[dk2] || {})[String(ev.data.draft[0]).slice(0, 40)] = String(ev.data.draft[1]).slice(0, 200); }
+      else if (ev.data.go) show(norm(ev.data.go));
       else if (ev.data.form != null) {
         var f = (a.forms || {})[norm(ev.data.form)], d = ev.data.data || {}, to = f ? f["else"] : "/";
         if (f) (f.rules || []).some(function (r) { var ok = Object.keys(r.when).every(function (k) { return d[k] === r.when[k]; }); if (ok) to = r.go; return ok; });
@@ -277,7 +279,7 @@
     var arts = body.artifacts || [];
     if (arts.length) {
       var holder = h("div", { "class": "box" }), tabs = h("div", { "class": "atabs" }), view = h("div");
-      var open = function (i) { clear(view); [].forEach.call(tabs.children, function (b, j) { b.classList.toggle("on", i === j); }); var a = arts[i]; var f = VIEWERS[a.type]; view.appendChild(f ? f(a) : h("div", { text: "?" })); };
+      var views = [], open = function (i) { while (view.firstChild) view.removeChild(view.firstChild); [].forEach.call(tabs.children, function (b, j) { b.classList.toggle("on", i === j); }); var a = arts[i]; if (!views[i]) { var f = VIEWERS[a.type]; views[i] = f ? f(a) : h("div", { text: "?" }); } view.appendChild(views[i]); };
       if (arts.length > 1) arts.forEach(function (a, i) { tabs.appendChild(h("button", { "class": "tab", type: "button", text: pick(a, "title"), onclick: function () { open(i); } })); });
       else holder.appendChild(h("h3", { text: pick(arts[0], "title") }));
       if (arts.length > 1) holder.appendChild(tabs);
@@ -308,6 +310,11 @@
         if (!t.solved) btn.disabled = false;
       }
       btn.addEventListener("click", check); inp.addEventListener("keydown", function (e) { if (e.key === "Enter") check(); });
+      var gd = (body.guides || [])[i];
+      if (gd) {
+        if (gd.learn && gd.learn.length) { var lb = h("div", { "class": "learn" }, h("h4", { text: tr("Learn", "اتعلّم") })); gd.learn.forEach(function (b) { if (b.t === "p") lb.appendChild(h("p", { text: EN() ? b.en : (b.ar || b.en) })); else if (b.t === "tip") lb.appendChild(h("div", { "class": "tipb", text: EN() ? b.en : (b.ar || b.en) })); else if (b.t === "code") lb.appendChild(h("pre", { "class": "cb", text: b.text })); }); card.appendChild(lb); }
+        if (gd.how && gd.how.length) { var hl = h("ol"); gd.how.forEach(function (x) { hl.appendChild(h("li", { text: EN() ? x.en : (x.ar || x.en) })); }); card.appendChild(h("div", { "class": "howto" }, h("h4", { text: tr("How to do it in this lab", "إزاي تعملها في المعمل") }), hl)); }
+      }
       card.appendChild(h("p", { "class": "q", text: (i + 1) + ". " + pick(t, "question") + "  (" + t.points + " " + tr("pts", "نقطة") + ")" }));
       card.appendChild(h("div", { "class": "row" }, inp, btn)); card.appendChild(st);
       var hint = pick(t, "hint");
