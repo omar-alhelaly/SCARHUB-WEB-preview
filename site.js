@@ -22,6 +22,8 @@ window.addEventListener('DOMContentLoaded',function(){
  try{var lk=document.querySelector('#nav .links'),upd=lk&&lk.querySelector('a[href="updates.html"]');
   if(lk&&upd&&!lk.querySelector('a[href="research.html"]')){var pg=location.pathname.split('/').pop();
    [['research.html','Research','\u0628\u062d\u0648\u062b'],['incidents.html','Incidents','\u0642\u0635\u0635 \u0627\u0644\u062d\u0648\u0627\u062f\u062b']].reverse().forEach(function(x){var na=document.createElement('a');na.href=x[0];na.dataset.en=x[1];na.dataset.ar=x[2];na.textContent=x[1];if(pg===x[0])na.className='on';upd.parentNode.insertBefore(na,upd.nextSibling)})}}catch(e){}
+ try{var nv2=document.getElementById('nav'),an2=document.getElementById('loginlink')||document.getElementById('lang');
+  if(nv2&&an2&&!document.getElementById('commlink')){var cl=document.createElement('a');cl.id='commlink';cl.href='community.html';cl.className='lang'+(location.pathname.split('/').pop()==='community.html'?' on':'');cl.dataset.en='Community';cl.dataset.ar='\u0627\u0644\u0645\u062c\u062a\u0645\u0639';cl.textContent=cl.dataset.en;cl.style.cssText='text-decoration:none;display:inline-flex;align-items:center';an2.parentNode.insertBefore(cl,an2)}}catch(e){}
  setLang(L);
  var nav=document.querySelector('nav'),bg=document.getElementById('burger');
  if(bg)bg.onclick=function(){nav.classList.toggle('open')};
@@ -49,3 +51,4 @@ window.addEventListener('DOMContentLoaded',function(){
 
 /* signed-in visitors on pages without the account script: load it so the header shows their avatar */
 window.addEventListener('DOMContentLoaded',function(){try{var k=Object.keys(localStorage).some(function(x){return /^sb-.*-auth-token$/.test(x)});if(!k||document.querySelector('script[src*="app.js"]'))return;['vendor-supabase.js','config.js','app.js'].forEach(function(f){var e=document.createElement('script');e.src=f;e.async=false;document.head.appendChild(e)})}catch(e){}});
+
