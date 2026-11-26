@@ -94,3 +94,10 @@ html[data-theme=light] #ch .legend i.l1{background:#9be9a8}html[data-theme=light
 #ch .term pre{margin:0;padding:0;background:none;border:0;box-shadow:none;color:#d6cfd0;border-radius:0}
 #ch .term pre.er{color:#ffb86b}
 #ch .term .pr{color:#ff6b78}
+
+#ch .learn{background:var(--p);border:1px solid var(--b);border-inline-start:4px solid #3b82f6;border-radius:8px;padding:8px 12px;margin:0 0 10px}
+#ch .learn h4,#ch .howto h4{margin:0 0 6px;font-size:14px;color:var(--r2)}
+#ch .learn p{margin:6px 0;font-size:14px;line-height:1.7}
+#ch .howto{background:var(--p);border:1px dashed var(--b);border-radius:8px;padding:8px 12px;margin:0 0 10px}
+#ch .howto ol{margin:0;padding-inline-start:20px;font-size:14px;line-height:1.7}
+#ch .wbar input{direction:ltr;text-align:left;unicode-bidi:plaintext}
