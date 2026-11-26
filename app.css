@@ -22,3 +22,18 @@ table.t{width:100%;border-collapse:collapse;font-size:14px}table.t th,table.t td
 @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 .av{overflow:hidden}
+
+/* v2.2: real tab styling (login + community), was browser-default grey */
+.tabs{background:var(--bg);border:1px solid var(--b);border-radius:12px;padding:4px;gap:4px}
+.tabs button{background:transparent;border:1px solid transparent;color:var(--m);border-radius:9px;padding:9px 10px;font:inherit;font-weight:600;cursor:pointer;transition:background .2s,color .2s}
+.tabs button:hover{color:var(--t)}
+.tabs button[aria-pressed=true]{background:var(--r);border-color:var(--r);color:#fff}
+
+
+/* badges (023) */
+.bdg{display:inline-block;font-size:11px;line-height:1.5;padding:0 8px;border-radius:20px;font-weight:700;margin-inline-start:6px;vertical-align:middle;white-space:nowrap}
+.bdg.owner{background:linear-gradient(135deg,#e11d2e,#ff9f1c);color:#fff}.bdg.admin{background:#1f6feb;color:#fff}.bdg.sub{background:#d4a01722;color:#d4a017;border:1px solid #d4a017}
+nav .uchip.owner{border-color:#e11d2e;color:#ff9f9f;max-width:230px}nav .uchip.admin{border-color:#1f6feb;color:#9ec1ff;max-width:230px}
+nav .uchip .bdg{margin-inline-start:0;padding:0 7px}
+@media (max-width:640px){nav .uchip .bdg{display:none}}
+.cm .av{cursor:pointer}.bdgs{display:inline}
