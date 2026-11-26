@@ -145,6 +145,67 @@
   function onPay(cb) { payOn.push(cb); }
   var payOn = paySubs;
   function startPay() { if (!payChan && sb && me && isStaff()) { try { payChan = sb.channel("pay-" + me.id).on("postgres_changes", { event: "*", schema: "public", table: "payment_requests" }, fireAll(payOn)).subscribe(); } catch (e) {} } livePoll(); }
+  /* payment proof inside an inbox message (staff): image preview + approve / reject */
+  function noteExtras(n, row) {
+    if (n.kind !== "payment_submitted" || !isStaff() || !n.meta || !n.meta.request) return;
+    var box = h("div", { style: "margin-top:6px;width:100%" }); row.appendChild(box);
+    (async function () {
+      var q = await sb.from("payment_requests").select("id,status,proof_path,reference").eq("id", n.meta.request).maybeSingle();
+      if (!q.data) return box.appendChild(h("span", { "class": "hint", text: tr("Request not found.", "الطلب مش موجود.") }));
+      if (q.data.status !== "pending") return box.appendChild(h("span", { "class": "hint", text: tr("Already handled: ", "اتعالجت: ") + ({ approved: tr("approved", "اتقبلت"), rejected: tr("rejected", "اترفضت") }[q.data.status] || q.data.status) }));
+      if (q.data.reference) box.appendChild(h("div", { "class": "hint", text: tr("Note: ", "ملاحظة: ") + q.data.reference }));
+      var u = await sb.storage.from("payment-proofs").createSignedUrl(q.data.proof_path, 600);
+      if (u.data) { var img = h("img", { src: u.data.signedUrl, alt: "proof", style: "max-width:100%;max-height:260px;border-radius:8px;display:block;margin:4px 0;cursor:zoom-in" }); img.addEventListener("click", function () { window.open(u.data.signedUrl, "_blank", "noopener"); }); box.appendChild(img); }
+      else box.appendChild(h("div", { "class": "hint", text: tr("Could not load the proof image.", "ماقدرتش أحمل صورة الإثبات.") }));
+      var msg = h("span", { "class": "hint" });
+      var ok = h("button", { "class": "btn f", type: "button", text: tr("Approve", "اقبل") }), no = h("button", { "class": "btn", type: "button", text: tr("Reject", "ارفض") });
+      ok.addEventListener("click", async function () {
+        if (!confirm(tr("Approve and activate this subscription?", "تقبل وتفعّل الاشتراك؟"))) return;
+        var x = await sb.rpc("review_manual_payment", { p_id: q.data.id, p_approve: true });
+        if (x.error) { msg.textContent = tr("Failed.", "فشل."); } else { clear(box); box.appendChild(h("span", { "class": "hint", text: tr("Approved.", "اتقبلت.") })); }
+      });
+      no.addEventListener("click", async function () {
+        var why = prompt(tr("Reason (shown to the customer)", "السبب (هيظهر للعميل)")); if (why === null) return;
+        var x = await sb.rpc("review_manual_payment", { p_id: q.data.id, p_approve: false, p_reason: why.slice(0, 200) });
+        if (x.error) { msg.textContent = tr("Failed.", "فشل."); } else { clear(box); box.appendChild(h("span", { "class": "hint", text: tr("Rejected.", "اترفضت.") })); }
+      });
+      box.appendChild(h("div", { "class": "row" }, ok, no, msg));
+    })();
+  }
+  /* bell: opens the inbox as a dropdown on every page */
+  function bellInit(nav, before) {
+    if (document.getElementById("bellbtn")) return;
+    var st = document.createElement("style");
+    st.textContent = ".bell{position:relative;display:inline-flex;align-items:center;justify-content:center;height:36px;min-width:36px;padding:0 8px;box-sizing:border-box;border:1px solid #c9a227;border-radius:30px;background:transparent;color:#f0d98a;cursor:pointer;font-size:16px;margin-inline-start:6px;flex:none}.bell:hover{background:#c9a22722}.bell b{position:absolute;top:-7px;inset-inline-end:-5px;min-width:18px;height:18px;border-radius:9px;background:#d22;color:#fff;font:700 11px/18px sans-serif;padding:0 4px;text-align:center}.bellpanel{position:fixed;top:64px;inset-inline-end:12px;width:min(380px,calc(100vw - 24px));max-height:75vh;overflow:auto;background:#14100a;border:1px solid #c9a227;border-radius:12px;padding:10px 12px;z-index:99998;box-shadow:0 10px 40px #000a;color:#eee}.bellpanel .nrow{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.1);display:flex;flex-direction:column;gap:2px}.bellpanel .nrow.u{border-inline-start:3px solid #d22;padding-inline-start:8px}";
+    document.head.appendChild(st);
+    var cnt = h("b", { style: "display:none", text: "0" });
+    var bell = h("button", { type: "button", id: "bellbtn", "class": "bell", "aria-label": tr("Inbox", "الرسائل"), title: tr("Inbox", "الرسائل") }, "\u2709", cnt);
+    var pnl = h("div", { "class": "bellpanel", style: "display:none", role: "dialog" }); document.body.appendChild(pnl);
+    if (before && before.parentNode === nav) nav.insertBefore(bell, before); else nav.appendChild(bell);
+    var open = false;
+    async function render(list) {
+      clear(pnl); pnl.appendChild(h("b", { text: tr("Inbox", "صندوق الرسائل") }));
+      if (!list.length) pnl.appendChild(h("p", { "class": "hint", text: tr("No messages yet.", "مفيش رسايل لسه.") }));
+      list.slice(0, 15).forEach(function (n) {
+        var r = h("div", { "class": "nrow" + (n.read_at ? "" : " u") }, h("span", { text: noteText(n) }), h("span", { "class": "hint", text: new Date(n.created_at).toLocaleString(EN() ? "en-GB" : "ar-EG") }));
+        if (n.kind === "payment_submitted" && isStaff()) r.appendChild(h("a", { href: "admin.html#payments", text: tr("Open Admin > payments", "افتح الإدارة > المدفوعات") }));
+        pnl.appendChild(r); noteExtras(n, r);
+      });
+      pnl.appendChild(h("p", null, h("a", { href: "account.html#inbox", text: tr("Open full inbox", "افتح صندوق الرسائل كامل") })));
+    }
+    async function count() { var l = await loadNotes(), n = l.filter(function (x) { return !x.read_at; }).length; cnt.textContent = String(n); cnt.style.display = n ? "" : "none"; return l; }
+    async function toggle(force) {
+      open = force === undefined ? !open : force; pnl.style.display = open ? "block" : "none"; if (!open) return;
+      var l = await loadNotes(); await render(l);
+      if (l.some(function (x) { return !x.read_at; })) { await sb.rpc("mark_notifications_read"); cnt.style.display = "none"; var d = document.getElementById("inboxdot"); if (d) d.remove(); }
+    }
+    bell.addEventListener("click", function (e) { e.stopPropagation(); toggle(); });
+    pnl.addEventListener("click", function (e) { e.stopPropagation(); });
+    document.addEventListener("click", function (e) { if (open) { if (e.target && e.target.id === "inboxdot") return; toggle(false); } });
+    document.addEventListener("click", function (e) { if (e.target && e.target.id === "inboxdot") { e.stopPropagation(); toggle(true); } }, true);
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && open) toggle(false); });
+    count(); onNotes(async function () { var l = await count(); if (open) render(l); });
+  }
   async function loadNotes() {
     var r = await sb.from("notifications").select("id,kind,meta,read_at,created_at").order("created_at", { ascending: false }).limit(50);
     return r.error ? [] : (r.data || []);
@@ -160,11 +221,12 @@
   }
   async function drawInbox(box, list) {
     var p = h("div", { "class": "panel", id: "inbox" }, h("h2", { text: tr("Inbox", "صندوق الرسائل") }));
-    box.appendChild(p);
+    box.appendChild(p); if (location.hash === "#inbox") setTimeout(function () { p.scrollIntoView(); }, 50);
     if (!list.length) { p.appendChild(h("p", { "class": "hint", text: tr("No messages yet.", "مفيش رسايل لسه.") })); return; }
     list.forEach(function (n) {
-      p.appendChild(h("div", { "class": "row", style: "flex-direction:column;align-items:flex-start;gap:2px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.08)" + (n.read_at ? "" : ";border-inline-start:3px solid var(--r);padding-inline-start:8px") },
-        h("span", { text: noteText(n) }), h("span", { "class": "hint", text: new Date(n.created_at).toLocaleString(EN() ? "en-GB" : "ar-EG") })));
+      var nr = h("div", { "class": "row", style: "flex-direction:column;align-items:flex-start;gap:2px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.08)" + (n.read_at ? "" : ";border-inline-start:3px solid var(--r);padding-inline-start:8px") },
+        h("span", { text: noteText(n) }), h("span", { "class": "hint", text: new Date(n.created_at).toLocaleString(EN() ? "en-GB" : "ar-EG") }));
+      p.appendChild(nr); noteExtras(n, nr);
     });
     if (list.some(function (n) { return !n.read_at; })) { await sb.rpc("mark_notifications_read"); var d = document.getElementById("inboxdot"); if (d) d.remove(); var il = document.getElementById("inboxlink"); if (il) il.textContent = tr("Inbox", "الرسائل"); }
   }
@@ -178,6 +240,7 @@
     var nav = document.getElementById("nav"); if (!nav) return;
     var chip = h("a", { "class": "uchip", href: "account.html", title: (isStaff() ? me.alias : me.username) + " - " + tr("My account", "حسابي") }, h("span", { "class": "av" }, avatarSvg(me.avatar, me.id)), h("span", { "class": "nm", text: isStaff() ? me.alias : me.username }));
     var lg = document.getElementById("lang"); if (lg && lg.parentNode === nav) nav.insertBefore(chip, lg); else nav.appendChild(chip);
+    bellInit(nav, chip);
   }
 
   /* ---------- side menu ---------- */
@@ -703,7 +766,7 @@
     });
     tp.appendChild(tpmsg);
     /* payment confirmations (owner and admins) */
-    var cp = h("div", { "class": "panel" }), cmsg = h("div", { "class": "msg" }); box.appendChild(cp);
+    var cp = h("div", { "class": "panel", id: "payments" }), cmsg = h("div", { "class": "msg" }); box.appendChild(cp);
     async function loadPending() {
       clear(cp); cp.appendChild(h("h3", { text: tr("Payments waiting for confirmation", "دفعات مستنية التأكيد") }));
       var rq = await sb.from("payment_requests").select("id,user_id,amount_minor,currency,period,reference,proof_path,created_at").eq("method", "manual").eq("status", "pending").order("created_at");
@@ -725,7 +788,7 @@
       });
     cp.appendChild(cmsg);
     }
-    await loadPending(); onPay(loadPending); startPay();
+    await loadPending(); onPay(loadPending); startPay(); if (location.hash === "#payments") cp.scrollIntoView();
     /* logs (owner and admins) */
     var lp = h("div", { "class": "panel", id: "logs" }, h("h2", { text: tr("Logs", "السجل") })), lmsg = h("div", { "class": "msg" }), ltb = h("tbody"), lsel = h("select", { "aria-label": "filter" });
     box.appendChild(lp);
