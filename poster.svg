@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 735" width="1040" height="1470" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono','DejaVu Sans Mono',monospace">
+<title>SCAR toolkit poster</title><rect width="520" height="735" fill="#0c0c0e"/><rect width="520" height="3" fill="#e5232f"/>
+<text x="182.6" y="82" text-anchor="middle" font-size="76" font-weight="800" fill="none" stroke="#e5232f" stroke-width="1.6">S</text><text x="234.2" y="82" text-anchor="middle" font-size="76" font-weight="800" fill="none" stroke="#e5232f" stroke-width="1.6">C</text><text x="285.8" y="82" text-anchor="middle" font-size="76" font-weight="800" fill="none" stroke="#e5232f" stroke-width="1.6">A</text><text x="337.4" y="82" text-anchor="middle" font-size="76" font-weight="800" fill="none" stroke="#e5232f" stroke-width="1.6">R</text>
+<text x="219.8" y="106" text-anchor="middle" font-size="14" font-weight="700" fill="#f2f2f2">T</text><text x="233.2" y="106" text-anchor="middle" font-size="14" font-weight="700" fill="#f2f2f2">O</text><text x="246.6" y="106" text-anchor="middle" font-size="14" font-weight="700" fill="#f2f2f2">O</text><text x="260.0" y="106" text-anchor="middle" font-size="14" font-weight="700" fill="#f2f2f2">L</text><text x="273.4" y="106" text-anchor="middle" font-size="14" font-weight="700" fill="#f2f2f2">K</text><text x="286.8" y="106" text-anchor="middle" font-size="14" font-weight="700" fill="#f2f2f2">I</text><text x="300.2" y="106" text-anchor="middle" font-size="14" font-weight="700" fill="#f2f2f2">T</text>
+<text x="260" y="123" text-anchor="middle" font-size="8.6" fill="#9a9aa0">Ten standalone tools for pentest, DFIR and SOC work. Pure Python. No dependencies.</text>
+<rect x="25" y="135" width="470" height="0.8" fill="#e5232f" opacity=".6"/>
+<rect x="25" y="148" width="232" height="70" rx="4" fill="#161618" stroke="#2c1d20" stroke-width="0.8"/><rect x="25" y="148" width="2" height="70" fill="#e5232f"/>
+<text x="34" y="165" font-size="9.5" fill="#e5232f" font-weight="700">01</text><text x="52" y="165" font-size="11.5" font-weight="800" fill="#f4f4f4">SCAROSINT</text>
+<rect x="220.5" y="156" width="30.5" height="11" rx="2" fill="none" stroke="#e5232f" stroke-width=".7"/><text x="235.75" y="164" text-anchor="middle" font-size="5.8" fill="#e5232f">RECON</text>
+<text x="34" y="182" font-size="6.9" fill="#d0d0d4">Keyless domain recon: DNS, subdomains, WHOIS, TLS,</text><text x="34" y="192" font-size="6.9" fill="#d0d0d4">headers, archives.</text>
+<rect x="33" y="200" width="216" height="12" rx="2" fill="#08080a"/><text x="37" y="208.5" font-size="6.2" fill="#3fd68f">$ SCAROSINT example.com --json --no-save</text>
+<rect x="263" y="148" width="232" height="70" rx="4" fill="#161618" stroke="#2c1d20" stroke-width="0.8"/><rect x="263" y="148" width="2" height="70" fill="#e5232f"/>
+<text x="272" y="165" font-size="9.5" fill="#e5232f" font-weight="700">02</text><text x="290" y="165" font-size="11.5" font-weight="800" fill="#f4f4f4">SCARREPORT</text>
+<rect x="454.2" y="156" width="34.8" height="11" rx="2" fill="none" stroke="#e5232f" stroke-width=".7"/><text x="471.6" y="164" text-anchor="middle" font-size="5.8" fill="#e5232f">REPORT</text>
+<text x="272" y="182" font-size="6.9" fill="#d0d0d4">Turns SCAROSINT JSON into a clean HTML and Markdown</text><text x="272" y="192" font-size="6.9" fill="#d0d0d4">report.</text>
+<rect x="271" y="200" width="216" height="12" rx="2" fill="#08080a"/><text x="275" y="208.5" font-size="6.2" fill="#3fd68f">$ scarreport report.json -o reports/</text>
+<rect x="25" y="225" width="232" height="70" rx="4" fill="#161618" stroke="#2c1d20" stroke-width="0.8"/><rect x="25" y="225" width="2" height="70" fill="#e5232f"/>
+<text x="34" y="242" font-size="9.5" fill="#e5232f" font-weight="700">03</text><text x="52" y="242" font-size="11.5" font-weight="800" fill="#f4f4f4">SCARLAN</text>
+<rect x="211.9" y="233" width="39.099999999999994" height="11" rx="2" fill="none" stroke="#e5232f" stroke-width=".7"/><text x="231.45" y="241" text-anchor="middle" font-size="5.8" fill="#e5232f">NETWORK</text>
+<text x="34" y="259" font-size="6.9" fill="#d0d0d4">Local network inventory: hosts, ports, possible</text><text x="34" y="269" font-size="6.9" fill="#d0d0d4">exposures, diff.</text>
+<rect x="33" y="277" width="216" height="12" rx="2" fill="#08080a"/><text x="37" y="285.5" font-size="6.2" fill="#3fd68f">$ scarlan scan --network 192.168.1.0/24 --i-own-this-net</text>
+<rect x="263" y="225" width="232" height="70" rx="4" fill="#161618" stroke="#2c1d20" stroke-width="0.8"/><rect x="263" y="225" width="2" height="70" fill="#e5232f"/>
+<text x="272" y="242" font-size="9.5" fill="#e5232f" font-weight="700">04</text><text x="290" y="242" font-size="11.5" font-weight="800" fill="#f4f4f4">SCARNOTE</text>
+<rect x="458.5" y="233" width="30.5" height="11" rx="2" fill="none" stroke="#e5232f" stroke-width=".7"/><text x="473.75" y="241" text-anchor="middle" font-size="5.8" fill="#e5232f">NOTES</text>
+<text x="272" y="259" font-size="6.9" fill="#d0d0d4">Terminal notes and cheatsheets. Searchable, tagged,</text><text x="272" y="269" font-size="6.9" fill="#d0d0d4">encryptable.</text>
+<rect x="271" y="277" width="216" height="12" rx="2" fill="#08080a"/><text x="275" y="285.5" font-size="6.2" fill="#3fd68f">$ scarnote search nmap</text>
+<rect x="25" y="302" width="232" height="70" rx="4" fill="#161618" stroke="#2c1d20" stroke-width="0.8"/><rect x="25" y="302" width="2" height="70" fill="#e5232f"/>
+<text x="34" y="319" font-size="9.5" fill="#e5232f" font-weight="700">05</text><text x="52" y="319" font-size="11.5" font-weight="800" fill="#f4f4f4">SCARCUSTODY</text>
+<rect x="224.8" y="310" width="26.2" height="11" rx="2" fill="none" stroke="#e5232f" stroke-width=".7"/><text x="237.9" y="318" text-anchor="middle" font-size="5.8" fill="#e5232f">DFIR</text>
+<text x="34" y="336" font-size="6.9" fill="#d0d0d4">Evidence hashing and a tamper-evident</text><text x="34" y="346" font-size="6.9" fill="#d0d0d4">chain-of-custody log.</text>
+<rect x="33" y="354" width="216" height="12" rx="2" fill="#08080a"/><text x="37" y="362.5" font-size="6.2" fill="#3fd68f">$ scarcustody add image.dd -n "desk 3"</text>
+<rect x="263" y="302" width="232" height="70" rx="4" fill="#161618" stroke="#2c1d20" stroke-width="0.8"/><rect x="263" y="302" width="2" height="70" fill="#e5232f"/>
+<text x="272" y="319" font-size="9.5" fill="#e5232f" font-weight="700">06</text><text x="290" y="319" font-size="11.5" font-weight="800" fill="#f4f4f4">SCARLOG</text>
+<rect x="462.8" y="310" width="26.2" height="11" rx="2" fill="none" stroke="#e5232f" stroke-width=".7"/><text x="475.9" y="318" text-anchor="middle" font-size="5.8" fill="#e5232f">DFIR</text>
+<text x="272" y="336" font-size="6.9" fill="#d0d0d4">SSH/auth and web log analyzer: brute force,</text><text x="272" y="346" font-size="6.9" fill="#d0d0d4">spraying, probes, timeline.</text>
+<rect x="271" y="354" width="216" height="12" rx="2" fill="#08080a"/><text x="275" y="362.5" font-size="6.2" fill="#3fd68f">$ scarlog /var/log/auth.log --year 2026</text>
+<rect x="25" y="379" width="232" height="70" rx="4" fill="#161618" stroke="#2c1d20" stroke-width="0.8"/><rect x="25" y="379" width="2" height="70" fill="#e5232f"/>
+<text x="34" y="396" font-size="9.5" fill="#e5232f" font-weight="700">07</text><text x="52" y="396" font-size="11.5" font-weight="800" fill="#f4f4f4">SCARIOC</text>
+<rect x="199.0" y="387" width="52.0" height="11" rx="2" fill="none" stroke="#e5232f" stroke-width=".7"/><text x="225.0" y="395" text-anchor="middle" font-size="5.8" fill="#e5232f">DFIR / SOC</text>
+<text x="34" y="413" font-size="6.9" fill="#d0d0d4">IoC extractor: IPs, domains, URLs, emails, hashes,</text><text x="34" y="423" font-size="6.9" fill="#d0d0d4">CVEs. Defang aware.</text>
+<rect x="33" y="431" width="216" height="12" rx="2" fill="#08080a"/><text x="37" y="439.5" font-size="6.2" fill="#3fd68f">$ scarioc -c incident.log</text>
+<rect x="263" y="379" width="232" height="70" rx="4" fill="#161618" stroke="#2c1d20" stroke-width="0.8"/><rect x="263" y="379" width="2" height="70" fill="#e5232f"/>
+<text x="272" y="396" font-size="9.5" fill="#e5232f" font-weight="700">08</text><text x="290" y="396" font-size="11.5" font-weight="800" fill="#f4f4f4">SCARDECODE</text>
+<rect x="445.6" y="387" width="43.4" height="11" rx="2" fill="none" stroke="#e5232f" stroke-width=".7"/><text x="467.3" y="395" text-anchor="middle" font-size="5.8" fill="#e5232f">ANALYSIS</text>
+<text x="272" y="413" font-size="6.9" fill="#d0d0d4">Encode, decode, peel layers, read JWTs, identify</text><text x="272" y="423" font-size="6.9" fill="#d0d0d4">hashes, entropy.</text>
+<rect x="271" y="431" width="216" height="12" rx="2" fill="#08080a"/><text x="275" y="439.5" font-size="6.2" fill="#3fd68f">$ scardecode magic "VTJGc2RHVmtY..."</text>
+<rect x="25" y="456" width="232" height="70" rx="4" fill="#161618" stroke="#2c1d20" stroke-width="0.8"/><rect x="25" y="456" width="2" height="70" fill="#e5232f"/>
+<text x="34" y="473" font-size="9.5" fill="#e5232f" font-weight="700">09</text><text x="52" y="473" font-size="11.5" font-weight="800" fill="#f4f4f4">SCARENGAGE</text>
+<rect x="211.9" y="464" width="39.099999999999994" height="11" rx="2" fill="none" stroke="#e5232f" stroke-width=".7"/><text x="231.45" y="472" text-anchor="middle" font-size="5.8" fill="#e5232f">PENTEST</text>
+<text x="34" y="490" font-size="6.9" fill="#d0d0d4">Engagement tracker: authorization, scope, findings,</text><text x="34" y="500" font-size="6.9" fill="#d0d0d4">evidence, reports.</text>
+<rect x="33" y="508" width="216" height="12" rx="2" fill="#08080a"/><text x="37" y="516.5" font-size="6.2" fill="#3fd68f">$ scarengage export ENG-001 --format html</text>
+<rect x="263" y="456" width="232" height="70" rx="4" fill="#161618" stroke="#2c1d20" stroke-width="0.8"/><rect x="263" y="456" width="2" height="70" fill="#e5232f"/>
+<text x="272" y="473" font-size="9.5" fill="#e5232f" font-weight="700">10</text><text x="290" y="473" font-size="11.5" font-weight="800" fill="#f4f4f4">SCARCIPHER</text>
+<rect x="454.2" y="464" width="34.8" height="11" rx="2" fill="none" stroke="#e5232f" stroke-width=".7"/><text x="471.6" y="472" text-anchor="middle" font-size="5.8" fill="#e5232f">CIPHER</text>
+<text x="272" y="490" font-size="6.9" fill="#d0d0d4">Cipher utility of the toolkit. Standalone, same</text><text x="272" y="500" font-size="6.9" fill="#d0d0d4">red-terminal style.</text>
+<rect x="271" y="508" width="216" height="12" rx="2" fill="#08080a"/><text x="275" y="516.5" font-size="6.2" fill="#3fd68f">$ scarcipher --help</text>
+<text x="185.8" y="551" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f4f4f4">G</text><text x="195.7" y="551" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f4f4f4">U</text><text x="205.6" y="551" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f4f4f4">I</text><text x="215.4" y="551" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f4f4f4">D</text><text x="225.3" y="551" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f4f4f4">E</text><text x="235.2" y="551" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f4f4f4">D</text><text x="245.1" y="551" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f4f4f4"> </text><text x="255.0" y="551" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f4f4f4">W</text><text x="264.9" y="551" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f4f4f4">O</text><text x="274.8" y="551" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f4f4f4">R</text><text x="284.8" y="551" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f4f4f4">K</text><text x="294.6" y="551" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f4f4f4">F</text><text x="304.6" y="551" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f4f4f4">L</text><text x="314.4" y="551" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f4f4f4">O</text><text x="324.3" y="551" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f4f4f4">W</text><text x="334.2" y="551" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f4f4f4">S</text>
+<rect x="228" y="558" width="64" height="17" rx="4" fill="#e5232f"/><text x="260" y="570" text-anchor="middle" font-size="9.5" font-weight="800" fill="#fff">SCARHUB</text>
+<text x="260" y="587" text-anchor="middle" font-size="6.4" fill="#9a9aa0">one launcher: menu, status, help, install, update, workflows</text>
+<text x="25" y="603" font-size="6.3" font-weight="700" fill="#e5232f">RECON TO REPORT</text>
+<rect x="240.8" y="592" width="53.4" height="15" rx="2.5" fill="#141416" stroke="#6a2a30" stroke-width=".8"/><text x="267.5" y="602" text-anchor="middle" font-size="6.8" fill="#ececec">SCAROSINT</text>
+<path d="M296.2 599.5 H303.2 M300.7 597 L303.7 599.5 L300.7 602" fill="none" stroke="#e5232f" stroke-width=".9"/>
+<rect x="306.2" y="592" width="44.2" height="15" rx="2.5" fill="#141416" stroke="#6a2a30" stroke-width=".8"/><text x="328.3" y="602" text-anchor="middle" font-size="6.8" fill="#ececec">SCARIOC</text>
+<path d="M352.4 599.5 H359.4 M356.9 597 L359.9 599.5 L356.9 602" fill="none" stroke="#e5232f" stroke-width=".9"/>
+<rect x="362.4" y="592" width="58.0" height="15" rx="2.5" fill="#141416" stroke="#6a2a30" stroke-width=".8"/><text x="391.4" y="602" text-anchor="middle" font-size="6.8" fill="#ececec">SCARREPORT</text>
+<path d="M422.4 599.5 H429.4 M426.9 597 L429.9 599.5 L426.9 602" fill="none" stroke="#e5232f" stroke-width=".9"/>
+<rect x="432.4" y="592" width="62.6" height="15" rx="2.5" fill="#141416" stroke="#6a2a30" stroke-width=".8"/><text x="463.7" y="602" text-anchor="middle" font-size="6.8" fill="#ececec">SCARCUSTODY</text>
+<text x="25" y="629" font-size="6.3" font-weight="700" fill="#e5232f">INCIDENT RESPONSE</text>
+<rect x="189.2" y="618" width="62.6" height="15" rx="2.5" fill="#141416" stroke="#6a2a30" stroke-width=".8"/><text x="220.5" y="628" text-anchor="middle" font-size="6.8" fill="#ececec">SCARCUSTODY</text>
+<path d="M253.8 625.5 H260.8 M258.3 623 L261.3 625.5 L258.3 628" fill="none" stroke="#e5232f" stroke-width=".9"/>
+<rect x="263.8" y="618" width="44.2" height="15" rx="2.5" fill="#141416" stroke="#6a2a30" stroke-width=".8"/><text x="285.9" y="628" text-anchor="middle" font-size="6.8" fill="#ececec">SCARLOG</text>
+<path d="M310.0 625.5 H317.0 M314.5 623 L317.5 625.5 L314.5 628" fill="none" stroke="#e5232f" stroke-width=".9"/>
+<rect x="320.0" y="618" width="44.2" height="15" rx="2.5" fill="#141416" stroke="#6a2a30" stroke-width=".8"/><text x="342.1" y="628" text-anchor="middle" font-size="6.8" fill="#ececec">SCARIOC</text>
+<path d="M366.2 625.5 H373.2 M370.7 623 L373.7 625.5 L370.7 628" fill="none" stroke="#e5232f" stroke-width=".9"/>
+<rect x="376.2" y="618" width="58.0" height="15" rx="2.5" fill="#141416" stroke="#6a2a30" stroke-width=".8"/><text x="405.2" y="628" text-anchor="middle" font-size="6.8" fill="#ececec">SCARDECODE</text>
+<path d="M436.2 625.5 H443.2 M440.7 623 L443.7 625.5 L440.7 628" fill="none" stroke="#e5232f" stroke-width=".9"/>
+<rect x="446.2" y="618" width="48.8" height="15" rx="2.5" fill="#141416" stroke="#6a2a30" stroke-width=".8"/><text x="470.6" y="628" text-anchor="middle" font-size="6.8" fill="#ececec">SCARNOTE</text>
+<text x="25" y="655" font-size="6.3" font-weight="700" fill="#e5232f">ENGAGEMENT</text>
+<rect x="175.4" y="644" width="58.0" height="15" rx="2.5" fill="#141416" stroke="#6a2a30" stroke-width=".8"/><text x="204.4" y="654" text-anchor="middle" font-size="6.8" fill="#ececec">SCARENGAGE</text>
+<path d="M235.4 651.5 H242.4 M239.9 649 L242.9 651.5 L239.9 654" fill="none" stroke="#e5232f" stroke-width=".9"/>
+<rect x="245.4" y="644" width="53.4" height="15" rx="2.5" fill="#141416" stroke="#6a2a30" stroke-width=".8"/><text x="272.1" y="654" text-anchor="middle" font-size="6.8" fill="#ececec">SCAROSINT</text>
+<path d="M300.8 651.5 H307.8 M305.3 649 L308.3 651.5 L305.3 654" fill="none" stroke="#e5232f" stroke-width=".9"/>
+<rect x="310.8" y="644" width="44.2" height="15" rx="2.5" fill="#141416" stroke="#6a2a30" stroke-width=".8"/><text x="332.9" y="654" text-anchor="middle" font-size="6.8" fill="#ececec">SCARLAN</text>
+<path d="M357.0 651.5 H364.0 M361.5 649 L364.5 651.5 L361.5 654" fill="none" stroke="#e5232f" stroke-width=".9"/>
+<rect x="367.0" y="644" width="58.0" height="15" rx="2.5" fill="#141416" stroke="#6a2a30" stroke-width=".8"/><text x="396.0" y="654" text-anchor="middle" font-size="6.8" fill="#ececec">SCARREPORT</text>
+<path d="M427.0 651.5 H434.0 M431.5 649 L434.5 651.5 L431.5 654" fill="none" stroke="#e5232f" stroke-width=".9"/>
+<rect x="437.0" y="644" width="58.0" height="15" rx="2.5" fill="#141416" stroke="#6a2a30" stroke-width=".8"/><text x="466.0" y="654" text-anchor="middle" font-size="6.8" fill="#ececec">SCARENGAGE</text>
+<rect x="0" y="676" width="520" height="0.8" fill="#e5232f" opacity=".7"/>
+<text x="260" y="694" text-anchor="middle" font-size="11" font-weight="800" fill="#e5232f">Made by Zenoth</text>
+<text x="260" y="708" text-anchor="middle" font-size="7.2" fill="#a0a0a6">linkedin.com/in/omar-abdulaziz-a092b8373   |   github.com/omar-alhelaly</text>
+<text x="260" y="722" text-anchor="middle" font-size="5.6" fill="#6a6a70">AUTHORIZED USE ONLY: Run these tools on systems, networks and data you own or have written permission to test.</text>
+</svg>
