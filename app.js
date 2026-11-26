@@ -14,10 +14,38 @@
   function pwProblems(p) {
     var r = [];
     if (p.length < 12 || p.length > 64) r.push(tr("12 to 64 characters", "من 12 لـ 64 حرف"));
-    if (!/[A-Za-z]/.test(p)) r.push(tr("a letter", "حرف"));
+    if (!/[a-z]/.test(p)) r.push(tr("a lowercase letter (a-z)", "حرف صغير (a-z)"));
+    if (!/[A-Z]/.test(p)) r.push(tr("an uppercase letter (A-Z)", "حرف كبير (A-Z)"));
     if (!/[0-9]/.test(p)) r.push(tr("a number", "رقم"));
-    if (!/[^A-Za-z0-9]/.test(p)) r.push(tr("a symbol", "رمز"));
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|<>?,.\/`~]/.test(p)) r.push(tr("a symbol like ! @ # $ % & *", "رمز زي ! @ # $ % & *"));
     return r;
+  }
+  /* server (Supabase Auth) rule: 12+ chars with lowercase, uppercase, digit and symbol. Keep pwProblems equal to it. */
+  function authErr(e, kind) {
+    var c = (e && (e.code || e.error_code)) || "", st = e && e.status, m = String((e && e.message) || "").toLowerCase();
+    if (c === "weak_password") {
+      var rs = (e.weak_password && e.weak_password.reasons) || [];
+      if (rs.indexOf("pwned") >= 0) return tr("This password appears in known data leaks. Choose a different one.", "الباسورد ده ظاهر في تسريبات معروفة. اختار باسورد تاني.");
+      return tr("The password was rejected: it needs 12+ characters with a lowercase letter, an uppercase letter, a number and a symbol.", "الباسورد اترفض: لازم 12 حرف أو أكتر فيهم حرف صغير وحرف كبير ورقم ورمز.");
+    }
+    if (c === "same_password") return tr("The new password must be different from the old one.", "الباسورد الجديد لازم يختلف عن القديم.");
+    if (c === "user_already_exists" || c === "email_exists" || c === "identity_already_exists" || m.indexOf("already registered") >= 0) return tr("This email is already registered. Try signing in or reset your password.", "الإيميل ده متسجل قبل كده. جرب تدخل أو اعمل استعادة للباسورد.");
+    if (c === "over_email_send_rate_limit" || c === "over_request_rate_limit" || c === "over_sms_send_rate_limit" || st === 429) return tr("Too many attempts. Wait a few minutes and try again.", "محاولات كتير. استنى كام دقيقة وجرب تاني.");
+    if (c === "captcha_failed") return tr("The security check failed or expired. Complete it again and retry.", "التحقق الأمني فشل أو انتهى. كمّله تاني وجرب.");
+    if (c === "signup_disabled") return tr("New sign-ups are closed right now.", "التسجيل الجديد مقفول دلوقتي.");
+    if (c === "email_address_invalid" || c === "validation_failed") return tr("Please check the email and the other fields.", "راجع الإيميل وباقي الخانات.");
+    if (c === "email_not_confirmed") return tr("Confirm your email first using the code we sent.", "أكد الإيميل الأول بالكود اللي بعتناه.");
+    if (c === "reauthentication_needed" || c === "session_not_found") return tr("Your session ended. Open the link from your email again.", "الجلسة خلصت. افتح اللينك من الإيميل تاني.");
+    if (st === 0 || m.indexOf("fetch") >= 0 || m.indexOf("network") >= 0) return tr("Network problem. Check your connection and retry.", "مشكلة في النت. اتأكد من الاتصال وجرب تاني.");
+    return (kind === "up" ? tr("Could not create the account.", "ماقدرناش نعمل الحساب.") : kind === "pw" ? tr("Could not change the password.", "ماقدرناش نغير الباسورد.") : tr("Something went wrong.", "حصل خطأ.")) + " [" + (c || st || "error") + "]";
+  }
+  /* show/hide eye next to a password field */
+  function eye(inp) {
+    var b = h("button", { type: "button", "class": "pw-eye", "aria-pressed": "false" }), on = false;
+    var ic = function () { b.innerHTML = on ? '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>' : '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'; b.setAttribute("aria-label", on ? tr("Hide password", "إخفاء الباسورد") : tr("Show password", "إظهار الباسورد")); b.title = b.getAttribute("aria-label"); b.setAttribute("aria-pressed", on ? "true" : "false"); };
+    b.addEventListener("click", function () { on = !on; inp.type = on ? "text" : "password"; ic(); inp.focus(); });
+    ic();
+    return h("div", { "class": "pwf" }, inp, b);
   }
   function h(tag, attrs) {
     var e = document.createElement(tag);
@@ -350,7 +378,7 @@
     new Promise(function (ok) { if (window.turnstile) return ok(); var s = document.createElement("script"); s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"; s.async = true; s.onload = ok; s.onerror = ok; document.head.appendChild(s); }).then(function () { if (!window.turnstile || !CFG.turnstileSiteKey) return; capId = window.turnstile.render(cap, { sitekey: CFG.turnstileSiteKey, callback: function (x) { capTok = x; }, "expired-callback": function () { capTok = null; }, "error-callback": function () { capTok = null; } }); });
     function takeCaptcha() { var x = capTok; if (x) { capTok = null; setTimeout(function () { window.turnstile.reset(capId); }, 0); } return x; }
     form.appendChild(h("label", { "for": "em", text: tr("Email", "الإيميل") })); form.appendChild(email); form.appendChild(emHint);
-    form.appendChild(h("div", { id: "pwwrap" }, h("label", { "for": "pw", text: tr("Password (12-64: letters, numbers, symbols)", "الباسورد (12-64: حروف وأرقام ورموز)") }), pw, pwHint));
+    form.appendChild(h("div", { id: "pwwrap" }, h("label", { "for": "pw", text: tr("Password (12-64: upper and lower letters, numbers, symbols)", "الباسورد (12-64: حروف كبيرة وصغيرة وأرقام ورموز)") }), eye(pw), pwHint));
     form.appendChild(upBox); form.appendChild(codeBox); form.appendChild(cap); form.appendChild(h("div", { "class": "row" }, main)); form.appendChild(msg);
     var forgot = h("button", { "class": "btn", type: "button", text: tr("Forgot password?", "نسيت الباسورد؟") });
     forgot.onclick = async function () {
@@ -390,12 +418,12 @@
           if (!userNameOk(uname.value, false)) return say(msg, tr("Invalid or not allowed username (English letters, numbers, _).", "اسم مستخدم غير صحيح أو مش مسموح (حروف إنجليزي وأرقام و _)."), "err");
           var ct = takeCaptcha(); if (!ct) return say(msg, tr("Please complete the check above first.", "كمّل التحقق اللي فوق الأول."), "err");
           var r = await sb.auth.signUp({ email: em, password: pw.value, options: { captchaToken: ct, emailRedirectTo: location.origin + location.pathname.replace(/[^/]*$/, "") + "login.html", data: { username: uname.value, avatar: pick() } } });
-          if (r.error) return say(msg, tr("Could not create the account. The email or username may already be used.", "ماقدرناش نعمل الحساب. الإيميل أو الاسم ممكن يكونوا مستخدمين.") + " [" + (r.error.code || r.error.status || "error") + "]", "err");
+          if (r.error) return say(msg, authErr(r.error, "up"), "err");
           pending = em; setMode("code"); return say(msg, tr("We sent a verification code to your email. Enter it below to confirm your account. Check spam if you do not see it.", "بعتنالك كود تأكيد على الإيميل. اكتبه تحت عشان تأكد حسابك. بص في السبام لو مش لاقيه."), "ok");
         }
         var ct2 = takeCaptcha(); if (!ct2) return say(msg, tr("Please complete the check above first.", "كمّل التحقق اللي فوق الأول."), "err");
         var s = await sb.auth.signInWithPassword({ email: em, password: pw.value, options: { captchaToken: ct2 } });
-        if (s.error) return say(msg, tr("Wrong email or password.", "الإيميل أو الباسورد غلط.") + (s.error.code && s.error.code !== "invalid_credentials" ? " [" + s.error.code + "]" : ""), "err");
+        if (s.error) return say(msg, s.error.code === "invalid_credentials" ? tr("Wrong email or password.", "الإيميل أو الباسورد غلط.") : authErr(s.error, "in"), "err");
         go("account.html");
       } finally { main.disabled = false; }
     });
@@ -408,12 +436,12 @@
     var hint = h("div", { "class": "hint" }), msg = h("div", { "class": "msg", role: "status", "aria-live": "polite" });
     var btn = h("button", { "class": "btn f", type: "submit", text: tr("Set new password", "حط الباسورد الجديد") }), form = h("form", { novalidate: "" });
     p1.addEventListener("input", function () { var q = pwProblems(p1.value); hint.textContent = q.length ? tr("Needs: ", "ناقص: ") + q.join(", ") : "OK"; hint.className = "hint " + (q.length ? "bad" : "good"); });
-    form.appendChild(h("label", { "for": "np", text: tr("New password (12-64: letters, numbers, symbols)", "الباسورد الجديد (12-64: حروف وأرقام ورموز)") })); form.appendChild(p1); form.appendChild(hint);
+    form.appendChild(h("label", { "for": "np", text: tr("New password (12-64: upper and lower letters, numbers, symbols)", "الباسورد الجديد (12-64: حروف كبيرة وصغيرة وأرقام ورموز)") })); form.appendChild(eye(p1)); form.appendChild(hint);
     form.appendChild(h("div", { "class": "row" }, btn)); form.appendChild(msg);
     form.addEventListener("submit", async function (e) {
       e.preventDefault(); var q = pwProblems(p1.value); if (q.length) return say(msg, tr("Password needs: ", "الباسورد ناقص: ") + q.join(", "), "err");
       btn.disabled = true; var u = await sb.auth.updateUser({ password: p1.value }); btn.disabled = false;
-      if (u.error) return say(msg, tr("Could not change the password.", "ماقدرناش نغير الباسورد.") + " [" + (u.error.code || u.error.status || "error") + "]", "err");
+      if (u.error) return say(msg, authErr(u.error, "pw"), "err");
       await sb.auth.signOut(); say(msg, tr("Password changed. Taking you to sign in...", "الباسورد اتغير. هنوديك لتسجيل الدخول..."), "ok"); setTimeout(function () { go("login.html"); }, 1500);
     });
     clear(app); app.appendChild(h("div", { "class": "auth" }, h("h2", { text: tr("Choose a new password", "اختار باسورد جديد") }), form));
@@ -582,7 +610,7 @@
     }); }
     if (isStaff()) plansBox.appendChild(h("p", null, h("a", { href: "admin.html#payments", text: tr("Review payments waiting for confirmation (Admin)", "راجع الدفعات المستنية التأكيد (الإدارة)") })));
     var dpw = h("input", { type: "password", autocomplete: "current-password", maxlength: "64" }), dmsg = h("div", { "class": "msg" });
-    box.appendChild(h("div", { "class": "panel", id: "delete" }, h("h2", { text: tr("Delete account", "حذف الحساب") }), h("p", { text: tr("This signs you out and removes your login. It cannot be undone.", "ده هيطلعك ويمسح الدخول بتاعك. ماينفعش يتراجع.") }), h("label", { text: tr("Confirm with your password", "أكد بالباسورد") }), dpw,
+    box.appendChild(h("div", { "class": "panel", id: "delete" }, h("h2", { text: tr("Delete account", "حذف الحساب") }), h("p", { text: tr("This signs you out and removes your login. It cannot be undone.", "ده هيطلعك ويمسح الدخول بتاعك. ماينفعش يتراجع.") }), h("label", { text: tr("Confirm with your password", "أكد بالباسورد") }), eye(dpw),
       h("div", { "class": "row" }, h("button", { "class": "btn", type: "button", text: tr("Delete my account", "احذف حسابي"), on: { click: async function () {
         if (!confirm(tr("Delete your account for good?", "تحذف حسابك نهائي؟"))) return;
         var s = (await sb.auth.getSession()).data.session;
