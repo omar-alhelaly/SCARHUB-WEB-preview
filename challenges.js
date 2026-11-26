@@ -232,6 +232,8 @@
     });
     return t;
   }
+  /* answer placeholder: one dot per character of the first accepted answer, words apart. Only the lengths are stored, never the answer. */
+  function maskPh(mk) { if (!mk || !/^[0-9]+( [0-9]+)*$/.test(mk)) return tr("Your answer", "إجابتك"); return mk.split(" ").map(function (n) { var k = Math.min(+n, 60), o = []; for (var i = 0; i < k; i++) o.push("\u2022"); return o.join(" "); }).join("   "); }
   function progress(done, total) { var b = h("div", { "class": "bar" + (total && done >= total ? " done" : "") }, h("i")); b.firstChild.style.width = (total ? Math.round(100 * done / total) : 0) + "%"; return b; }
 
   async function pageRooms() {
@@ -292,7 +294,7 @@
     if (!me) tb.appendChild(h("div", { "class": "tipb" }, tr("Sign in to submit answers. ", "سجّل دخول عشان تبعت إجابات. "), h("a", { href: "login.html", text: tr("Sign in", "تسجيل الدخول") })));
     var cards = [];
     r.tasks.forEach(function (t, i) {
-      var st = h("div", { "class": "st" }), inp = h("input", { type: "text", placeholder: tr("Your answer", "إجابتك"), maxlength: "200", autocomplete: "off", spellcheck: "false", "aria-label": tr("answer", "إجابة") });
+      var st = h("div", { "class": "st" }), inp = h("input", { type: "text", placeholder: maskPh(t.mask), maxlength: "200", autocomplete: "off", spellcheck: "false", "aria-label": tr("answer", "إجابة") });
       var btn = h("button", { "class": "btn2 f", type: "button", text: tr("Check", "تحقق") });
       var card = h("div", { "class": "task" + (t.solved ? " ok" : "") });
       function lockSolved() { card.classList.add("ok"); inp.disabled = true; btn.disabled = true; inp.value = ""; inp.placeholder = tr("Solved", "اتحلت"); st.className = "st good"; st.textContent = "✓ " + tr("Solved", "اتحلت") + " (+" + t.points + ")"; }
