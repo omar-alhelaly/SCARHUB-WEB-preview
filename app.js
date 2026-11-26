@@ -137,12 +137,29 @@
     if (n.kind === "payment_submitted") return tr("New payment proof from " + (m.user || "a user") + ": " + (m.amount / 100).toFixed(2) + " " + m.currency + (m.plan ? " (" + m.plan + ")" : "") + ". Review it in Admin > Payments.", "إثبات دفع جديد من " + (m.user || "مستخدم") + ": " + (m.amount / 100).toFixed(2) + " " + m.currency + (m.plan ? " (" + m.plan + ")" : "") + ". راجعه في Admin > المدفوعات.");
     return "";
   }
+  /* live updates: Supabase Realtime plus a 20 second poll as fallback */
+  var noteSubs = [], paySubs = [], noteChan = null, payChan = null, pollOn = false;
+  function fireAll(list) { return function () { list.forEach(function (f) { try { f(); } catch (e) {} }); }; }
+  function livePoll() { if (!pollOn) { pollOn = true; setInterval(function () { if (!document.hidden) { fireAll(noteSubs)(); fireAll(paySubs)(); } }, 20000); } }
+  function onNotes(cb) { noteSubs.push(cb); if (!noteChan && sb && me) { try { noteChan = sb.channel("notes-" + me.id).on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter: "user_id=eq." + me.id }, fireAll(noteSubs)).subscribe(); } catch (e) {} } livePoll(); }
+  function onPay(cb) { payOn.push(cb); }
+  var payOn = paySubs;
+  function startPay() { if (!payChan && sb && me && isStaff()) { try { payChan = sb.channel("pay-" + me.id).on("postgres_changes", { event: "*", schema: "public", table: "payment_requests" }, fireAll(payOn)).subscribe(); } catch (e) {} } livePoll(); }
   async function loadNotes() {
     var r = await sb.from("notifications").select("id,kind,meta,read_at,created_at").order("created_at", { ascending: false }).limit(50);
     return r.error ? [] : (r.data || []);
   }
   async function inboxPanel(box) {
-    var list = await loadNotes(), p = h("div", { "class": "panel", id: "inbox" }, h("h2", { text: tr("Inbox", "صندوق الرسائل") }));
+    var sig = null;
+    async function draw() {
+      var list = await loadNotes(), sg = list.map(function (n) { return n.id + (n.read_at ? "r" : "u"); }).join(",");
+      if (sg === sig) return; sig = sg;
+      clear(box); await drawInbox(box, list);
+    }
+    await draw(); onNotes(draw);
+  }
+  async function drawInbox(box, list) {
+    var p = h("div", { "class": "panel", id: "inbox" }, h("h2", { text: tr("Inbox", "صندوق الرسائل") }));
     box.appendChild(p);
     if (!list.length) { p.appendChild(h("p", { "class": "hint", text: tr("No messages yet.", "مفيش رسايل لسه.") })); return; }
     list.forEach(function (n) {
@@ -174,11 +191,13 @@
     side.appendChild(h("p", { text: (isStaff() ? me.alias : me.username) + (me.role === "owner" ? " (owner)" : "") }));
     [["account.html", tr("My account", "حسابي")], ["community.html", tr("Community", "المجتمع")], ["tools.html", tr("Tools", "الأدوات")]].forEach(function (l) { side.appendChild(h("a", { href: l[0], text: l[1] })); });
     var inl = h("a", { href: "account.html#inbox", id: "inboxlink", text: tr("Inbox", "الرسائل") }); side.appendChild(inl);
-    loadNotes().then(function (l) {
-      var n = l.filter(function (x) { return !x.read_at; }).length; if (!n) return;
-      inl.textContent = tr("Inbox", "الرسائل") + " (" + n + ")";
-      btn.appendChild(h("span", { id: "inboxdot", text: String(n), style: "position:absolute;top:-6px;inset-inline-start:-6px;min-width:20px;height:20px;border-radius:10px;background:#d22;color:#fff;font:700 12px/20px sans-serif;text-align:center;padding:0 4px" }));
-    });
+    function badge() { loadNotes().then(function (l) {
+      var n = l.filter(function (x) { return !x.read_at; }).length, dot = document.getElementById("inboxdot");
+      inl.textContent = tr("Inbox", "الرسائل") + (n ? " (" + n + ")" : "");
+      if (!n) { if (dot) dot.remove(); return; }
+      if (dot) dot.textContent = String(n); else btn.appendChild(h("span", { id: "inboxdot", text: String(n), style: "position:absolute;top:-6px;inset-inline-start:-6px;min-width:20px;height:20px;border-radius:10px;background:#d22;color:#fff;font:700 12px/20px sans-serif;text-align:center;padding:0 4px" }));
+    }); }
+    badge(); onNotes(badge);
     if (isStaff()) side.appendChild(h("a", { href: "admin.html", text: tr("Admin panel", "لوحة الإدارة") }));
     if (isStaff()) side.appendChild(h("a", { href: "admin.html#manage", text: tr("Manage tools", "إدارة الأدوات") }));
     side.appendChild(h("button", { type: "button", text: tr("Edit profile", "تعديل البروفايل"), on: { click: function () { go("account.html#edit"); } } }));
@@ -685,8 +704,8 @@
     tp.appendChild(tpmsg);
     /* payment confirmations (owner and admins) */
     var cp = h("div", { "class": "panel" }), cmsg = h("div", { "class": "msg" }); box.appendChild(cp);
-    {
-      cp.appendChild(h("h3", { text: tr("Payments waiting for confirmation", "دفعات مستنية التأكيد") }));
+    async function loadPending() {
+      clear(cp); cp.appendChild(h("h3", { text: tr("Payments waiting for confirmation", "دفعات مستنية التأكيد") }));
       var rq = await sb.from("payment_requests").select("id,user_id,amount_minor,currency,period,reference,proof_path,created_at").eq("method", "manual").eq("status", "pending").order("created_at");
       if (!(rq.data || []).length) cp.appendChild(h("p", { "class": "hint", text: tr("None.", "مفيش.") }));
       (rq.data || []).forEach(function (q) {
@@ -706,6 +725,7 @@
       });
     cp.appendChild(cmsg);
     }
+    await loadPending(); onPay(loadPending); startPay();
     /* logs (owner and admins) */
     var lp = h("div", { "class": "panel", id: "logs" }, h("h2", { text: tr("Logs", "السجل") })), lmsg = h("div", { "class": "msg" }), ltb = h("tbody"), lsel = h("select", { "aria-label": "filter" });
     box.appendChild(lp);
