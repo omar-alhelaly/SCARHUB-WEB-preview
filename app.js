@@ -26,6 +26,33 @@
     return e;
   }
   var $ = function (id) { return document.getElementById(id); };
+  /* staff removal dialog: optional reason + explicit opt-in to email it */
+  function askRemoval(title, who) {
+    return new Promise(function (resolve) {
+      var ov = h("div", { style: "position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px" });
+      var box = h("div", { role: "dialog", "aria-modal": "true", style: "background:var(--card,#fff);color:inherit;border:1px solid var(--line,#ccc);border-radius:12px;padding:18px;width:min(440px,100%);max-height:90vh;overflow:auto" });
+      var ta = h("textarea", { rows: "3", maxlength: "500", style: "width:100%;box-sizing:border-box", "aria-label": tr("Reason (optional)", "السبب (اختياري)"), placeholder: tr("Reason (optional)", "السبب (اختياري)") });
+      var cb = h("input", { type: "checkbox", id: "rmNotify" }); cb.disabled = true;
+      var lbl = h("label", { "for": "rmNotify", style: "display:flex;gap:8px;align-items:flex-start;margin:10px 0" }, cb, h("span", { text: tr("Send to the user by email", "ابعت للمستخدم بالإيميل") }));
+      var hint = h("p", { "class": "hint", text: tr("Optional. The reason is saved in Admin > Logs. An email goes out only if you write a reason AND tick this box.", "اختياري. السبب بيتسجل في سجل الإدارة. الإيميل بيتبعت بس لو كتبت سبب وعلّمت على الخانة دي.") });
+      function fin(v) { document.removeEventListener("keydown", esc, true); ov.remove(); resolve(v); }
+      function esc(e) { if (e.key === "Escape") fin(null); }
+      ta.addEventListener("input", function () { var has = !!ta.value.trim(); cb.disabled = !has; if (!has) cb.checked = false; });
+      var ok = h("button", { "class": "btn", type: "button", style: "color:#e11d2e", text: tr("Confirm", "تأكيد"), on: { click: function () { var rs = ta.value.trim(); fin({ reason: rs || null, notify: !!(rs && cb.checked) }); } } });
+      var no = h("button", { "class": "btn", type: "button", text: tr("Cancel", "إلغاء"), on: { click: function () { fin(null); } } });
+      box.appendChild(h("h3", { text: title })); if (who) box.appendChild(h("p", { text: who })); box.appendChild(ta); box.appendChild(lbl); box.appendChild(hint);
+      box.appendChild(h("div", { style: "display:flex;gap:8px;justify-content:flex-end" }, no, ok)); ov.appendChild(box); document.body.appendChild(ov);
+      document.addEventListener("keydown", esc, true); ta.focus();
+    });
+  }
+  async function sendNotices() {
+    try {
+      var r = await sb.auth.getSession(), t = r.data && r.data.session && r.data.session.access_token; if (!t) return false;
+      var f = await fetch(CFG.url + "/functions/v1/send-notices", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + t, apikey: CFG.anonKey }, body: "{}" });
+      return f.ok;
+    } catch (e) { return false; }
+  }
+  function noticeNote(ok) { return ok ? "" : "\n" + tr("The email could not be sent right now. The action itself went through.", "الإيميل ماتبعتش دلوقتي. الإجراء نفسه اتنفذ."); }
   function say(el, text, kind) { el.className = "msg " + (kind || ""); el.textContent = text; }
   function clear(el) { while (el.firstChild) el.removeChild(el.firstChild); }
 
@@ -722,11 +749,14 @@
       showBar();
       setTimeout(function () { document.addEventListener("mousedown", outPop, true); document.addEventListener("touchstart", outPop, true); document.addEventListener("keydown", escPop, true); }, 0);
     }
-    async function delMsg(scope, id) {
-      if (!confirm(tr("Delete this message?", "تمسح الرسالة دي؟"))) return;
-      var r = await sb.rpc("delete_message", { p_scope: scope, p_id: id });
+    async function delMsg(scope, id, others) {
+      var o = { reason: null, notify: false };
+      if (others) { o = await askRemoval(tr("Delete this message?", "تمسح الرسالة دي؟")); if (!o) return; }
+      else if (!confirm(tr("Delete this message?", "تمسح الرسالة دي؟"))) return;
+      var r = await sb.rpc("delete_message", others ? { p_scope: scope, p_id: id, p_reason: o.reason, p_notify: o.notify } : { p_scope: scope, p_id: id });
       if (r.error) return say(err, tr("Could not delete: ", "ماقدرتش أمسح: ") + (r.error.message || ""), "err");
-      say(err, ""); lastSig = ""; load();
+      var ok = true; if (o.notify) ok = await sendNotices();
+      say(err, ok ? "" : noticeNote(false).trim(), ok ? "" : "err"); lastSig = ""; load();
     }
     async function openWho(anchor, scope, id, em) {
       closePop(); var rect = anchor.getBoundingClientRect(), snap = { getBoundingClientRect: function () { return rect; } };
@@ -820,7 +850,7 @@
     }
     function line(m) {
       var p = names[m.user_id] || { display_name: "?", avatar: "b1" }, del = null;
-      if (!m.deleted_at && (isStaff() || m.user_id === me.id)) del = h("button", { "class": "btn", type: "button", text: isStaff() ? "x" : tr("Delete", "احذف"), "aria-label": tr("Delete message", "احذف الرسالة"), on: { click: function () { delMsg("chat", m.id); } } });
+      if (!m.deleted_at && (isStaff() || m.user_id === me.id)) del = h("button", { "class": "btn", type: "button", text: isStaff() ? "x" : tr("Delete", "احذف"), "aria-label": tr("Delete message", "احذف الرسالة"), on: { click: function () { delMsg("chat", m.id, m.user_id !== me.id); } } });
       var av = h("div", { "class": "av", style: "cursor:pointer", title: tr("View profile", "شوف البروفايل"), on: { click: function () { openProfile(m.user_id); } } }, avatarSvg(p.avatar, p.id));
       var nm = h("b", { text: p.display_name, style: "cursor:pointer", on: { click: function () { openProfile(m.user_id); } } });
       var body = m.audio_path ? (urls[m.audio_path] ? voicePlayer(urls[m.audio_path], m.audio_secs) : h("p", { "class": "hint", text: tr("Voice message (loading)", "رسالة صوتية (بتحمّل)") })) : h("p", { text: m.body });
@@ -962,10 +992,14 @@
             var x = await sb.rpc("admin_set_ban", { target: u.id, ban: !banned }); if (x.error) alert(x.error.message); users();
           } } }));
           act.appendChild(h("button", { "class": "btn", type: "button", style: "color:#e11d2e", text: tr("Delete", "حذف"), on: { click: async function () {
-            if (!confirm(tr("Delete this user permanently? This cannot be undone.", "تحذف المستخدم ده نهائي؟ مش هتقدر ترجعه.") + (dn ? "\n" + dn : ""))) return;
-            var x = await sb.rpc("admin_delete_user", { target: u.id }); if (x.error) alert(x.error.message); users();
+            var o = await askRemoval(tr("Delete this user permanently? This cannot be undone.", "تحذف المستخدم ده نهائي؟ مش هتقدر ترجعه."), dn); if (!o) return;
+            var x = await sb.rpc("admin_delete_user", { target: u.id, p_reason: o.reason, p_notify: o.notify }); if (x.error) alert(x.error.message); else if (o.notify && !(await sendNotices())) alert(noticeNote(false).trim()); users();
           } } }));
         }
+        if (u.role !== "owner" && u.status !== "deleted") act.appendChild(h("button", { "class": "btn", type: "button", text: tr("Clear chat", "امسح الشات"), on: { click: async function () {
+          var o = await askRemoval(tr("Clear this user's chat messages?", "تمسح رسايل المستخدم ده في الشات؟"), name); if (!o) return;
+          var x = await sb.rpc("admin_clear_user_chat", { target: u.id, p_reason: o.reason, p_notify: o.notify }); if (x.error) alert(x.error.message); else if (o.notify && !(await sendNotices())) alert(noticeNote(false).trim()); users();
+        } } }));
         if (!owner && u.status === "active" && u.role === "user") act.appendChild(h("button", { "class": "btn", type: "button", text: tr("Profile / block", "البروفايل / حظر"), on: { click: function () { openProfile(u.id); } } }));
         if (owner && u.status === "active") act.appendChild(h("button", { "class": "btn", type: "button", text: tr("Profile", "البروفايل"), on: { click: function () { openProfile(u.id); } } }));
         var mine = gm[u.id] || [], subCell = h("td", { text: u.subscribed ? "yes" : "-" });
@@ -1173,8 +1207,8 @@
     /* logs (owner and admins) */
     var lp = h("div", { "class": "panel", id: "logs" }, h("h2", { text: tr("Logs", "السجل") })), lmsg = h("div", { "class": "msg" }), ltb = h("tbody"), lsel = h("select", { "aria-label": "filter" });
     box.appendChild(lp);
-    var LBL = { signup: ["Sign up", "تسجيل جديد"], login: ["Login", "دخول"], view_dm: ["Owner viewed a private chat", "المالك فتح شات خاص"], block_user: ["Block", "حظر"], unblock_user: ["Unblock", "فك حظر"], ban_user: ["Ban", "حظر"], unban_user: ["Unban", "فك حظر"], admin_delete_user: ["Account deleted by admin", "حذف حساب بواسطة أدمن"], delete_account: ["Account deleted by user", "المستخدم حذف حسابه"], grant_plan: ["Free plan granted", "اشتراك مجاني اتمنح"], revoke_plan: ["Free plan revoked", "اشتراك مجاني اتسحب"], review_manual_payment: ["Payment reviewed", "مراجعة دفعة"], set_role: ["Role changed", "تغيير صلاحية"], claim_owner: ["Owner claimed", "استلام الأونر"], tool_price: ["Tool price", "سعر أداة"], set_manual_instructions: ["Wallet details changed", "تغيير بيانات المحفظة"], delete_message: ["Message deleted", "رسالة اتمسحت"], contact_change: ["Contact details changed", "تعديل بيانات التواصل"], tool_added: ["Tool added", "أداة اتضافت"], tool_change: ["Tool changed", "أداة اتعدلت"], tool_deleted: ["Tool deleted", "أداة اتمسحت"] };
-    lsel.appendChild(h("option", { value: "", text: tr("All", "الكل") })); ["signup", "login", "view_dm", "block_user", "unblock_user", "ban_user", "unban_user", "admin_delete_user", "delete_account", "grant_plan", "revoke_plan", "review_manual_payment", "set_role", "delete_message", "contact_change", "tool_added", "tool_change", "tool_deleted"].forEach(function (k) { lsel.appendChild(h("option", { value: k, text: tr(LBL[k][0], LBL[k][1]) })); });
+    var LBL = { signup: ["Sign up", "تسجيل جديد"], login: ["Login", "دخول"], view_dm: ["Owner viewed a private chat", "المالك فتح شات خاص"], block_user: ["Block", "حظر"], unblock_user: ["Unblock", "فك حظر"], ban_user: ["Ban", "حظر"], unban_user: ["Unban", "فك حظر"], admin_delete_user: ["Account deleted by admin", "حذف حساب بواسطة أدمن"], delete_account: ["Account deleted by user", "المستخدم حذف حسابه"], grant_plan: ["Free plan granted", "اشتراك مجاني اتمنح"], revoke_plan: ["Free plan revoked", "اشتراك مجاني اتسحب"], review_manual_payment: ["Payment reviewed", "مراجعة دفعة"], set_role: ["Role changed", "تغيير صلاحية"], claim_owner: ["Owner claimed", "استلام الأونر"], tool_price: ["Tool price", "سعر أداة"], set_manual_instructions: ["Wallet details changed", "تغيير بيانات المحفظة"], delete_message: ["Message deleted", "رسالة اتمسحت"], contact_change: ["Contact details changed", "تعديل بيانات التواصل"], tool_added: ["Tool added", "أداة اتضافت"], tool_change: ["Tool changed", "أداة اتعدلت"], tool_deleted: ["Tool deleted", "أداة اتمسحت"], clear_user_chat: ["User chat cleared", "شات مستخدم اتمسح"], notice_sent: ["Notice emailed", "إيميل اتبعت"], notice_failed: ["Notice email failed", "الإيميل فشل"], notice_skipped: ["Notice skipped", "الإيميل اتخطى"] };
+    lsel.appendChild(h("option", { value: "", text: tr("All", "الكل") })); ["signup", "login", "view_dm", "block_user", "unblock_user", "ban_user", "unban_user", "admin_delete_user", "delete_account", "grant_plan", "revoke_plan", "review_manual_payment", "set_role", "delete_message", "contact_change", "tool_added", "tool_change", "tool_deleted", "clear_user_chat", "notice_sent", "notice_failed", "notice_skipped"].forEach(function (k) { lsel.appendChild(h("option", { value: k, text: tr(LBL[k][0], LBL[k][1]) })); });
     lp.appendChild(h("div", { "class": "row" }, lsel)); lp.appendChild(h("table", { "class": "t" }, h("thead", null, h("tr", null, h("th", { text: tr("When", "الوقت") }), h("th", { text: tr("What", "إيه") }), h("th", { text: tr("By", "بواسطة") }), h("th", { text: tr("User", "المستخدم") }))), ltb)); lp.appendChild(lmsg);
     var allLogs = [];
     function lgMoney(v, c) { return v == null ? tr("no price", "من غير سعر") : (v / 100).toFixed(2) + " " + (c || ""); }
@@ -1204,7 +1238,7 @@
       if (l.action === "tool_deleted") return tr("Tool deleted: ", "أداة اتمسحت: ") + nm;
       return tr("Tool changed: ", "أداة اتعدلت: ") + nm + " - " + (m.changes || []).map(lgChange).join("; ");
     }
-    function drawLogs() { clear(ltb); allLogs.filter(function (l) { return !lsel.value || l.action === lsel.value; }).slice(0, 200).forEach(function (l) { var lb = LBL[l.action]; ltb.appendChild(h("tr", null, h("td", { text: new Date(l.at).toLocaleString(EN() ? "en-GB" : "ar-EG") }), h("td", { text: (/^tool_(added|change|deleted)$/.test(l.action) ? lgTool(l) : (lb ? tr(lb[0], lb[1]) : l.action)) + (l.meta && l.meta.users ? " (" + l.meta.users + ")" : "") + (l.meta && l.meta.scope ? " (" + (l.meta.scope === "site" ? tr("site", "الموقع") : tr("chat", "الشات")) + (l.meta.reason ? ": " + l.meta.reason : "") + (l.meta.until ? ", " + tr("until ", "لحد ") + fmtTime(l.meta.until) : l.action === "block_user" ? ", " + tr("permanent", "دائم") : "") + ")" : "") }), h("td", { text: l.actor_name || "-" }), h("td", { text: l.target_name || "-" }))); }); }
+    function drawLogs() { clear(ltb); allLogs.filter(function (l) { return !lsel.value || l.action === lsel.value; }).slice(0, 200).forEach(function (l) { var lb = LBL[l.action]; ltb.appendChild(h("tr", null, h("td", { text: new Date(l.at).toLocaleString(EN() ? "en-GB" : "ar-EG") }), h("td", { text: (/^tool_(added|change|deleted)$/.test(l.action) ? lgTool(l) : (lb ? tr(lb[0], lb[1]) : l.action)) + (l.meta && l.meta.users ? " (" + l.meta.users + ")" : "") + (/^(admin_delete_user|clear_user_chat|delete_message)$/.test(l.action) && l.meta && l.meta.reason && !l.meta.scope ? " | " + tr("Reason: ", "السبب: ") + l.meta.reason : "") + (l.meta && l.meta.notice ? " | " + tr("email: ", "إيميل: ") + l.meta.notice : "") + (l.meta && l.meta.scope ? " (" + (l.meta.scope === "site" ? tr("site", "الموقع") : tr("chat", "الشات")) + (l.meta.reason ? ": " + l.meta.reason : "") + (l.meta.until ? ", " + tr("until ", "لحد ") + fmtTime(l.meta.until) : l.action === "block_user" ? ", " + tr("permanent", "دائم") : "") + ")" : "") }), h("td", { text: l.actor_name || "-" }), h("td", { text: l.target_name || "-" }))); }); }
     lsel.addEventListener("change", drawLogs);
     (async function () { var lr = await sb.rpc("admin_logs", { p_limit: 500 }); if (lr.error) return say(lmsg, tr("Could not load logs.", "ماقدرتش أحمل السجل."), "err"); allLogs = lr.data || []; drawLogs(); })();
     if (owner) {
