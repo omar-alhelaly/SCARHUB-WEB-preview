@@ -181,3 +181,4 @@ table{display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:to
 .side a,.side button{min-height:46px;font-size:16px}
 }
 @media (max-width:400px){h1{font-size:25px}.hero .wrap{padding-top:36px}}
+@media (max-width:640px){nav>a.lang#commlink{padding:6px 8px;font-size:12px}}
