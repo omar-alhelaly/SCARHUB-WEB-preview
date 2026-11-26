@@ -210,7 +210,7 @@
           var ct = takeCaptcha(); if (!ct) return say(msg, tr("Please complete the check above first.", "كمّل التحقق اللي فوق الأول."), "err");
           var r = await sb.auth.signUp({ email: em, password: pw.value, options: { captchaToken: ct, emailRedirectTo: location.origin + location.pathname.replace(/[^/]*$/, "") + "login.html", data: { username: uname.value, avatar: pick() } } });
           if (r.error) return say(msg, tr("Could not create the account. The email or username may already be used.", "ماقدرناش نعمل الحساب. الإيميل أو الاسم ممكن يكونوا مستخدمين.") + " [" + (r.error.code || r.error.status || "error") + "]", "err");
-          pending = em; setMode("code"); return say(msg, tr("We sent a 6-digit code to your email. Enter it below to confirm your account. Check spam if you do not see it.", "بعتنالك كود من 6 أرقام على الإيميل. اكتبه تحت عشان تأكد حسابك. بص في السبام لو مش لاقيه."), "ok");
+          pending = em; setMode("code"); return say(msg, tr("We sent a verification code to your email. Enter it below to confirm your account. Check spam if you do not see it.", "بعتنالك كود تأكيد على الإيميل. اكتبه تحت عشان تأكد حسابك. بص في السبام لو مش لاقيه."), "ok");
         }
         var ct2 = takeCaptcha(); if (!ct2) return say(msg, tr("Please complete the check above first.", "كمّل التحقق اللي فوق الأول."), "err");
         var s = await sb.auth.signInWithPassword({ email: em, password: pw.value, options: { captchaToken: ct2 } });
