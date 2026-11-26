@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Changa:wght@500;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap');
 
 :root{--bg:#0a0708;--p:#140d0f;--p2:#1c1114;--r:#e11d2e;--r2:#ff4455;--t:#ece6e7;--m:#9c8f92;--b:#2c1a1e}
 *{box-sizing:border-box}html{scroll-behavior:smooth}
@@ -131,3 +132,52 @@ main:focus{outline:none}
 
 .card.third{border-style:dashed}.tag.third{border-color:#b98a00;color:#e0b43a}
 .credit{font-size:13px;color:var(--m);border-inline-start:3px solid #b98a00;padding:4px 10px;background:#b98a0014;border-radius:6px}
+
+/* v2.2 design refresh: deliberate type system, calmer hovers, visible focus */
+:root{--fd-display:"Changa","IBM Plex Sans Arabic",system-ui,sans-serif;--fd-body:"IBM Plex Sans Arabic","Segoe UI",Tahoma,system-ui,sans-serif;--fd-mono:"IBM Plex Mono","IBM Plex Sans Arabic",ui-monospace,Menlo,Consolas,monospace}
+body{font-family:var(--fd-body)}
+h1,h2,h3,nav .brand,footer .brand,.stats b,.box .n,.step .no{font-family:var(--fd-display)}
+h1,h2,h3{letter-spacing:0}
+nav .brand,footer .brand{letter-spacing:.1em}
+.stats b,.box .n{font-weight:800}
+code,pre,.term pre{font-family:var(--fd-mono)}
+.btn{font-family:var(--fd-mono);font-size:13px;border-radius:6px;padding:10px 18px}
+.eyebrow{font-family:var(--fd-mono);text-transform:none;letter-spacing:.02em;font-size:13px}
+.card:hover,.box:hover,a.box:hover,.box.h:hover{transform:none;box-shadow:none;border-color:var(--r)}
+a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--r2);outline-offset:2px;border-radius:6px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ===== phone layout (max 640px). Desktop rules above are untouched. ===== */
+@media (max-width:640px){
+html,body{overflow-x:hidden;max-width:100%}
+body{font-size:16px;line-height:1.65;-webkit-text-size-adjust:100%}
+nav{padding:8px 12px;gap:6px;flex-wrap:nowrap}
+nav .brand{font-size:16px;letter-spacing:.1em;gap:6px;min-width:0}
+nav .brand svg{width:26px;height:26px}
+nav>button,nav>a.lang,nav button.burger{min-height:40px;min-width:40px;padding:6px 10px;font-size:14px;margin-inline-start:0;white-space:nowrap}
+nav>a.back,nav>button.back,nav .back{display:none}
+nav .chip span{display:none}nav .chip{padding:3px;min-height:40px}nav .chip svg,nav .chip img{width:32px;height:32px}
+nav .links{max-height:calc(100vh - 56px);overflow-y:auto}
+nav .links a{padding:14px 12px;font-size:16px;min-height:44px}
+header,.hero .wrap{padding-left:16px;padding-right:16px}
+section{padding-left:16px;padding-right:16px}
+h1{font-size:clamp(26px,8vw,34px);line-height:1.2;overflow-wrap:anywhere}
+h2{font-size:clamp(21px,6vw,26px);overflow-wrap:anywhere}
+p,li{overflow-wrap:anywhere}
+.grid,.steps,.cards{grid-template-columns:1fr!important}
+.ft{grid-template-columns:1fr!important}
+.btn,button,input,select,textarea{min-height:44px;font-size:16px}
+input,select,textarea{width:100%;max-width:100%;box-sizing:border-box}
+pre,code{white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%}
+pre{overflow-x:auto}
+img,svg,video,canvas{max-width:100%;height:auto}
+table{display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.wide,.panel{max-width:100%;box-sizing:border-box}
+.panel{padding:14px}
+.row{flex-wrap:wrap;gap:8px}
+.row>*{max-width:100%}
+.acct{width:52px;height:52px;inset-inline-end:12px;bottom:12px}
+.side{width:min(86vw,320px)}
+.side a,.side button{min-height:46px;font-size:16px}
+}
+@media (max-width:400px){h1{font-size:25px}.hero .wrap{padding-top:36px}}
