@@ -513,11 +513,11 @@
   }
 
   /* ---------- badges, public profile, moderation, voice ---------- */
-  function badgesEl(role, sub) {
+  function badgesEl(role, sub, plan) {
     var w = h("span", { "class": "bdgs" });
     if (role === "owner") w.appendChild(h("span", { "class": "bdg owner", text: tr("Owner", "المالك") }));
     else if (role === "admin") w.appendChild(h("span", { "class": "bdg admin", text: tr("Admin", "أدمن") }));
-    if (sub) w.appendChild(h("span", { "class": "bdg sub", text: "\u2605 " + tr("Subscriber", "مشترك") }));
+    if (sub) w.appendChild(h("span", { "class": "bdg sub", text: "\u2605 " + (plan || tr("Subscriber", "مشترك")) }));
     return w;
   }
   function fmtDate(v) { return v ? new Date(v).toLocaleDateString(EN() ? "en-GB" : "ar-EG") : "-"; }
@@ -536,7 +536,8 @@
     var d = r.data;
     function row(k, v) { return h("p", { style: "margin:4px 0" }, h("b", { text: k + ": " }), typeof v === "string" ? document.createTextNode(v) : v); }
     var av = h("div", { "class": "av", style: "width:64px;height:64px;flex:none" }, avatarSvg(d.avatar, d.id));
-    card.appendChild(h("div", { style: "display:flex;gap:14px;align-items:center;margin-bottom:10px;padding-inline-end:40px" }, av, h("div", null, h("h2", { text: d.name, style: "margin:0" }), badgesEl(d.role, d.subscribed))));
+    card.appendChild(h("div", { style: "display:flex;gap:14px;align-items:center;margin-bottom:10px;padding-inline-end:40px" }, av, h("div", null, h("h2", { text: d.name, style: "margin:0" }), badgesEl(d.role, d.subscribed, d.plans && d.plans.length ? d.plans.join(", ") : (d.all_access ? tr("All tools", "كل الأدوات") : null)))));
+    if (d.id !== me.id) card.appendChild(h("p", { style: "margin:4px 0 8px" }, h("button", { "class": "btn f", type: "button", text: tr("Message privately", "ابعتله رسالة خاصة"), on: { click: function () { startDm(d.id); } } })));
     card.appendChild(row(tr("Joined", "انضم"), fmtDate(d.joined)));
     var pl = (d.plans || []).slice(); if (d.all_access) pl.unshift(tr("All tools", "كل الأدوات"));
     card.appendChild(row(tr("Plan", "الاشتراك"), pl.length ? pl.join(", ") : tr("None", "مفيش")));
@@ -584,6 +585,13 @@
       if (x.error) return say(msg, tr("Could not block: ", "ماقدرتش أحظر: ") + x.error.message, "err"); openProfile(id);
     } } })); card.appendChild(msg);
   }
+  async function startDm(uid) {
+    var r = await sb.rpc("dm_open", { target: uid });
+    if (r.error || !r.data) return alert(tr("Cannot open a private chat with this user.", "ماينفعش تفتح شات خاص مع المستخدم ده."));
+    var pm = $("profmodal"); if (pm) pm.remove();
+    if (window.__scarOpenDm) window.__scarOpenDm(r.data); else location.href = "community.html#dm=" + r.data;
+  }
+  var DM_NOTICE = function () { return tr("Private chat. Only you and the other person can read it, except that the site owner may review private chats for safety and abuse reports. Every owner review is logged. Do not share passwords or payment details.", "شات خاص. إنت والشخص التاني بس اللي تقروه، إلا إن مالك الموقع ممكن يراجع الشاتات الخاصة لأسباب الأمان وبلاغات الإساءة. أي مراجعة من المالك بتتسجل. ماتشاركش باسووردات أو بيانات دفع."); };
   /* whole-site block: the account stays signed in but sees only this notice */
   function blockedScreen(b) {
     var ov = h("div", { style: "position:fixed;inset:0;z-index:2000;background:#0a0708;display:flex;align-items:center;justify-content:center;padding:20px" });
@@ -596,14 +604,14 @@
   /* ---------- community ---------- */
   async function communityPage() {
     var app = $("app"); if (!me) return go("login.html"); clear(app);
-    var chans = [["general", tr("General chat", "الشات العام"), true], ["admins", tr("Admins only", "للإدارة فقط"), isStaff()]].filter(function (c) { return c[2]; });
+    var chans = [["general", tr("General chat", "الشات العام"), true], ["admins", tr("Admins only", "للإدارة فقط"), isStaff()], ["dmlist", tr("Private", "خاص"), true]].filter(function (c) { return c[2]; });
     var box = h("div", { "class": "wide" }), tabs = h("div", { "class": "tabs" }), log = h("div", { "class": "chatbox", role: "log", "aria-live": "polite" });
     var input = h("input", { type: "text", maxlength: "1000", "aria-label": tr("Message", "رسالة"), style: "flex:1;padding:11px;border-radius:10px;border:1px solid var(--b);background:var(--bg);color:var(--t)" });
     var err = h("div", { "class": "msg" }), cur = "general", names = {}, urls = {}, urlsAt = Date.now(), sub = null, lastSig = "", myBlk = ((await sb.rpc("my_blocks")).data || [])[0] || null;
     setInterval(function () { if (!document.hidden) load(); }, 2000);
     async function who(ids) {
       var need = ids.filter(function (i) { return !names[i]; }); if (!need.length) return;
-      var r = await sb.from("public_profiles").select("id,display_name,avatar,subscribed,role,joined").in("id", need);
+      var r = await sb.from("public_profiles").select("id,display_name,avatar,subscribed,role,joined,plan_name").in("id", need);
       (r.data || []).forEach(function (p) { names[p.id] = p; });
     }
     function line(m) {
@@ -612,10 +620,29 @@
       var av = h("div", { "class": "av", style: "cursor:pointer", title: tr("View profile", "شوف البروفايل"), on: { click: function () { openProfile(m.user_id); } } }, avatarSvg(p.avatar, p.id));
       var nm = h("b", { text: p.display_name, style: "cursor:pointer", on: { click: function () { openProfile(m.user_id); } } });
       var body = m.audio_path ? (urls[m.audio_path] ? h("div", null, h("audio", { controls: "", preload: "none", src: urls[m.audio_path], style: "max-width:100%;height:38px" }), h("small", { "class": "hint", text: " " + m.audio_secs + "s" })) : h("p", { "class": "hint", text: tr("Voice message (loading)", "رسالة صوتية (بتحمّل)") })) : h("p", { text: m.body });
-      var el = h("div", { "class": "cm" }, av, h("div", { style: "flex:1" }, nm, badgesEl(p.role, p.subscribed), body), del);
+      var el = h("div", { "class": "cm" }, av, h("div", { style: "flex:1" }, nm, badgesEl(p.role, p.subscribed, p.plan_name), body), del);
       el.setAttribute("data-id", m.id); return el;
     }
+    function openDm(id) { cur = "dm:" + id; lastSig = ""; Array.prototype.forEach.call(tabs.children, function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-c") === "dmlist"); }); say(err, ""); load(); }
+    window.__scarOpenDm = openDm;
+    function dmNotice() { return h("p", { "class": "hint", style: "border:1px solid #d4a017;border-radius:8px;padding:8px;margin:0 0 8px;color:#d4a017", text: DM_NOTICE() }); }
+    async function loadDmList() {
+      var r = await sb.from("dm_threads").select("id,user_a,user_b,last_at").order("last_at", { ascending: false }).limit(50), rows = r.data || [];
+      var others = rows.map(function (t) { return t.user_a === me.id ? t.user_b : t.user_a; }); await who(others);
+      var sg = "dmlist:" + rows.map(function (t) { return t.id + t.last_at; }).join(","); if (sg === lastSig) return; lastSig = sg; clear(log); log.appendChild(dmNotice());
+      if (!rows.length) log.appendChild(h("p", { "class": "hint", text: tr("No private chats yet. Click someone's avatar in the chat, then press Message privately.", "مفيش شاتات خاصة لسه. دوس على صورة حد في الشات وبعدين ابعتله رسالة خاصة.") }));
+      rows.forEach(function (t, i) { var p = names[others[i]] || { display_name: "?", avatar: "b1" }; log.appendChild(h("div", { "class": "cm", style: "cursor:pointer", on: { click: function () { openDm(t.id); } } }, h("div", { "class": "av" }, avatarSvg(p.avatar, p.id)), h("div", { style: "flex:1" }, h("b", { text: p.display_name }), badgesEl(p.role, p.subscribed, p.plan_name), h("p", { "class": "hint", text: fmtTime(t.last_at) })))); });
+    }
+    async function loadDm() {
+      var tid = cur.slice(3), r = await sb.from("dm_messages").select("id,sender,body,created_at").eq("thread_id", tid).order("created_at", { ascending: false }).limit(60), rows = (r.data || []).reverse();
+      var sg = cur + ":" + rows.map(function (x) { return x.id; }).join(","); if (sg === lastSig) return; lastSig = sg;
+      var atEnd = log.scrollHeight - log.scrollTop - log.clientHeight < 80; await who(rows.map(function (x) { return x.sender; }));
+      clear(log); log.appendChild(h("button", { "class": "btn", type: "button", text: tr("\u2190 All private chats", "\u2190 كل الشاتات الخاصة"), on: { click: function () { select("dmlist"); } } })); log.appendChild(dmNotice());
+      rows.forEach(function (m) { var p = names[m.sender] || { display_name: "?", avatar: "b1" }; log.appendChild(h("div", { "class": "cm" }, h("div", { "class": "av", style: "cursor:pointer", on: { click: function () { openProfile(m.sender); } } }, avatarSvg(p.avatar, p.id)), h("div", { style: "flex:1" }, h("b", { text: p.display_name }), badgesEl(p.role, p.subscribed, p.plan_name), h("p", { text: m.body })))); });
+      if (atEnd || !log.getAttribute("data-dm")) { log.scrollTop = log.scrollHeight; log.setAttribute("data-dm", "1"); }
+    }
     async function load() {
+      if (cur === "dmlist") return loadDmList(); if (cur.indexOf("dm:") === 0) return loadDm();
       var r = await sb.from("chat_messages").select("id,user_id,body,created_at,audio_path,audio_secs").eq("channel", cur).order("created_at", { ascending: false }).limit(60);
       var rows = (r.data || []).reverse(), sg = cur + ":" + rows.map(function (x) { return x.id; }).join(",");
       if (sg === lastSig) return; lastSig = sg;
@@ -626,7 +653,7 @@
       clear(log); rows.forEach(function (m) { log.appendChild(line(m)); }); if (atEnd || !log.getAttribute("data-init")) { log.scrollTop = log.scrollHeight; log.setAttribute("data-init", "1"); }
     }
     function select(c) {
-      cur = c; lastSig = ""; if (sub) sb.removeChannel(sub);
+      cur = c; lastSig = ""; log.removeAttribute("data-dm"); log.removeAttribute("data-init"); if (sub) sb.removeChannel(sub);
       sub = sb.channel("chat-" + c).on("postgres_changes", { event: "*", schema: "public", table: "chat_messages", filter: "channel=eq." + c }, load).subscribe();
       Array.prototype.forEach.call(tabs.children, function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-c") === c); }); load();
     }
@@ -634,6 +661,8 @@
     var form = h("form", { "class": "row", style: "display:flex;gap:8px;margin-top:10px" }, input, h("button", { "class": "btn f", type: "submit", text: tr("Send", "إرسال") }));
     form.addEventListener("submit", async function (e) {
       e.preventDefault(); var b = input.value.trim(); if (!b) return;
+      if (cur === "dmlist") return say(err, tr("Open a private chat first.", "افتح شات خاص الأول."), "err");
+      if (cur.indexOf("dm:") === 0) { var dr = await sb.from("dm_messages").insert({ thread_id: cur.slice(3), sender: me.id, body: b }); if (dr.error) say(err, tr("Slow down or try again.", "على مهلك أو جرب تاني."), "err"); else { input.value = ""; say(err, ""); load(); } return; }
       var r = await sb.from("chat_messages").insert({ channel: cur, user_id: me.id, body: b });
       if (r.error) say(err, tr("Slow down or try again.", "على مهلك أو جرب تاني."), "err"); else { input.value = ""; say(err, ""); load(); }
     });
@@ -642,6 +671,7 @@
     function micReset() { if (rtick) clearInterval(rtick); rtick = null; if (rstop) clearTimeout(rstop); rstop = null; if (rstream) rstream.getTracks().forEach(function (t) { t.stop(); }); rstream = null; recd = null; micBtn.textContent = tr("\u25cf Voice", "\u25cf صوت"); micBtn.style.color = ""; }
     micBtn.addEventListener("click", async function () {
       if (recd) { recd.stop(); return; }
+      if (cur !== "general" && cur !== "admins") return say(err, tr("Voice messages are for the community chat only.", "الرسائل الصوتية للشات العام بس."), "err");
       if (!navigator.mediaDevices || !window.MediaRecorder) return say(err, tr("Voice recording is not supported in this browser.", "التسجيل الصوتي مش مدعوم في المتصفح ده."), "err");
       try { rstream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (e) { return say(err, tr("Microphone permission was denied.", "إذن الميكروفون اترفض."), "err"); }
       var mt = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4"].filter(function (x) { return MediaRecorder.isTypeSupported(x); })[0];
@@ -663,7 +693,7 @@
     });
     form.insertBefore(micBtn, form.lastChild);
     if (myBlk) { input.disabled = true; micBtn.disabled = true; Array.prototype.forEach.call(form.querySelectorAll("button"), function (b) { b.disabled = true; }); say(err, tr("You are blocked from chat. Reason: ", "إنت محظور من الشات. السبب: ") + myBlk.reason + (myBlk.expires_at ? " (" + tr("until ", "لحد ") + fmtTime(myBlk.expires_at) + ")" : " (" + tr("no end date", "من غير مدة") + ")"), "err"); }
-    box.appendChild(h("div", { "class": "panel" }, h("h2", { text: tr("Community", "المجتمع") }), tabs, log, form, err)); app.appendChild(box); select("general");
+    box.appendChild(h("div", { "class": "panel" }, h("h2", { text: tr("Community", "المجتمع") }), tabs, log, form, err)); app.appendChild(box); var dmh = location.hash.match(/^#dm=([0-9a-f-]{36})$/); if (dmh) { select("dmlist"); openDm(dmh[1]); } else select("general");
   }
 
   /* ---------- admin ---------- */
@@ -921,13 +951,26 @@
     /* logs (owner and admins) */
     var lp = h("div", { "class": "panel", id: "logs" }, h("h2", { text: tr("Logs", "السجل") })), lmsg = h("div", { "class": "msg" }), ltb = h("tbody"), lsel = h("select", { "aria-label": "filter" });
     box.appendChild(lp);
-    var LBL = { signup: ["Sign up", "تسجيل جديد"], login: ["Login", "دخول"], block_user: ["Block", "حظر"], unblock_user: ["Unblock", "فك حظر"], ban_user: ["Ban", "حظر"], unban_user: ["Unban", "فك حظر"], admin_delete_user: ["Account deleted by admin", "حذف حساب بواسطة أدمن"], delete_account: ["Account deleted by user", "المستخدم حذف حسابه"], grant_plan: ["Free plan granted", "اشتراك مجاني اتمنح"], revoke_plan: ["Free plan revoked", "اشتراك مجاني اتسحب"], review_manual_payment: ["Payment reviewed", "مراجعة دفعة"], set_role: ["Role changed", "تغيير صلاحية"], claim_owner: ["Owner claimed", "استلام الأونر"], tool_price: ["Tool price", "سعر أداة"], set_manual_instructions: ["Wallet details changed", "تغيير بيانات المحفظة"] };
-    lsel.appendChild(h("option", { value: "", text: tr("All", "الكل") })); ["signup", "login", "block_user", "unblock_user", "ban_user", "unban_user", "admin_delete_user", "delete_account", "grant_plan", "revoke_plan", "review_manual_payment", "set_role"].forEach(function (k) { lsel.appendChild(h("option", { value: k, text: tr(LBL[k][0], LBL[k][1]) })); });
+    var LBL = { signup: ["Sign up", "تسجيل جديد"], login: ["Login", "دخول"], view_dm: ["Owner viewed a private chat", "المالك فتح شات خاص"], block_user: ["Block", "حظر"], unblock_user: ["Unblock", "فك حظر"], ban_user: ["Ban", "حظر"], unban_user: ["Unban", "فك حظر"], admin_delete_user: ["Account deleted by admin", "حذف حساب بواسطة أدمن"], delete_account: ["Account deleted by user", "المستخدم حذف حسابه"], grant_plan: ["Free plan granted", "اشتراك مجاني اتمنح"], revoke_plan: ["Free plan revoked", "اشتراك مجاني اتسحب"], review_manual_payment: ["Payment reviewed", "مراجعة دفعة"], set_role: ["Role changed", "تغيير صلاحية"], claim_owner: ["Owner claimed", "استلام الأونر"], tool_price: ["Tool price", "سعر أداة"], set_manual_instructions: ["Wallet details changed", "تغيير بيانات المحفظة"] };
+    lsel.appendChild(h("option", { value: "", text: tr("All", "الكل") })); ["signup", "login", "view_dm", "block_user", "unblock_user", "ban_user", "unban_user", "admin_delete_user", "delete_account", "grant_plan", "revoke_plan", "review_manual_payment", "set_role"].forEach(function (k) { lsel.appendChild(h("option", { value: k, text: tr(LBL[k][0], LBL[k][1]) })); });
     lp.appendChild(h("div", { "class": "row" }, lsel)); lp.appendChild(h("table", { "class": "t" }, h("thead", null, h("tr", null, h("th", { text: tr("When", "الوقت") }), h("th", { text: tr("What", "إيه") }), h("th", { text: tr("By", "بواسطة") }), h("th", { text: tr("User", "المستخدم") }))), ltb)); lp.appendChild(lmsg);
     var allLogs = [];
-    function drawLogs() { clear(ltb); allLogs.filter(function (l) { return !lsel.value || l.action === lsel.value; }).slice(0, 200).forEach(function (l) { var lb = LBL[l.action]; ltb.appendChild(h("tr", null, h("td", { text: new Date(l.at).toLocaleString(EN() ? "en-GB" : "ar-EG") }), h("td", { text: (lb ? tr(lb[0], lb[1]) : l.action) + (l.meta && l.meta.scope ? " (" + (l.meta.scope === "site" ? tr("site", "الموقع") : tr("chat", "الشات")) + (l.meta.reason ? ": " + l.meta.reason : "") + (l.meta.until ? ", " + tr("until ", "لحد ") + fmtTime(l.meta.until) : l.action === "block_user" ? ", " + tr("permanent", "دائم") : "") + ")" : "") }), h("td", { text: l.actor_name || "-" }), h("td", { text: l.target_name || "-" }))); }); }
+    function drawLogs() { clear(ltb); allLogs.filter(function (l) { return !lsel.value || l.action === lsel.value; }).slice(0, 200).forEach(function (l) { var lb = LBL[l.action]; ltb.appendChild(h("tr", null, h("td", { text: new Date(l.at).toLocaleString(EN() ? "en-GB" : "ar-EG") }), h("td", { text: (lb ? tr(lb[0], lb[1]) : l.action) + (l.meta && l.meta.users ? " (" + l.meta.users + ")" : "") + (l.meta && l.meta.scope ? " (" + (l.meta.scope === "site" ? tr("site", "الموقع") : tr("chat", "الشات")) + (l.meta.reason ? ": " + l.meta.reason : "") + (l.meta.until ? ", " + tr("until ", "لحد ") + fmtTime(l.meta.until) : l.action === "block_user" ? ", " + tr("permanent", "دائم") : "") + ")" : "") }), h("td", { text: l.actor_name || "-" }), h("td", { text: l.target_name || "-" }))); }); }
     lsel.addEventListener("change", drawLogs);
     (async function () { var lr = await sb.rpc("admin_logs", { p_limit: 500 }); if (lr.error) return say(lmsg, tr("Could not load logs.", "ماقدرتش أحمل السجل."), "err"); allLogs = lr.data || []; drawLogs(); })();
+    if (owner) {
+      var dp = h("div", { "class": "panel", id: "dms" }, h("h2", { text: tr("Private chats (owner only, read-only)", "الشاتات الخاصة (للمالك فقط، قراءة بس)") })), dmsg = h("div", { "class": "msg" }), dview = h("div", { "class": "chatbox", style: "display:none;margin-top:10px" }), dtb = h("tbody");
+      dp.appendChild(h("p", { "class": "hint", text: tr("Every time you open a conversation here it is written to the Logs. Admins cannot see private chats.", "كل مرة بتفتح محادثة هنا بتتسجل في السجل. الأدمن مايقدرش يشوف الشاتات الخاصة.") }));
+      dp.appendChild(h("table", { "class": "t" }, h("thead", null, h("tr", null, h("th", { text: tr("Users", "المستخدمين") }), h("th", { text: tr("Messages", "الرسايل") }), h("th", { text: tr("Last", "آخر رسالة") }), h("th", { text: "" }))), dtb)); dp.appendChild(dview); dp.appendChild(dmsg); box.appendChild(dp);
+      (async function () {
+        var lr2 = await sb.rpc("owner_list_dms"); if (lr2.error) return say(dmsg, tr("Could not load.", "ماقدرتش أحمل."), "err");
+        (lr2.data || []).forEach(function (t) { dtb.appendChild(h("tr", null, h("td", { text: t.a_name + " & " + t.b_name }), h("td", { text: String(t.msgs) }), h("td", { text: fmtTime(t.last_at) }), h("td", null, h("button", { "class": "btn", type: "button", text: tr("Open (logged)", "افتح (بتتسجل)"), on: { click: async function () {
+          var vr = await sb.rpc("owner_view_dm", { p_thread: t.thread_id }); if (vr.error) return say(dmsg, tr("Could not open.", "ماقدرتش أفتح."), "err");
+          clear(dview); dview.style.display = ""; (vr.data || []).forEach(function (m) { dview.appendChild(h("p", { style: "margin:4px 0" }, h("b", { text: m.sender_name + " " }), h("small", { "class": "hint", text: fmtTime(m.created_at) }), h("br"), document.createTextNode(m.body))); }); if (!(vr.data || []).length) dview.appendChild(h("p", { "class": "hint", text: tr("Empty.", "فاضية.") }));
+        } } })))); });
+        if (!(lr2.data || []).length) dtb.appendChild(h("tr", null, h("td", { text: tr("No private chats yet.", "مفيش شاتات خاصة لسه.") }), h("td"), h("td"), h("td")));
+      })();
+    }
     if (!owner) return;
     /* plans (owner only) */
     var pp = h("div", { "class": "panel" }, h("h2", { text: tr("Payments", "المدفوعات") })), pmsg = h("div", { "class": "msg" }); box.appendChild(pp);
