@@ -53,4 +53,33 @@ window.addEventListener('DOMContentLoaded',function(){
 /* signed-in visitors on pages without the account script: load it so the header shows their avatar */
 window.addEventListener('DOMContentLoaded',function(){try{var k=Object.keys(localStorage).some(function(x){return /^sb-.*-auth-token$/.test(x)});if(!k||document.querySelector('script[src*="app.js"]'))return;['vendor-supabase.js','config.js','app.js'].forEach(function(f){var e=document.createElement('script');e.src=f;e.async=false;document.head.appendChild(e)})}catch(e){}});
 
-
+/* auto-update (every page): after a deploy, refresh stale cached files once; every 3 minutes show a dismissible toast at the bottom */
+(function(){
+var NAMES=['app.js','app.css','site.css','site.js','fx.js','config.js'];
+function used(){var o=[];[].slice.call(document.querySelectorAll('script[src],link[rel=stylesheet][href]')).forEach(function(e){var u=e.getAttribute('src')||e.getAttribute('href')||'';if(/^(https?:)?\/\//.test(u))return;var n=u.split('?')[0].split('/').pop();if(NAMES.indexOf(n)>=0&&o.indexOf(n)<0)o.push(n)});return o}
+async function stale(F){var bad=[];await Promise.all(F.map(async function(f){try{var a=await fetch(f,{cache:'force-cache'}),b=await fetch(f,{method:'HEAD',cache:'no-store'});var la=a.headers.get('etag')||a.headers.get('last-modified'),lb=b.headers.get('etag')||b.headers.get('last-modified');if(b.ok&&la&&lb&&la!==lb)bad.push(f)}catch(e){}}));return bad}
+async function refresh(F){await Promise.all(F.map(function(f){return fetch(f,{cache:'reload'}).catch(function(){})}))}
+var dismissed=false;
+function toast(F){
+ if(dismissed||document.getElementById('newver'))return;
+ var ar=(localStorage.l||'en')=='ar';
+ var go=function(){refresh(F).then(function(){location.reload()})};
+ var b=document.createElement('div');b.id='newver';b.setAttribute('role','status');b.setAttribute('aria-live','polite');b.tabIndex=0;
+ b.style.cssText='position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:99999;display:flex;align-items:center;gap:10px;width:max-content;max-width:calc(100vw - 24px);box-sizing:border-box;background:#14100a;color:#f0d98a;border:1px solid #c9a227;border-inline-start:4px solid #d22;padding:11px 14px;border-radius:14px;font:600 14px/1.4 sans-serif;cursor:pointer;box-shadow:0 10px 36px #000c;animation:scarup .35s ease-out';
+ if(ar)b.dir='rtl';
+ var i=document.createElement('span');i.textContent='\u21bb';i.style.cssText='color:#d22;font-size:18px;flex:none';
+ var s=document.createElement('span');s.textContent=ar?'\u0627\u0644\u0645\u0648\u0642\u0639 \u0627\u062a\u062d\u062f\u0651\u062b\u060c \u062f\u0648\u0633 \u0647\u0646\u0627 \u0639\u0634\u0627\u0646 \u062a\u062d\u062f\u0651\u062b\u0647':'The site was updated, tap here to refresh';
+ var x=document.createElement('button');x.type='button';x.textContent='\u2715';x.setAttribute('aria-label',ar?'\u0625\u063a\u0644\u0627\u0642':'Dismiss');x.style.cssText='background:none;border:0;color:#9a8a5a;font-size:16px;cursor:pointer;padding:0 4px;flex:none';
+ if(!document.getElementById('scarup')){var st=document.createElement('style');st.id='scarup';st.textContent='@keyframes scarup{from{opacity:0;transform:translate(-50%,16px)}to{opacity:1;transform:translate(-50%,0)}}';document.head.appendChild(st)}
+ b.appendChild(i);b.appendChild(s);b.appendChild(x);
+ b.addEventListener('click',go);b.addEventListener('keydown',function(e){if(e.key==='Enter')go()});
+ x.addEventListener('click',function(e){e.stopPropagation();dismissed=true;b.remove()});
+ document.body.appendChild(b)}
+window.addEventListener('load',async function(){try{
+ var F=used();if(!F.length)return;
+ var bad=await stale(F),k='scar_autoreload',last=0;
+ try{last=parseInt(sessionStorage.getItem(k)||'0',10)}catch(e){}
+ if(bad.length&&Date.now()-last>120000){try{sessionStorage.setItem(k,String(Date.now()))}catch(e){}await refresh(bad);location.reload();return}
+ window.__scarToast=function(){toast(F)};
+ setInterval(async function(){if(document.hidden)return;var b2=await stale(F);if(b2.length)toast(F)},180000)}catch(e){}});
+})();
