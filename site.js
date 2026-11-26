@@ -5,7 +5,8 @@
 var $=function(s,r){return [].slice.call((r||document).querySelectorAll(s))};
 var L=localStorage.l||'en';
 function setLang(l){L=l;localStorage.l=l;var d=document.documentElement;d.lang=l;d.dir=l=='ar'?'rtl':'ltr';
- $('[data-en]').forEach(function(e){e.textContent=e.dataset[l]});
+ var iso=function(t){return l=='ar'?String(t).replace(/[A-Za-z0-9]+(?:[ .\-\/+_][A-Za-z0-9]+)*/g,'\u2066$&\u2069'):t};window.scarIso=function(t){return String(t).replace(/[A-Za-z0-9]+(?:[ .\-\/+_][A-Za-z0-9]+)*/g,'\u2066$&\u2069')};
+ $('[data-en]').forEach(function(e){e.textContent=iso(e.dataset[l])});
  $('[data-ph-en]').forEach(function(e){e.placeholder=l=='ar'?e.dataset.phAr:e.dataset.phEn});
  var b=document.getElementById('lang');if(b)b.textContent=l=='ar'?'English':'\u0627\u0644\u0639\u0631\u0628\u064a\u0629';
  var ti=document.documentElement.dataset['t'+l];if(ti)document.title=ti}
@@ -51,4 +52,5 @@ window.addEventListener('DOMContentLoaded',function(){
 
 /* signed-in visitors on pages without the account script: load it so the header shows their avatar */
 window.addEventListener('DOMContentLoaded',function(){try{var k=Object.keys(localStorage).some(function(x){return /^sb-.*-auth-token$/.test(x)});if(!k||document.querySelector('script[src*="app.js"]'))return;['vendor-supabase.js','config.js','app.js'].forEach(function(f){var e=document.createElement('script');e.src=f;e.async=false;document.head.appendChild(e)})}catch(e){}});
+
 
