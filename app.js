@@ -958,5 +958,34 @@
     if (PAGE === "login") { if (recovering) return resetPage(); if (me) return go("account.html"); loginPage(); }
     else { sideMenu(); if (PAGE === "account") accountPage(); else if (PAGE === "community") communityPage(); else if (PAGE === "admin") adminPage(); }
   })();
+  /* auto-update: after a deploy, the page picks up the new files without a manual hard refresh.
+     On load: if a cached file is older than the server copy, refresh the cache and reload once. Every 3 minutes: show a "new version" banner. */
+  (function () {
+    var FILES = ["app.js", "app.css", "site.css", "site.js", "fx.js", "config.js"];
+    async function stale() {
+      var bad = [];
+      await Promise.all(FILES.map(async function (f) {
+        try {
+          var a = await fetch(f, { cache: "force-cache" }), b = await fetch(f, { method: "HEAD", cache: "no-store" });
+          var la = a.headers.get("etag") || a.headers.get("last-modified"), lb = b.headers.get("etag") || b.headers.get("last-modified");
+          if (b.ok && la && lb && la !== lb) bad.push(f);
+        } catch (e) {}
+      }));
+      return bad;
+    }
+    async function refresh(bad) { await Promise.all(bad.map(function (f) { return fetch(f, { cache: "reload" }).catch(function () {}); })); }
+    function banner() {
+      if (document.getElementById("newver")) return;
+      var b = h("div", { id: "newver", role: "status", style: "position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:99999;background:#c9a227;color:#111;padding:10px 18px;border-radius:10px;font:600 14px sans-serif;cursor:pointer;box-shadow:0 6px 24px #000a", text: tr("New version available. Tap to reload.", "في نسخة جديدة. اضغط لإعادة التحميل.") });
+      b.addEventListener("click", async function () { await refresh(FILES); location.reload(); });
+      document.body.appendChild(b);
+    }
+    (async function () {
+      var bad = await stale(), k = "scar_autoreload", last = 0;
+      try { last = parseInt(sessionStorage.getItem(k) || "0", 10); } catch (e) {}
+      if (bad.length && Date.now() - last > 120000) { try { sessionStorage.setItem(k, String(Date.now())); } catch (e) {} await refresh(bad); location.reload(); return; }
+      setInterval(async function () { if (document.hidden) return; var b2 = await stale(); if (b2.length) banner(); }, 180000);
+    })();
+  })();
 })();
 
