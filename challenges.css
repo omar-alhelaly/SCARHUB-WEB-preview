@@ -130,3 +130,25 @@ html[data-theme=light] #ch .mod.theory .mk{color:#1d4ed8}
 #ch .certp .ci{font-family:monospace;font-size:16px;letter-spacing:2px;background:#f1e8cf;padding:4px 12px;border-radius:6px}
 #ch .certp .cd{font-size:11px;color:#6b604a;max-width:520px;margin-top:6px}
 @media print{body *{visibility:hidden}#ch .certp,#ch .certp *{visibility:visible}#ch .certp{position:absolute;left:0;top:0;width:100%}}
+
+#ch .netlab{display:flex;flex-direction:column;gap:8px}
+#ch .nbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+#ch .nbar .tab{padding:4px 12px;font-size:13px}
+#ch .nmsg{min-height:18px}
+#ch .ncv{position:relative;height:300px;background:var(--p);background-image:radial-gradient(var(--b) 1px,transparent 1px);background-size:20px 20px;border:1px solid var(--b);border-radius:10px;overflow:hidden;touch-action:none;direction:ltr}
+#ch .nsvg{position:absolute;inset:0;width:100%;height:100%}
+#ch .nln{stroke:#7a8aa6;stroke-width:3}#ch .nln.del{stroke:#e0535f;cursor:pointer;stroke-width:6}
+#ch .ndev{position:absolute;width:62px;height:50px;border-radius:10px;border:2px solid var(--b);background:#1a1214;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:grab;user-select:none;font-size:10px;color:var(--t)}
+#ch .ndev b{font-size:15px}#ch .ndev span{max-width:58px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#ch .ndev.pc{border-color:#4b8bf5}#ch .ndev.sw{border-color:#22d3a6}#ch .ndev.rt{border-color:#f2a33a}
+#ch .ndev.sel{box-shadow:0 0 0 3px var(--r)}#ch .ndev.pend{box-shadow:0 0 0 3px #f2c14e}
+html[data-theme=light] #ch .ndev{background:#fff}
+#ch .npanel{border:1px solid var(--b);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px}
+#ch .npanel h4{margin:0}
+#ch .nform{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center}
+#ch .nform input{padding:6px 10px;border-radius:6px;border:1px solid var(--b);background:var(--p);color:var(--t);font-family:ui-monospace,monospace}
+#ch .nform button,#ch .nform .note{grid-column:1/-1}
+#ch .nterm{background:#050304;border:1px solid var(--b);border-radius:8px;padding:8px 10px;font:12.5px/1.45 ui-monospace,Menlo,Consolas,monospace;color:#d6cfd0;direction:ltr;text-align:left}
+#ch .ntout{max-height:220px;overflow:auto}#ch .ntout pre{margin:0;white-space:pre-wrap;font:inherit}
+#ch .ntl{display:flex;gap:6px;align-items:center}#ch .ntp{color:#ff6b78;white-space:nowrap}
+#ch .ntin{flex:1;background:transparent;border:0;outline:0;color:#fff;font:inherit;min-width:0}
