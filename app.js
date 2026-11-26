@@ -480,6 +480,7 @@
     if ((mine.data || []).length) { plansBox.appendChild(h("h3", { text: tr("My payments", "مدفوعاتي") })); mine.data.forEach(function (q) {
       plansBox.appendChild(h("p", { "class": "hint", text: new Date(q.created_at).toLocaleDateString() + " - " + q.method + " - " + (q.amount_minor / 100).toFixed(2) + " " + q.currency + " - " + ({ pending: tr("waiting for confirmation", "مستني التأكيد"), approved: tr("approved", "اتقبلت"), rejected: tr("rejected", "اترفضت") }[q.status] || q.status) + (q.reject_reason ? " (" + q.reject_reason + ")" : "") }));
     }); }
+    if (isStaff()) plansBox.appendChild(h("p", null, h("a", { href: "admin.html#payments", text: tr("Review payments waiting for confirmation (Admin)", "راجع الدفعات المستنية التأكيد (الإدارة)") })));
     var dpw = h("input", { type: "password", autocomplete: "current-password", maxlength: "64" }), dmsg = h("div", { "class": "msg" });
     box.appendChild(h("div", { "class": "panel", id: "delete" }, h("h2", { text: tr("Delete account", "حذف الحساب") }), h("p", { text: tr("This signs you out and removes your login. It cannot be undone.", "ده هيطلعك ويمسح الدخول بتاعك. ماينفعش يتراجع.") }), h("label", { text: tr("Confirm with your password", "أكد بالباسورد") }), dpw,
       h("div", { "class": "row" }, h("button", { "class": "btn", type: "button", text: tr("Delete my account", "احذف حسابي"), on: { click: async function () {
@@ -772,18 +773,8 @@
       var rq = await sb.from("payment_requests").select("id,user_id,amount_minor,currency,period,reference,proof_path,created_at").eq("method", "manual").eq("status", "pending").order("created_at");
       if (!(rq.data || []).length) cp.appendChild(h("p", { "class": "hint", text: tr("None.", "مفيش.") }));
       (rq.data || []).forEach(function (q) {
-        var rowEl = h("div", { "class": "row" }, h("span", { text: new Date(q.created_at).toLocaleString() + " - " + (q.amount_minor / 100).toFixed(2) + " " + q.currency + "/" + q.period + (q.reference ? " - ref " + q.reference : "") + " - user " + q.user_id.slice(0, 8) + "  " }));
-        rowEl.appendChild(h("button", { "class": "btn", type: "button", text: tr("View proof", "اعرض الإثبات"), on: { click: async function () {
-          var u = await sb.storage.from("payment-proofs").createSignedUrl(q.proof_path, 60); if (u.data) window.open(u.data.signedUrl, "_blank", "noopener"); else say(cmsg, tr("Could not open the proof.", "ماقدرتش أفتح الإثبات."), "err");
-        } } }));
-        rowEl.appendChild(h("button", { "class": "btn f", type: "button", text: tr("Approve", "اقبل"), on: { click: async function () {
-          if (!confirm(tr("Approve and activate this subscription?", "تقبل وتفعّل الاشتراك؟"))) return;
-          var x = await sb.rpc("review_manual_payment", { p_id: q.id, p_approve: true }); if (x.error) say(cmsg, tr("Failed.", "فشل."), "err"); else { say(cmsg, tr("Approved.", "اتقبلت."), "ok"); rowEl.remove(); }
-        } } }));
-        rowEl.appendChild(h("button", { "class": "btn", type: "button", text: tr("Reject", "ارفض"), on: { click: async function () {
-          var why = prompt(tr("Reason (shown to the customer)", "السبب (هيظهر للعميل)")); if (why === null) return;
-          var x = await sb.rpc("review_manual_payment", { p_id: q.id, p_approve: false, p_reason: why.slice(0, 200) }); if (x.error) say(cmsg, tr("Failed.", "فشل."), "err"); else { say(cmsg, tr("Rejected.", "اترفضت."), "ok"); rowEl.remove(); }
-        } } }));
+        var rowEl = h("div", { style: "padding:10px 0;border-bottom:1px solid rgba(255,255,255,.1)" }, h("span", { text: new Date(q.created_at).toLocaleString() + " - " + (q.amount_minor / 100).toFixed(2) + " " + q.currency + "/" + q.period + (q.reference ? " - ref " + q.reference : "") + " - user " + q.user_id.slice(0, 8) + "  " }));
+        noteExtras({ kind: "payment_submitted", meta: { request: q.id } }, rowEl);
         cp.appendChild(rowEl);
       });
     cp.appendChild(cmsg);
