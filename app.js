@@ -108,7 +108,7 @@
   }
 
   async function load() {
-    if (!CFG.url || !CFG.anonKey || !window.supabase) { if (PAGE !== "tools") off(); return false; }
+    if (!CFG.url || !CFG.anonKey || !window.supabase) { if (PAGE !== "tools" && PAGE) off(); return false; }
     sb = window.supabase.createClient(CFG.url, CFG.anonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, flowType: "pkce" } });
     sb.auth.onAuthStateChange(function (ev) { if (ev === "PASSWORD_RECOVERY") recovering = true; });
     var cm = PAGE === "login" ? location.search.match(/[?&]code=([^&]+)/) : null;
@@ -124,6 +124,39 @@
   var isStaff = function () { return me && (me.role === "owner" || me.role === "admin"); };
   var go = function (u) { location.href = u; };
 
+  /* ---------- in-site inbox ---------- */
+  function noteText(n) {
+    var m = n.meta || {}, plan = m.plan ? " (" + m.plan + ")" : "", until = m.until ? new Date(m.until).toLocaleDateString(EN() ? "en-GB" : "ar-EG") : "";
+    if (n.kind === "free_plan_granted") return tr("You received a free subscription from the owner" + plan + "." + (until ? " Valid until " + until + "." : ""), "حصلت على اشتراك مجاني من المالك" + plan + "." + (until ? " صالح لحد " + until + "." : ""));
+    if (n.kind === "free_plan_revoked") return tr("The owner ended your free subscription" + plan + ".", "المالك أنهى اشتراكك المجاني" + plan + ".");
+    return "";
+  }
+  async function loadNotes() {
+    var r = await sb.from("notifications").select("id,kind,meta,read_at,created_at").order("created_at", { ascending: false }).limit(50);
+    return r.error ? [] : (r.data || []);
+  }
+  async function inboxPanel(box) {
+    var list = await loadNotes(), p = h("div", { "class": "panel", id: "inbox" }, h("h2", { text: tr("Inbox", "صندوق الرسائل") }));
+    box.appendChild(p);
+    if (!list.length) { p.appendChild(h("p", { "class": "hint", text: tr("No messages yet.", "مفيش رسايل لسه.") })); return; }
+    list.forEach(function (n) {
+      p.appendChild(h("div", { "class": "row", style: "flex-direction:column;align-items:flex-start;gap:2px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.08)" + (n.read_at ? "" : ";border-inline-start:3px solid var(--r);padding-inline-start:8px") },
+        h("span", { text: noteText(n) }), h("span", { "class": "hint", text: new Date(n.created_at).toLocaleString(EN() ? "en-GB" : "ar-EG") })));
+    });
+    if (list.some(function (n) { return !n.read_at; })) { await sb.rpc("mark_notifications_read"); var d = document.getElementById("inboxdot"); if (d) d.remove(); var il = document.getElementById("inboxlink"); if (il) il.textContent = tr("Inbox", "الرسائل"); }
+  }
+
+  /* ---------- signed-in look on every page: avatar chip in the header and a different background ---------- */
+  function inMode() {
+    if (!me || document.getElementById("inmode")) return;
+    var st = document.createElement("style"); st.id = "inmode";
+    st.textContent = "html.in body{background:radial-gradient(1100px 560px at 15% -10%,#3b2c0a 0,transparent 55%),radial-gradient(900px 500px at 90% 0,#2a0b10 0,transparent 60%),#0b0a08}html.in nav{border-bottom:1px solid #c9a22799;box-shadow:0 2px 18px #c9a22722}.chip{display:inline-flex;align-items:center;gap:8px;padding:3px 14px 3px 4px;border:1px solid #c9a227;border-radius:30px;color:#f0d98a;text-decoration:none;font-size:14px;white-space:nowrap}.chip svg,.chip img{width:30px;height:30px;border-radius:50%;display:block}.chip:hover{background:#c9a22722}";
+    document.head.appendChild(st); document.documentElement.classList.add("in");
+    var nav = document.getElementById("nav"); if (!nav) return;
+    var chip = h("a", { "class": "chip", href: "account.html", title: tr("My account", "حسابي") }, avatarSvg(me.avatar, me.id), h("span", { text: isStaff() ? me.alias : me.username }));
+    var lg = document.getElementById("lang"); if (lg && lg.parentNode === nav) nav.insertBefore(chip, lg); else nav.appendChild(chip);
+  }
+
   /* ---------- side menu ---------- */
   function sideMenu() {
     if (!me) return;
@@ -134,6 +167,12 @@
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") toggle(false); });
     side.appendChild(h("p", { text: (isStaff() ? me.alias : me.username) + (me.role === "owner" ? " (owner)" : "") }));
     [["account.html", tr("My account", "حسابي")], ["community.html", tr("Community", "المجتمع")], ["tools.html", tr("Tools", "الأدوات")]].forEach(function (l) { side.appendChild(h("a", { href: l[0], text: l[1] })); });
+    var inl = h("a", { href: "account.html#inbox", id: "inboxlink", text: tr("Inbox", "الرسائل") }); side.appendChild(inl);
+    loadNotes().then(function (l) {
+      var n = l.filter(function (x) { return !x.read_at; }).length; if (!n) return;
+      inl.textContent = tr("Inbox", "الرسائل") + " (" + n + ")";
+      btn.appendChild(h("span", { id: "inboxdot", text: String(n), style: "position:absolute;top:-6px;inset-inline-start:-6px;min-width:20px;height:20px;border-radius:10px;background:#d22;color:#fff;font:700 12px/20px sans-serif;text-align:center;padding:0 4px" }));
+    });
     if (isStaff()) side.appendChild(h("a", { href: "admin.html", text: tr("Admin panel", "لوحة الإدارة") }));
     if (isStaff()) side.appendChild(h("a", { href: "admin.html#manage", text: tr("Manage tools", "إدارة الأدوات") }));
     side.appendChild(h("button", { type: "button", text: tr("Edit profile", "تعديل البروفايل"), on: { click: function () { go("account.html#edit"); } } }));
@@ -303,6 +342,7 @@
   async function accountPage() {
     var app = $("app"); if (!me) return go("login.html"); clear(app);
     var box = h("div", { "class": "wide" }); app.appendChild(box);
+    var inboxBox = h("div"); box.appendChild(inboxBox); inboxPanel(inboxBox);
     if (isStaff()) { var mfaBox = h("div"); box.appendChild(mfaBox); mfaPanel(mfaBox); }
     var uname = h("input", { type: "text", maxlength: "20", value: me.username }), avBox = h("div", { "class": "avatars" }), msg = h("div", { "class": "msg" });
     var cur = me.avatar; avatarPicker(avBox, cur, function (c) { cur = c; });
@@ -803,9 +843,11 @@
   }
   (async function () {
     var ok = await load();
+    if (ok) inMode();
     if (PAGE === "tool") { if (ok) { sideMenu(); toolPage(); } return; }
-    if (PAGE === "tools") { if (ok) dynTools(); return; }
+    if (PAGE === "tools") { if (ok) { dynTools(); sideMenu(); } return; }
     if (!ok) return;
+    if (!PAGE) { sideMenu(); return; }
     if (PAGE === "login") { if (recovering) return resetPage(); if (me) return go("account.html"); loginPage(); }
     else { sideMenu(); if (PAGE === "account") accountPage(); else if (PAGE === "community") communityPage(); else if (PAGE === "admin") adminPage(); }
   })();
