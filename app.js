@@ -748,6 +748,39 @@
       var tb = h("button", { type: "button", "class": "btn", style: "margin-top:6px;width:100%", text: has ? tr("Tap to remove ", "دوس عشان تشيل ") + em : tr("React with ", "تفاعل بـ ") + em, on: { click: function () { closePop(); toggle(scope, id, em); } } }); tb.disabled = !!myBlk; wrap.appendChild(tb);
       mine.appendChild(wrap); placePop(snap);
     }
+    var rcSent = {}, rcQ = [];
+    function queueRc(scope, rows, key) {
+      if (scope === "chat" && (isStaff() || cur !== "general")) return;   /* staff read invisibly; the database ignores them too */
+      rows.forEach(function (x) { if (x[key] !== me.id && !x.deleted_at) rcQ.push([scope, x.id]); });
+    }
+    async function flushRc() {
+      if (!rcQ.length) return; var seen = !document.hidden, lvl = seen ? 2 : 1, by = { chat: [], dm: [] }, q = rcQ; rcQ = [];
+      q.forEach(function (it) { var k = it[0] + ":" + it[1]; if ((rcSent[k] || 0) < lvl && by[it[0]].indexOf(it[1]) === -1) by[it[0]].push(it[1]); });
+      ["chat", "dm"].forEach(function (sc) {
+        if (!by[sc].length) return; by[sc].forEach(function (i) { rcSent[sc + ":" + i] = lvl; });
+        sb.rpc("mark_receipts", { p_scope: sc, p_ids: by[sc].slice(0, 100), p_seen: seen }).then(function (r) { if (r.error) by[sc].forEach(function (i) { delete rcSent[sc + ":" + i]; }); }, function () {});
+      });
+    }
+    setInterval(flushRc, 3000);
+    document.addEventListener("visibilitychange", function () { if (!document.hidden) { Object.keys(rcSent).forEach(function (k) { if (rcSent[k] === 1) delete rcSent[k]; }); lastSig = ""; load(); } });
+    async function openInfo(anchor, scope, id) {
+      closePop(); var rect = anchor.getBoundingClientRect(), snap = { getBoundingClientRect: function () { return rect; } };
+      pop = h("div", { "class": "rxpop", role: "dialog", "aria-label": tr("Message info", "معلومات الرسالة") }); document.body.appendChild(pop);
+      pop.appendChild(h("p", { "class": "hint", style: "margin:8px", text: tr("Loading...", "بيحمّل...") })); placePop(snap);
+      setTimeout(function () { document.addEventListener("mousedown", outPop, true); document.addEventListener("touchstart", outPop, true); document.addEventListener("keydown", escPop, true); }, 0);
+      var r = await sb.rpc("message_info", { p_scope: scope, p_id: id }), mine = pop; if (!mine) return; clear(mine);
+      if (r.error) { mine.appendChild(h("p", { "class": "hint", style: "margin:8px", text: tr("Could not load: ", "ماقدرتش أحمل: ") + (r.error.message || "") })); return placePop(snap); }
+      var rows = r.data || [], wrap = h("div", { style: "width:min(300px,86vw);max-height:300px;overflow-y:auto" });
+      function sect(title, list, tf) {
+        wrap.appendChild(h("b", { style: "display:block;margin:6px 6px 2px", text: title + " (" + list.length + ")" }));
+        list.slice(0, 100).forEach(function (x) { wrap.appendChild(h("div", { style: "display:flex;align-items:center;gap:8px;padding:3px 6px" }, h("div", { "class": "av", style: "width:26px;height:26px;flex:none" }, avatarSvg(x.avatar, x.user_id)), h("span", { style: "flex:1", text: x.display_name }), tf ? h("small", { "class": "hint", text: fmtTime(x[tf]) }) : null)); });
+        if (list.length > 100) wrap.appendChild(h("p", { "class": "hint", style: "margin:2px 6px", text: "+" + (list.length - 100) }));
+      }
+      sect(tr("Seen by", "شافوها"), rows.filter(function (x) { return x.seen_at; }), "seen_at");
+      sect(tr("Delivered, not seen yet", "وصلت ولسه ماشافوهاش"), rows.filter(function (x) { return x.delivered_at && !x.seen_at; }), "delivered_at");
+      sect(tr("Not delivered yet", "لسه ماوصلتش"), rows.filter(function (x) { return !x.delivered_at; }), null);
+      mine.appendChild(wrap); placePop(snap);
+    }
     function paintPills(c) {
       var scope = c.getAttribute("data-s"), id = c.getAttribute("data-i"), o = rx[scope + ":" + id] || {}, sig = JSON.stringify(o) + (myBlk ? "b" : "");
       if (c.getAttribute("data-sig") === sig) return; c.setAttribute("data-sig", sig); clear(c);
@@ -757,13 +790,13 @@
       });
     }
     function paintAll() { Array.prototype.forEach.call(log.querySelectorAll(".rx"), paintPills); }
-    function reactUi(scope, id, headerEl, rowEl) {
+    function reactUi(scope, id, headerEl, rowEl, info) {
       var btn = h("button", { type: "button", "class": "rxbtn", text: "\u263a", title: tr("React", "تفاعل"), "aria-label": tr("React to message", "تفاعل مع الرسالة"), on: { click: function (e) { e.stopPropagation(); openPicker(btn, scope, id); } } });
       var pills = h("div", { "class": "rx", "data-s": scope, "data-i": String(id) }); paintPills(pills);
       var t = null; rowEl.addEventListener("touchstart", function (e) { if (e.target.closest && e.target.closest("button,audio,a,input")) return; t = setTimeout(function () { t = null; openPicker(btn, scope, id); }, 500); }, { passive: true });
       ["touchend", "touchmove", "touchcancel"].forEach(function (ev) { rowEl.addEventListener(ev, function () { if (t) { clearTimeout(t); t = null; } }, { passive: true }); });
       rowEl.addEventListener("contextmenu", function (e) { if (t !== null || e.pointerType === "touch") e.preventDefault(); });
-      headerEl.appendChild(btn); return pills;
+      headerEl.appendChild(btn); if (info) { var ib = h("button", { type: "button", "class": "rxbtn", text: "\u24d8", title: tr("Message info", "معلومات الرسالة"), "aria-label": tr("Message info", "معلومات الرسالة"), on: { click: function (e) { e.stopPropagation(); openInfo(ib, scope, id); } } }); headerEl.appendChild(ib); } return pills;
     }
     async function fetchRx(scope, ids) {
       if (!ids.length) return {};
@@ -791,7 +824,7 @@
       var body = m.audio_path ? (urls[m.audio_path] ? voicePlayer(urls[m.audio_path], m.audio_secs) : h("p", { "class": "hint", text: tr("Voice message (loading)", "رسالة صوتية (بتحمّل)") })) : h("p", { text: m.body });
       var dby = m.deleted_by && names[m.deleted_by] ? names[m.deleted_by].display_name : "?", hd = h("div", { style: "flex:1" }, nm, badgesEl(p.role, p.subscribed, p.plan_name), m.deleted_at ? h("span", { "class": "tag", style: "margin-inline-start:8px;color:#e55", text: tr("Deleted", "محذوفة") + (m.deleted_by === m.user_id ? "" : " " + tr("by ", "بواسطة ") + dby) }) : null), el = h("div", { "class": "cm" }, av, hd, del);
       if (m.deleted_at) body.style.opacity = ".55";
-      var pills = reactUi("chat", m.id, hd, el); hd.appendChild(body); hd.appendChild(pills);
+      var pills = reactUi("chat", m.id, hd, el, !m.deleted_at && cur === "general" && (m.user_id === me.id || isStaff())); hd.appendChild(body); hd.appendChild(pills);
       el.setAttribute("data-id", m.id); return el;
     }
     function openDm(id) { closePop(); cur = "dm:" + id; lastSig = ""; lastRsig = ""; rx = {}; Array.prototype.forEach.call(tabs.children, function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-c") === "dmlist"); }); say(err, ""); load(); }
@@ -806,17 +839,17 @@
     }
     async function loadDm() {
       var tid = cur.slice(3), r = await sb.from("dm_messages").select("id,sender,body,created_at,deleted_at").eq("thread_id", tid).order("created_at", { ascending: false }).limit(60), rows = (r.data || []).reverse();
-      var sg = cur + ":" + rows.map(function (x) { return x.id; }).join(","), changed = await syncRx("dm", rows.map(function (x) { return x.id; }));
+      var sg = cur + ":" + rows.map(function (x) { return x.id; }).join(","), changed = await syncRx("dm", rows.map(function (x) { return x.id; })); queueRc("dm", rows, "sender");
       if (sg === lastSig) { if (changed) paintAll(); return; } lastSig = sg;
       var atEnd = log.scrollHeight - log.scrollTop - log.clientHeight < 80; await who(rows.map(function (x) { return x.sender; }));
       clear(log); log.appendChild(h("button", { "class": "btn", type: "button", text: tr("\u2190 All private chats", "\u2190 كل الشاتات الخاصة"), on: { click: function () { select("dmlist"); } } })); log.appendChild(dmNotice());
-      rows.forEach(function (m) { var p = names[m.sender] || { display_name: "?", avatar: "b1" }, hd = h("div", { style: "flex:1" }, h("b", { text: p.display_name }), badgesEl(p.role, p.subscribed, p.plan_name)), row = h("div", { "class": "cm" }, h("div", { "class": "av", style: "cursor:pointer", on: { click: function () { openProfile(m.sender); } } }, avatarSvg(p.avatar, p.id)), hd, m.sender === me.id ? h("button", { "class": "btn", type: "button", text: tr("Delete", "احذف"), "aria-label": tr("Delete message", "احذف الرسالة"), on: { click: function () { delMsg("dm", m.id); } } }) : null); var pl = reactUi("dm", m.id, hd, row); hd.appendChild(h("p", { text: m.body })); hd.appendChild(pl); log.appendChild(row); });
+      rows.forEach(function (m) { var p = names[m.sender] || { display_name: "?", avatar: "b1" }, hd = h("div", { style: "flex:1" }, h("b", { text: p.display_name }), badgesEl(p.role, p.subscribed, p.plan_name)), row = h("div", { "class": "cm" }, h("div", { "class": "av", style: "cursor:pointer", on: { click: function () { openProfile(m.sender); } } }, avatarSvg(p.avatar, p.id)), hd, m.sender === me.id ? h("button", { "class": "btn", type: "button", text: tr("Delete", "احذف"), "aria-label": tr("Delete message", "احذف الرسالة"), on: { click: function () { delMsg("dm", m.id); } } }) : null); var pl = reactUi("dm", m.id, hd, row, m.sender === me.id); hd.appendChild(h("p", { text: m.body })); hd.appendChild(pl); log.appendChild(row); });
       if (atEnd || !log.getAttribute("data-dm")) { log.scrollTop = log.scrollHeight; log.setAttribute("data-dm", "1"); }
     }
     async function load() {
       if (cur === "dmlist") return loadDmList(); if (cur.indexOf("dm:") === 0) return loadDm();
       var r = await sb.from("chat_messages").select("id,user_id,body,created_at,audio_path,audio_secs,deleted_at,deleted_by").eq("channel", cur).order("created_at", { ascending: false }).limit(60);
-      var rows = (r.data || []).reverse(), sg = cur + ":" + rows.map(function (x) { return x.id + (x.deleted_at ? "d" : ""); }).join(","), changed = await syncRx("chat", rows.map(function (x) { return x.id; }));
+      var rows = (r.data || []).reverse(), sg = cur + ":" + rows.map(function (x) { return x.id + (x.deleted_at ? "d" : ""); }).join(","), changed = await syncRx("chat", rows.map(function (x) { return x.id; })); queueRc("chat", rows, "user_id");
       if (sg === lastSig) { if (changed) paintAll(); return; } lastSig = sg;
       var atEnd = log.scrollHeight - log.scrollTop - log.clientHeight < 80; await who(rows.map(function (x) { return x.user_id; }).concat(rows.filter(function (x) { return x.deleted_by; }).map(function (x) { return x.deleted_by; })));
       if (Date.now() - urlsAt > 3000000) { urls = {}; urlsAt = Date.now(); }
