@@ -370,6 +370,21 @@
 
   /* ---------- account ---------- */
   /* manual Vodafone Cash payment: customer sends money, uploads proof, owner approves in Admin. Amount and plan are checked by the database. */
+  /* proof images: check the real file signature, then re-draw on a canvas and save as WebP/JPEG (drops metadata and anything hidden in the file). Final size must be under 3 MB. */
+  async function cleanProofImage(f) {
+    var b = new Uint8Array(await f.slice(0, 12).arrayBuffer()), ok = (b[0] === 255 && b[1] === 216 && b[2] === 255) || (b[0] === 137 && b[1] === 80 && b[2] === 78 && b[3] === 71 && b[4] === 13 && b[5] === 10 && b[6] === 26 && b[7] === 10) || (b[0] === 82 && b[1] === 73 && b[2] === 70 && b[3] === 70 && b[8] === 87 && b[9] === 69 && b[10] === 66 && b[11] === 80);
+    if (!ok) return null;
+    var bmp; try { bmp = await createImageBitmap(f); } catch (e) { return null; }
+    var sc = Math.min(1, 2000 / Math.max(bmp.width, bmp.height)), steps = [[sc, 0.85], [sc, 0.7], [sc * 0.7, 0.7], [sc * 0.5, 0.6]];
+    for (var i = 0; i < steps.length; i++) {
+      var cv = document.createElement("canvas"); cv.width = Math.max(1, Math.round(bmp.width * steps[i][0])); cv.height = Math.max(1, Math.round(bmp.height * steps[i][0]));
+      var cx = cv.getContext("2d"); cx.fillStyle = "#fff"; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(bmp, 0, 0, cv.width, cv.height);
+      var mime = "image/webp", blob = await new Promise(function (r) { cv.toBlob(r, mime, steps[i][1]); });
+      if (!blob || blob.type !== "image/webp") { mime = "image/jpeg"; blob = await new Promise(function (r) { cv.toBlob(r, mime, steps[i][1]); }); }
+      if (blob && blob.size <= 3145728) return { blob: blob, mime: blob.type, ext: blob.type === "image/webp" ? "webp" : "jpg" };
+    }
+    return null;
+  }
   async function manualForm(p, box, msg) {
     clear(box); var ins = await sb.rpc("manual_instructions"), i = (ins.data || [])[0];
     if (!i) return say(msg, tr("Manual payment is not available right now.", "الدفع اليدوي مش متاح دلوقتي."), "err");
@@ -377,15 +392,16 @@
     box.appendChild(h("div", { "class": "panel" },
       h("p", { text: tr("1. Send exactly ", "1. حوّل بالظبط ") + (p.price_minor / 100).toFixed(2) + " " + p.currency + tr(" by Vodafone Cash to ", " بفودافون كاش على ") + i.wallet_number + " (" + i.holder_name + ")" }),
       i.note ? h("p", { "class": "hint", text: i.note }) : null,
-      h("p", { text: tr("2. Attach a screenshot of the transfer (JPG, PNG or WebP, max 5 MB).", "2. ارفق صورة التحويل (JPG أو PNG أو WebP، 5 ميجا بحد أقصى).") }), ref, file,
+      h("p", { text: tr("2. Attach a screenshot of the transfer (JPG, PNG or WebP image, max 3 MB after processing).", "2. ارفق صورة التحويل (صورة JPG أو PNG أو WebP، 3 ميجا بحد أقصى بعد المعالجة).") }), ref, file,
       h("div", { "class": "row" }, h("button", { "class": "btn f", type: "button", text: tr("Send for approval", "ابعت للمراجعة"), on: { click: async function () {
-        var f = file.files[0]; if (!f || !/^image\/(jpeg|png|webp)$/.test(f.type) || f.size > 5242880) return say(msg, tr("Attach a JPG, PNG or WebP image up to 5 MB.", "ارفق صورة JPG أو PNG أو WebP لحد 5 ميجا."), "err");
+        var f = file.files[0]; if (!f || !/^image\/(jpeg|png|webp)$/.test(f.type) || f.size > 10485760) return say(msg, tr("Attach a real JPG, PNG or WebP image.", "ارفق صورة حقيقية JPG أو PNG أو WebP."), "err");
+        var clean = await cleanProofImage(f); if (!clean) return say(msg, tr("This file is not a valid image or is too big (max 3 MB after processing).", "الملف ده مش صورة سليمة أو كبير أوي (3 ميجا بحد أقصى بعد المعالجة)."), "err");
         if (ref.value.trim() && !/^[A-Za-z0-9 -]{4,40}$/.test(ref.value.trim())) return say(msg, tr("The optional note must be 4 to 40 letters or numbers, or leave it empty.", "الملاحظة (اختياري) 4 لـ 40 حرف أو رقم، أو سيبها فاضية."), "err");
-        var path = me.id + "/" + Date.now() + "-" + Math.random().toString(36).slice(2, 10) + "." + { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" }[f.type];
-        var up = await sb.storage.from("payment-proofs").upload(path, f, { contentType: f.type, upsert: false });
-        if (up.error) return say(msg, tr("Upload failed.", "فشل رفع الصورة."), "err");
+        var path = me.id + "/" + crypto.randomUUID() + "." + clean.ext;
+        var up = await sb.storage.from("payment-proofs").upload(path, clean.blob, { contentType: clean.mime, upsert: false });
+        if (up.error) return say(msg, /row-level|policy|Unauthorized|403/i.test(up.error.message || "") ? tr("Too many uploads this hour. Try again later.", "رفعت كتير في الساعة دي. جرب بعدين.") : tr("Upload failed.", "فشل رفع الصورة."), "err");
         var r = await sb.rpc("submit_manual_payment", { p_plan: p.id, p_reference: ref.value.trim() || null, p_proof: path });
-        if (r.error) return say(msg, /one_pending/.test(r.error.message) ? tr("You already have a payment waiting for approval.", "عندك دفعة مستنية المراجعة.") : tr("Could not submit.", "ماقدرتش أبعت."), "err");
+        if (r.error) return say(msg, /one_pending/.test(r.error.message) ? tr("You already have a payment waiting for approval.", "عندك دفعة مستنية المراجعة.") : /rate limit/.test(r.error.message) ? tr("Too many attempts this hour. Try again later.", "محاولات كتير في الساعة دي. جرب بعدين.") : tr("Could not submit.", "ماقدرتش أبعت."), "err");
         clear(box); say(msg, tr("Received. Your subscription is NOT active yet: waiting for confirmation from the team. You will get a message in your inbox.", "اتسلمت. اشتراكك لسه مش شغال: مستني تأكيد الفريق. هتوصلك رسالة في الإنبوكس."), "ok");
       } } }))));
   }
@@ -991,4 +1007,5 @@
     })();
   })();
 })();
+
 
