@@ -259,9 +259,51 @@
         clear(box); say(msg, tr("Sent. The owner will review it and activate your subscription.", "اتبعتت. المالك هيراجعها ويفعّل اشتراكك."), "ok");
       } } }))));
   }
+  /* ---------- 2-step login (TOTP) for owner/admin ---------- */
+  async function mfaState() {
+    var f = await sb.auth.mfa.listFactors(), a = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+    var ver = ((f.data && f.data.totp) || []).filter(function (x) { return x.status === "verified"; })[0];
+    return { factor: ver, level: a.data && a.data.currentLevel };
+  }
+  async function mfaPanel(box, onDone) {
+    var st = await mfaState(), msg = h("div", { "class": "msg" }), p = h("div", { "class": "panel" }, h("h2", { text: tr("2-step login (authenticator app)", "التحقق بخطوتين (تطبيق المصادقة)") }));
+    clear(box); box.appendChild(p); p.appendChild(msg);
+    var code = h("input", { type: "text", inputmode: "numeric", maxlength: "6", autocomplete: "one-time-code", placeholder: "123456", "aria-label": "code" });
+    if (st.factor) {
+      if (st.level === "aal2") { p.appendChild(h("p", { "class": "hint", text: tr("On. This session is verified.", "شغال. الجلسة دي متأكدة.") })); return; }
+      p.appendChild(h("p", { "class": "hint", text: tr("Enter the 6-digit code from your authenticator app.", "اكتب كود الـ6 أرقام من تطبيق المصادقة.") }));
+      var go2 = h("button", { type: "button", "class": "btn", text: tr("Verify", "تأكيد") });
+      go2.addEventListener("click", async function () {
+        var r = await sb.auth.mfa.challengeAndVerify({ factorId: st.factor.id, code: code.value.trim() });
+        if (r.error) return say(msg, tr("Wrong or expired code.", "الكود غلط أو منتهي."), "err");
+        if (onDone) onDone(); else location.reload();
+      });
+      p.appendChild(h("div", { "class": "row" }, code, go2)); return;
+    }
+    var start = h("button", { type: "button", "class": "btn", text: tr("Turn on 2-step login", "تشغيل التحقق بخطوتين") });
+    p.appendChild(h("p", { "class": "hint", text: tr("Not on yet. Staff accounts should turn it on.", "لسه مش شغال. حسابات الإدارة لازم تشغله.") }));
+    p.appendChild(start);
+    start.addEventListener("click", async function () {
+      var e = await sb.auth.mfa.enroll({ factorType: "totp", friendlyName: "SCARHUB " + Date.now() });
+      if (e.error) return say(msg, e.error.message, "err");
+      start.remove();
+      var img = h("img", { src: e.data.totp.qr_code, alt: "QR", width: "180", height: "180" });
+      p.appendChild(h("p", { "class": "hint", text: tr("Scan this in Google Authenticator / Microsoft Authenticator, then enter the code.", "اعمل سكان في Google Authenticator أو Microsoft Authenticator وبعدين اكتب الكود.") }));
+      p.appendChild(img); p.appendChild(h("p", { "class": "hint", text: tr("Or type this key by hand: ", "أو اكتب المفتاح ده بإيدك: ") + e.data.totp.secret }));
+      var ok = h("button", { type: "button", "class": "btn", text: tr("Confirm", "تأكيد") });
+      ok.addEventListener("click", async function () {
+        var r = await sb.auth.mfa.challengeAndVerify({ factorId: e.data.id, code: code.value.trim() });
+        if (r.error) return say(msg, tr("Wrong or expired code.", "الكود غلط أو منتهي."), "err");
+        location.reload();
+      });
+      p.appendChild(h("div", { "class": "row" }, code, ok));
+    });
+  }
+
   async function accountPage() {
     var app = $("app"); if (!me) return go("login.html"); clear(app);
     var box = h("div", { "class": "wide" }); app.appendChild(box);
+    if (isStaff()) { var mfaBox = h("div"); box.appendChild(mfaBox); mfaPanel(mfaBox); }
     var uname = h("input", { type: "text", maxlength: "20", value: me.username }), avBox = h("div", { "class": "avatars" }), msg = h("div", { "class": "msg" });
     var cur = me.avatar; avatarPicker(avBox, cur, function (c) { cur = c; });
     var upFile = h("input", { type: "file", accept: "image/png,image/jpeg,image/webp", style: "max-width:230px" });
@@ -361,6 +403,8 @@
   /* ---------- admin ---------- */
   async function adminPage() {
     var app = $("app"); if (!me || !isStaff()) { clear(app); return app.appendChild(h("div", { "class": "off" }, h("p", { text: "404" }))); }
+    var mst = await mfaState();
+    if (mst.factor && mst.level !== "aal2") { clear(app); var gb = h("div", { "class": "wide" }); app.appendChild(gb); return mfaPanel(gb); }
     clear(app); var box = h("div", { "class": "wide" }); app.appendChild(box); var owner = me.role === "owner";
     /* users */
     var ut = h("div", { "class": "panel" }, h("h2", { text: tr("Accounts", "الحسابات") })), tb = h("tbody");
