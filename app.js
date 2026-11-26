@@ -503,7 +503,7 @@
     var box = h("div", { "class": "wide" }), tabs = h("div", { "class": "tabs" }), log = h("div", { "class": "chatbox", role: "log", "aria-live": "polite" });
     var input = h("input", { type: "text", maxlength: "1000", "aria-label": tr("Message", "رسالة"), style: "flex:1;padding:11px;border-radius:10px;border:1px solid var(--b);background:var(--bg);color:var(--t)" });
     var err = h("div", { "class": "msg" }), cur = "general", names = {}, sub = null, lastSig = "";
-    setInterval(function () { if (!document.hidden) load(); }, 4000);
+    setInterval(function () { if (!document.hidden) load(); }, 2000);
     async function who(ids) {
       var need = ids.filter(function (i) { return !names[i]; }); if (!need.length) return;
       var r = await sb.from("public_profiles").select("id,display_name,avatar,subscribed").in("id", need);
