@@ -541,11 +541,13 @@
     card.appendChild(row(tr("Joined", "انضم"), fmtDate(d.joined)));
     var pl = (d.plans || []).slice(); if (d.all_access) pl.unshift(tr("All tools", "كل الأدوات"));
     card.appendChild(row(tr("Plan", "الاشتراك"), pl.length ? pl.join(", ") : tr("None", "مفيش")));
+    if (d.staff) {
     card.appendChild(row(tr("Chat messages", "رسايل الشات"), String(d.messages) + (d.voice ? " (" + d.voice + " " + tr("voice", "صوتية") + ")" : "")));
     card.appendChild(row(tr("Last post", "آخر مشاركة"), d.last_post ? fmtTime(d.last_post) : "-"));
     if ((d.posts || []).length) {
       card.appendChild(h("h3", { text: tr("Recent posts", "آخر المشاركات"), style: "margin:14px 0 4px" }));
       d.posts.forEach(function (p) { card.appendChild(h("p", { "class": "hint", style: "margin:2px 0", text: fmtDate(p.created_at) + " - " + (p.body ? p.body.slice(0, 140) : tr("Voice message", "رسالة صوتية") + " " + p.audio_secs + "s") })); });
+    }
     }
     if (!d.staff) return;
     var s = d.staff;
@@ -591,6 +593,24 @@
     var pm = $("profmodal"); if (pm) pm.remove();
     if (window.__scarOpenDm) window.__scarOpenDm(r.data); else location.href = "community.html#dm=" + r.data;
   }
+  /* voice player: total time comes from the stored audio_secs (Chrome webm has no duration header) */
+  function fmtSecs(s) { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
+  function voicePlayer(url, total) {
+    total = Math.max(1, total || 1);
+    var au = new Audio(), playing = false, lbl = h("span", { text: "0:00 / " + fmtSecs(total), style: "font:600 12px sans-serif;direction:ltr;min-width:70px;text-align:center;flex:none" });
+    au.preload = "none"; au.src = url;
+    var fill = h("div", { style: "height:100%;width:0;background:#c9a227;border-radius:3px;transition:width .15s linear" });
+    var track = h("div", { style: "flex:1;min-width:60px;height:6px;border-radius:3px;background:rgba(255,255,255,.18);overflow:hidden;direction:ltr" }, fill);
+    var btn = h("button", { type: "button", "class": "btn", "aria-label": tr("Play", "تشغيل"), text: "\u25b6", style: "width:36px;height:36px;border-radius:50%;padding:0;flex:none" });
+    var wrap = h("div", { style: "display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid rgba(201,162,39,.5);border-radius:20px;background:rgba(0,0,0,.25);max-width:300px;direction:ltr" }, btn, track, lbl);
+    function ui(p) { playing = p; btn.textContent = p ? "\u275a\u275a" : "\u25b6"; btn.setAttribute("aria-label", p ? tr("Pause", "إيقاف") : tr("Play", "تشغيل")); }
+    au.addEventListener("timeupdate", function () { var c = Math.min(au.currentTime, total); fill.style.width = Math.min(100, c / total * 100) + "%"; lbl.textContent = fmtSecs(c) + " / " + fmtSecs(total); });
+    au.addEventListener("ended", function () { ui(false); fill.style.width = "0"; lbl.textContent = "0:00 / " + fmtSecs(total); au.currentTime = 0; });
+    au.addEventListener("pause", function () { ui(false); }); au.addEventListener("playing", function () { ui(true); });
+    au.addEventListener("error", function () { ui(false); lbl.textContent = tr("Retry", "جرب تاني"); au.removeAttribute("src"); au.src = url; });
+    btn.addEventListener("click", function () { if (playing) { au.pause(); return; } var pr = au.play(); if (pr && pr.catch) pr.catch(function () { lbl.textContent = tr("Retry", "جرب تاني"); au.load(); }); });
+    return wrap;
+  }
   var DM_NOTICE = function () { return tr("Private chat between the two of you.", "شات خاص بينكم الاتنين."); };
   /* whole-site block: the account stays signed in but sees only this notice */
   function blockedScreen(b) {
@@ -619,7 +639,7 @@
       if (isStaff()) del = h("button", { "class": "btn", type: "button", text: "x", "aria-label": "delete", on: { click: async function () { await sb.from("chat_messages").delete().eq("id", m.id); load(); } } });
       var av = h("div", { "class": "av", style: "cursor:pointer", title: tr("View profile", "شوف البروفايل"), on: { click: function () { openProfile(m.user_id); } } }, avatarSvg(p.avatar, p.id));
       var nm = h("b", { text: p.display_name, style: "cursor:pointer", on: { click: function () { openProfile(m.user_id); } } });
-      var body = m.audio_path ? (urls[m.audio_path] ? h("div", null, h("audio", { controls: "", preload: "none", src: urls[m.audio_path], style: "max-width:100%;height:38px" }), h("small", { "class": "hint", text: " " + m.audio_secs + "s" })) : h("p", { "class": "hint", text: tr("Voice message (loading)", "رسالة صوتية (بتحمّل)") })) : h("p", { text: m.body });
+      var body = m.audio_path ? (urls[m.audio_path] ? voicePlayer(urls[m.audio_path], m.audio_secs) : h("p", { "class": "hint", text: tr("Voice message (loading)", "رسالة صوتية (بتحمّل)") })) : h("p", { text: m.body });
       var el = h("div", { "class": "cm" }, av, h("div", { style: "flex:1" }, nm, badgesEl(p.role, p.subscribed, p.plan_name), body), del);
       el.setAttribute("data-id", m.id); return el;
     }
