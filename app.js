@@ -59,8 +59,9 @@
   /* avatars: b1-b8 boys, g1-g8 girls, generated SVG */
   var SKIN = ["#f1c9a5", "#e0a97d", "#c58c5c", "#8d5a3b"], HAIR = ["#1b1b1b", "#4a2c17", "#8a5a2b", "#c9a04a", "#7a1f1f", "#2f3d5a", "#3c3c3c", "#0e0e0e"], BG = ["#2a1215", "#122a24", "#12202a", "#2a2412"];
   var avN = 0;
+  function avVer(uid) { try { return localStorage.getItem("scar_av_" + uid) || ""; } catch (e) { return ""; } }
   function avatarSvg(code, uid) {
-    if (code === "custom" && uid) return h("img", { src: CFG.url + "/storage/v1/object/public/avatars/" + uid + "/avatar", alt: "", style: "width:100%;height:100%;border-radius:50%;object-fit:cover;display:block" });
+    if (code === "custom" && uid) return h("img", { "data-avu": uid, src: CFG.url + "/storage/v1/object/public/avatars/" + uid + "/avatar" + (avVer(uid) ? "?v=" + avVer(uid) : ""), alt: "", style: "width:100%;height:100%;border-radius:50%;object-fit:cover;display:block" });
     if (code === "custom") code = "b1";
     var NS = "http://www.w3.org/2000/svg", girl = code[0] === "g", n = (parseInt(code.slice(1), 10) || 1) - 1;
     var s = document.createElementNS(NS, "svg"); s.setAttribute("viewBox", "0 0 64 64"); s.setAttribute("aria-hidden", "true");
@@ -103,7 +104,29 @@
     A("circle", { cx: 24.5, cy: 34.5, r: 2.4, fill: "#f43f5e", opacity: ".15" }); A("circle", { cx: 39.5, cy: 34.5, r: 2.4, fill: "#f43f5e", opacity: ".15" });
     A("path", { d: "M28.5 38q3.5 2.8 7 0", fill: "none", stroke: !girl && n === 5 ? "#f5d5c5" : "#a8453a", "stroke-width": 1.5, "stroke-linecap": "round" });
     if (n === 6) { A("circle", { cx: 27, cy: 29.5, r: 4.4, fill: "rgba(255,255,255,.15)", stroke: "#111827", "stroke-width": 1.2 }); A("circle", { cx: 37, cy: 29.5, r: 4.4, fill: "rgba(255,255,255,.15)", stroke: "#111827", "stroke-width": 1.2 }); A("path", { d: "M31.4 29.5h1.2", stroke: "#111827", "stroke-width": 1.2 }); }
+    if (uid) s.setAttribute("data-avu", uid);
     return s;
+  }
+  /* swap every copy of my avatar on the page (header chip, side button, bell, chat, account) without a refresh */
+  function refreshMyAvatar(bump) {
+    if (!me) return; if (bump) { try { localStorage.setItem("scar_av_" + me.id, String(Date.now())); } catch (e) {} }
+    [].slice.call(document.querySelectorAll('[data-avu="' + me.id + '"]')).forEach(function (n) { if (n.parentNode) n.parentNode.replaceChild(avatarSvg(me.avatar, me.id), n); });
+  }
+  /* big viewer with zoom in / out (buttons, wheel, keys) for an avatar */
+  function avatarLightbox(code, uid) {
+    var o = h("div", { role: "dialog", "aria-modal": "true", "aria-label": "Avatar", style: "position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;overflow:auto;padding:60px 12px 12px" });
+    var size = Math.min(380, Math.floor(Math.min(innerWidth, innerHeight) * .8)), frame = h("div", { style: "flex:none;border-radius:50%;overflow:hidden;background:#0c0c0e;margin:auto" }), pct = h("span", { style: "color:#fff;font:600 14px sans-serif;min-width:48px;text-align:center" });
+    function put() { frame.style.width = frame.style.height = size + "px"; pct.textContent = Math.round(size / 3.8) + "%"; }
+    function bump(f) { size = Math.max(80, Math.min(3000, Math.round(size * f))); put(); }
+    var big = avatarSvg(code, uid); big.removeAttribute("data-avu"); big.style.width = "100%"; big.style.height = "100%"; frame.appendChild(big);
+    function mk(t, label, f) { return h("button", { type: "button", "aria-label": label, text: t, style: "font:700 22px/1 sans-serif;color:#fff;background:#222;border:1px solid #555;border-radius:8px;width:40px;height:36px;cursor:pointer", on: { click: function (e) { e.stopPropagation(); bump(f); } } }); }
+    var bar = h("div", { style: "position:fixed;top:10px;inset-inline-start:12px;display:flex;gap:8px;align-items:center;z-index:2" }, mk("\u2212", tr("Zoom out", "تصغير"), 1 / 1.25), pct, mk("+", tr("Zoom in", "تكبير"), 1.25));
+    var x = h("button", { type: "button", "aria-label": tr("Close", "إغلاق"), text: "\u00d7", style: "position:fixed;top:6px;inset-inline-end:14px;font:700 32px/1 sans-serif;color:#fff;background:transparent;border:0;cursor:pointer;z-index:2" });
+    function close() { document.removeEventListener("keydown", key, true); o.remove(); }
+    function key(e) { if (e.key === "Escape") close(); else if (e.key === "+" || e.key === "=") bump(1.25); else if (e.key === "-") bump(1 / 1.25); }
+    x.addEventListener("click", close); o.addEventListener("click", function (e) { if (e.target === o) close(); });
+    o.addEventListener("wheel", function (e) { e.preventDefault(); bump(e.deltaY < 0 ? 1.1 : 1 / 1.1); }, { passive: false });
+    document.addEventListener("keydown", key, true); put(); o.appendChild(frame); o.appendChild(bar); o.appendChild(x); document.body.appendChild(o);
   }
   function avatarSvgOld(code) {
     var NS = "http://www.w3.org/2000/svg", girl = code[0] === "g", n = parseInt(code.slice(1), 10) - 1;
@@ -487,14 +510,39 @@
       if (["image/png", "image/jpeg", "image/webp"].indexOf(f.type) < 0 || f.size > 1048576) return say(msg, tr("PNG, JPG or WebP, max 1 MB.", "PNG أو JPG أو WebP، لحد 1 ميجا."), "err");
       var x = await sb.storage.from("avatars").upload(me.id + "/avatar", f, { upsert: true, contentType: f.type, cacheControl: "60" }); if (x.error) return say(msg, x.error.message, "err");
       var y = await sb.rpc("update_my_profile", { new_username: null, new_avatar: "custom" }); if (y.error) return say(msg, y.error.message, "err");
-      cur = "custom"; me.avatar = "custom"; say(msg, tr("Picture saved. Refresh to see it everywhere.", "الصورة اتحفظت. اعمل Refresh عشان تظهر في كل حتة."), "ok");
+      cur = "custom"; me.avatar = "custom"; refreshMyAvatar(true); say(msg, tr("Picture saved and updated everywhere.", "الصورة اتحفظت واتحدثت في كل حتة."), "ok");
     } } }));
     var save = h("button", { "class": "btn f", type: "button", text: tr("Save", "حفظ"), on: { click: async function () {
       if (!userNameOk(uname.value, isStaff())) return say(msg, isStaff() ? tr("Username: 3-20 letters (Arabic or English), numbers or _.", "اسم المستخدم: 3-20 حرف (عربي أو إنجليزي) أو أرقام أو _.") : tr("Invalid or not allowed username (English letters, numbers, _).", "اسم مستخدم غير صحيح أو مش مسموح (حروف إنجليزي وأرقام و _)."), "err");
       if (isStaff() && alias.value.trim() !== (me.alias || "")) { if (!ALIAS_RE.test(alias.value.trim())) return say(msg, tr("Display name: 3-25 letters (Arabic or English), numbers, _ or spaces.", "الاسم الظاهر: 3-25 حرف (عربي أو إنجليزي) أو أرقام أو _ أو مسافة."), "err"); var ra = await sb.rpc("update_my_alias", { new_alias: alias.value.trim() }); if (ra.error) return say(msg, tr("Could not save the display name (taken?).", "ماتحفظش الاسم الظاهر (مستخدم؟)."), "err"); me.alias = alias.value.trim(); }
       var r = await sb.rpc("update_my_profile", { new_username: uname.value, new_avatar: cur });
+      if (!r.error) { me.username = uname.value; me.avatar = cur; refreshMyAvatar(false); if (typeof paintDetails === "function") paintDetails(); }
       say(msg, r.error ? tr("Could not save (name taken?).", "ماتحفظش (الاسم مستخدم؟).") : tr("Saved.", "اتحفظ."), r.error ? "err" : "ok");
     } } });
+    var detBox = h("div", { "class": "panel", id: "details" }, h("h2", { text: tr("Account details", "بيانات الحساب") })), detHead = h("div", { style: "display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:10px" }), detGrid = h("div"), acc = null, planVal = null, subInfo = tr("No active subscription", "مفيش اشتراك فعال");
+    function kv(k, v) { return h("div", { style: "display:flex;gap:10px;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap" }, h("span", { "class": "hint", text: k }), typeof v === "string" ? h("span", { text: v, dir: "auto" }) : v); }
+    function paintDetails() {
+      clear(detHead); clear(detGrid);
+      var avw = h("button", { type: "button", "class": "av", title: tr("Click to enlarge", "دوس للتكبير"), "aria-label": tr("View picture", "عرض الصورة"), style: "width:96px;height:96px;flex:none;border:0;padding:0;background:none;cursor:zoom-in;border-radius:50%", on: { click: function () { avatarLightbox(me.avatar, me.id); } } }, avatarSvg(me.avatar, me.id));
+      var nmEl = h("div", null, h("div", { style: "font-weight:700;font-size:1.15em", text: isStaff() && me.alias ? me.alias : me.username }), badgesEl(me.role, null, null));
+      detHead.appendChild(avw); detHead.appendChild(nmEl);
+      detGrid.appendChild(kv(tr("Username", "اسم المستخدم"), me.username));
+      if (isStaff()) detGrid.appendChild(kv(tr("Display name", "الاسم الظاهر"), me.alias || "-"));
+      detGrid.appendChild(kv(tr("Email", "الإيميل"), me.email + (acc && acc.email_confirmed ? "  \u2713 " + tr("verified", "متأكد") : "")));
+      detGrid.appendChild(kv(tr("Role", "الدور"), me.role === "owner" ? tr("Owner", "المالك") : me.role === "admin" ? tr("Admin", "أدمن") : tr("Member", "عضو")));
+      detGrid.appendChild(kv(tr("Status", "الحالة"), me.status === "active" ? tr("Active", "نشط") : String(me.status || "-")));
+      planVal = h("span", { text: subInfo, dir: "auto" }); detGrid.appendChild(kv(tr("Plan", "الباقة"), planVal));
+      if (acc) {
+        detGrid.appendChild(kv(tr("Joined", "تاريخ الانضمام"), acc.created_at ? fmtTime(acc.created_at) : "-"));
+        detGrid.appendChild(kv(tr("Last login", "آخر دخول"), acc.last_sign_in ? fmtTime(acc.last_sign_in) : "-"));
+        if (acc.previous_login) detGrid.appendChild(kv(tr("Previous visit", "الزيارة اللي قبلها"), fmtTime(acc.previous_login)));
+        detGrid.appendChild(kv(tr("Chat messages", "رسايل الشات"), String(acc.messages || 0)));
+        if (isStaff()) detGrid.appendChild(kv(tr("Two-step verification", "التحقق بخطوتين"), acc.mfa ? tr("On", "شغال") : tr("Off", "مقفول")));
+      }
+      detGrid.appendChild(h("p", { "class": "hint", text: tr("Only you can see this page.", "الصفحة دي ليك إنت بس.") }));
+    }
+    detBox.appendChild(detHead); detBox.appendChild(detGrid); box.appendChild(detBox); paintDetails();
+    sb.rpc("my_account").then(function (r) { if (r && r.data) { acc = r.data; paintDetails(); } });
     box.appendChild(h("div", { "class": "panel", id: "edit" }, h("h2", { text: tr("My profile", "بروفايلي") }), h("p", { text: me.email }),
       h("p", { text: tr("Role: ", "الدور: ") + me.role }), h("label", { text: tr("Username", "اسم المستخدم") }), uname, isStaff() ? h("label", { text: tr("Display name (shown to others)", "الاسم الظاهر للناس") }) : null, isStaff() ? alias : null, avBox, isStaff() ? upBox : null, h("div", { "class": "row" }, save), msg));
     var plansBox = h("div", { "class": "panel" }, h("h2", { text: tr("Subscription", "الاشتراك") })); box.appendChild(plansBox);
@@ -505,6 +553,10 @@
     var ptA = (await sb.from("plan_tools").select("plan_id,tool_id")).data || [], tnA = {}; ((await sb.from("tools").select("id,name")).data || []).forEach(function (x) { tnA[x.id] = x.name; });
     var upa = (await sb.from("user_plan_access").select("plan_id,current_period_end").eq("user_id", me.id)).data || [];
     upa.filter(function (a) { return new Date(a.current_period_end) > new Date(); }).forEach(function (a) { var pn_ = (pl.data || []).filter(function (q) { return q.id === a.plan_id; })[0]; plansBox.appendChild(h("p", { text: (pn_ ? pn_.name : tr("Plan", "خطة")) + tr(" active until ", " نشطة لحد ") + new Date(a.current_period_end).toLocaleDateString() })); });
+    var planBits = []; if (active) planBits.push(tr("Subscription until ", "اشتراك لحد ") + fmtDate(subR.data.current_period_end));
+    upa.filter(function (a) { return new Date(a.current_period_end) > new Date(); }).forEach(function (a) { var pn2 = (pl.data || []).filter(function (q) { return q.id === a.plan_id; })[0]; planBits.push((pn2 ? pn2.name : tr("Plan", "خطة")) + " - " + (/^infinity/.test(String(a.current_period_end)) ? tr("no expiry", "من غير انتهاء") : tr("until ", "لحد ") + fmtDate(a.current_period_end))); });
+    if (isStaff() && !planBits.length) planBits.push(tr("All tools (staff)", "كل الأدوات (إدارة)"));
+    subInfo = planBits.length ? planBits.join(" | ") : tr("No active subscription", "مفيش اشتراك فعال"); if (planVal) planVal.textContent = subInfo;
     var pm = await sb.rpc("payment_methods"), methods = (pm.data || []).map(function (x) { return x.method; });
     var manualBox = h("div"), payMsg = h("div", { "class": "msg" });
     if ((pl.data || []).length && !methods.length) plansBox.appendChild(h("p", { "class": "hint", text: tr("Payments are not open yet.", "الدفع لسه مش مفتوح.") }));
