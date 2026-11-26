@@ -238,20 +238,22 @@
     clear(root); root.appendChild(setTabs("rooms"));
     if (!me) root.appendChild(h("div", { "class": "strip" }, h("div", null, tr("Sign in to save your progress, earn points and appear on the leaderboard.", "سجّل دخول عشان تحفظ تقدمك وتكسب نقاط وتظهر في المتصدرين."), h("br"), h("a", { href: "login.html", text: tr("Sign in", "تسجيل الدخول") }))));
     else if (stats) root.appendChild(h("div", { "class": "strip" }, h("div", null, tr("Points", "النقاط"), h("b", { text: String(stats.points || 0) })), h("div", null, tr("Solved tasks", "مهام محلولة"), h("b", { text: String(stats.solves || 0) })), h("div", null, tr("Overall rank", "الترتيب العام"), h("b", { text: stats.rank ? "#" + stats.rank : "-" }))));
-    var any = false;
-    cat.sections.forEach(function (s) {
-      if (!s.rooms.length) return; any = true;
-      var done = 0, tot = 0, pts = 0; s.rooms.forEach(function (r) { done += r.solved; tot += r.tasks; pts += r.points; });
-      root.appendChild(h("div", { "class": "sec" }, h("h2", { text: pick(s, "title") }), h("small", { text: done + " / " + tot + " " + tr("tasks", "مهمة") + " · " + pts + " " + tr("pts", "نقطة") })));
-      var g = h("div", { "class": "rooms" });
+    var any = false, HUES = [210, 28, 280, 150, 340, 50, 180], cards = [], bar = h("div", { "class": "fbar", role: "group", "aria-label": tr("Filter by section", "فلتر بالقسم") }), g = h("div", { "class": "rooms" }), cur = "all", fbtns = [];
+    function setF(k) { cur = k; fbtns.forEach(function (x) { var on = x.k === k; x.b.className = "tab" + (on ? " on" : ""); x.b.setAttribute("aria-pressed", on ? "true" : "false"); }); cards.forEach(function (c) { c.el.style.display = (k === "all" || c.sec === k) ? "" : "none"; }); }
+    function fb(k, label) { var b = h("button", { type: "button", "class": "tab", text: label, onclick: function () { setF(k); } }); fbtns.push({ k: k, b: b }); bar.appendChild(b); }
+    fb("all", tr("All", "الكل"));
+    cat.sections.forEach(function (s, si) {
+      if (!s.rooms.length) return; any = true; fb(s.slug, pick(s, "title"));
+      var hue = HUES[si % HUES.length];
       s.rooms.forEach(function (r) {
-        g.appendChild(h("button", { "class": "room", type: "button", onclick: function () { location.hash = "#/room/" + r.slug; } },
-          h("div", { "class": "meta" }, diffPill(r.difficulty), h("span", { "class": "pill", text: r.tasks + " " + tr("tasks", "مهام") + " · " + r.points + " " + tr("pts", "نقطة") }), r.published ? null : h("span", { "class": "pill", text: tr("Draft", "مسودة") })),
+        var el = h("button", { "class": "room", type: "button", style: "--sh:" + hue, onclick: function () { location.hash = "#/room/" + r.slug; } },
+          h("div", { "class": "meta" }, h("span", { "class": "stag", text: pick(s, "title") }), diffPill(r.difficulty), r.published ? null : h("span", { "class": "pill", text: tr("Draft", "مسودة") })),
           h("h3", { text: pick(r, "title") }), h("p", { text: pick(r, "summary") }), progress(r.solved, r.tasks),
-          h("div", { "class": "meta", text: r.solved + " / " + r.tasks + " " + tr("solved", "اتحل") })));
+          h("div", { "class": "meta", text: r.solved + " / " + r.tasks + " " + tr("solved", "اتحل") + " · " + r.points + " " + tr("pts", "نقطة") }));
+        cards.push({ el: el, sec: s.slug }); g.appendChild(el);
       });
-      root.appendChild(g);
     });
+    if (any) { root.appendChild(bar); root.appendChild(g); setF("all"); }
     if (!any) root.appendChild(h("div", { "class": "empty", text: tr("No rooms yet.", "مفيش غرف لسه.") }));
   }
 
