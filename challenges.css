@@ -109,3 +109,24 @@ html[data-theme=light] #ch .legend i.l1{background:#9be9a8}html[data-theme=light
 #ch .howto ul{margin:0;padding-inline-start:20px;font-size:14px;line-height:1.7}
 html[data-theme=light] #ch .mod.theory .mk{color:#1d4ed8}
 @media (min-width:981px){#ch .rg{align-items:start}#ch .rg>div:first-child{position:sticky;top:90px;max-height:calc(100vh - 110px);overflow:auto;align-self:start;padding-inline-end:4px}}
+
+#ch .plist{display:flex;flex-direction:column;gap:10px;margin:14px 0}
+#ch .prow{display:flex;align-items:center;gap:14px;text-align:start;background:var(--p);border:1px solid var(--b);border-radius:12px;padding:12px 16px;color:var(--t);font-family:inherit;cursor:pointer}
+#ch .prow:hover,#ch .prow.next{border-color:var(--r)}
+#ch .prow .pn{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--b);font-weight:700}
+#ch .prow.done .pn{background:#2e9b57;color:#fff}
+#ch .prow .pt{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}#ch .prow .pt small{color:var(--m)}
+#ch .cinp{flex:1;min-width:180px;padding:9px 12px;border-radius:8px;border:1px solid var(--b);background:var(--p);color:var(--t);font-family:inherit}
+#ch .note{color:var(--m);font-size:13px}
+#ch .okv{background:#2e9b5722;border:1px solid #2e9b57;border-radius:10px;padding:10px 14px;margin:10px 0;color:#2e9b57;font-weight:600}
+#ch .certp{margin:16px 0}
+#ch .certp .cin{border:3px double #b8892b;background:#fffdf6;color:#2a2418;border-radius:10px;padding:34px 26px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center}
+#ch .certp .ck{font-size:15px;letter-spacing:6px;font-weight:800;color:#b8892b}
+#ch .certp .ct{font-size:30px;font-weight:700}
+#ch .certp .cs{font-size:14px;color:#6b604a}
+#ch .certp .cn{font-size:34px;font-weight:700;border-bottom:1px solid #b8892b;padding:2px 24px;overflow-wrap:anywhere}
+#ch .certp .cp{font-size:22px;font-weight:700;color:#8a6414}
+#ch .certp .cf{font-size:14px}
+#ch .certp .ci{font-family:monospace;font-size:16px;letter-spacing:2px;background:#f1e8cf;padding:4px 12px;border-radius:6px}
+#ch .certp .cd{font-size:11px;color:#6b604a;max-width:520px;margin-top:6px}
+@media print{body *{visibility:hidden}#ch .certp,#ch .certp *{visibility:visible}#ch .certp{position:absolute;left:0;top:0;width:100%}}
