@@ -78,7 +78,8 @@ function init(){
  var b=document.createElement('button');b.id='theme';b.className='theme';b.type='button';b.onclick=function(){apply(T=='dark'?'light':'dark')};
  if(nav){nav.insertBefore(b,lang||null)}
  apply(T);
- document.querySelectorAll('.card').forEach(function(c){hover(c,function(){
+ var NOPV=/^(incidents|research|incident)\.html$/.test(location.pathname.split('/').pop());
+ (NOPV?[]:document.querySelectorAll('.card')).forEach(function(c){hover(c,function(){
   var name=(c.querySelector('h3')||{}).textContent||'';
   var cmds=[].map.call(c.querySelectorAll('code'),function(x){return x.textContent});
   return term(name,cmds)})});
