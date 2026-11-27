@@ -264,3 +264,12 @@ html[data-theme=light] #ch .ptitle{color:hsl(var(--ph,210) 80% 34%)}
 #ch .bd.on .bi{background:#26a641;color:#fff}
 #ch .bd small{opacity:.75;font-size:.78em}
 @media(max-width:560px){#ch .bdg{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+#ch .daily{border-color:#26a641}
+#ch .daily .dtag{display:inline-block;font-size:.75em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#26a641;margin-bottom:4px}
+#ch .daily .q{margin:6px 0}
+#ch .daily .row{margin:8px 0;display:flex;gap:8px;flex-wrap:wrap}
+#ch .daily .row input{flex:1 1 180px;min-width:0}
+#ch .dlearn{margin:6px 0;border:1px solid var(--b);border-radius:10px;padding:8px 10px}
+#ch .dlearn summary{cursor:pointer;font-weight:600}
+#ch .dlearn p{margin:8px 0 0;line-height:1.6}
