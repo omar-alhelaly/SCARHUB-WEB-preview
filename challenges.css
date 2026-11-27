@@ -195,3 +195,6 @@ html[data-theme=light] #ch .ndev{background:#fff}
 #ch .certp .cd{font-size:1.2cqw;max-width:62%;margin-top:.5cqw;color:#5a5240}
 @media (max-width:520px){#ch .certp .cin{padding:4% 4%;aspect-ratio:auto;min-height:0}#ch .certp .cin{aspect-ratio:1.1/1}}
 @media print{@page{size:A4 landscape;margin:8mm}#ch .certp{max-width:none}}
+
+#ch .ptitle{color:hsl(var(--ph,210) 85% 62%);font-weight:800;letter-spacing:.01em}#ch .ptopic{font-weight:800;font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:#fff;background:hsl(var(--ph,210) 70% 40%);border-radius:4px;padding:3px 8px}#ch .roomh .ptitle{font-size:inherit}
+html[data-theme=light] #ch .ptitle{color:hsl(var(--ph,210) 80% 34%)}
