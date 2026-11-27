@@ -251,3 +251,5 @@ html[data-theme=light] #ch .ptitle{color:hsl(var(--ph,210) 80% 34%)}
 @media(max-width:700px){#ch .npc em{display:none}#ch .npc{padding:3px 6px}#ch .nmod{width:92px}#ch .npal .nbar{padding:6px}#ch .ntools .tab{padding:3px 8px;font-size:12px}}
 #ch .nps .tab.tbc em{font-style:normal}
 @media(max-width:700px){#ch .ncv{height:330px}}
+
+#ch .prow.ppr .pn{flex:none;width:34px;height:34px;min-width:34px;border-radius:50%;display:grid;place-items:center;background:var(--b);font-weight:700;overflow:visible}#ch .prow.ppr.done .pn{background:#2e9b57;color:#fff}
