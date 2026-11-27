@@ -340,7 +340,7 @@
           else if (lc === "show vlan brief" && d.type === "sw") { say("VLAN Name        Ports\n" + Object.keys(d.vlans).sort(function (a, b) { return a - b; }).map(function (v) { var ps2 = neighbors(d).map(function (id, i) { return [id, i]; }).filter(function (x) { var o = dev(x[0]); return o.type !== "sw" && String(d.pv[x[0]] || 1) === v; }).map(function (x) { return "Fa0/" + (x[1] + 1); }); return (v + "    ").slice(0, 5) + (d.vlans[v] + "            ").slice(0, 12) + ps2.join(", "); }).join("\n")); }
           else if (c === "hostname") { if (m !== "conf") say("% Use configure terminal first."); else if (!t[1] || !/^[A-Za-z][A-Za-z0-9_-]{0,13}$/.test(t[1])) say("% Invalid hostname."); else { d.name = t[1]; } }
           else if (/^show\s+run/.test(lc)) { if (m === "user") say("% Type enable first."); else say("hostname " + d.name + "\n!\n" + d.ifs.map(function (x) { return "interface " + x.n + "\n " + (x.ip ? "ip address " + x.ip + " " + x.mask : "no ip address") + "\n " + (x.up ? "no shutdown" : "shutdown") + "\n!"; }).join("\n") + (d.routes && d.routes.length ? "\n" + d.routes.map(function (r) { return "ip route " + r.net + " " + r.mask + " " + r.nh; }).join("\n") : "") + "\nend"); }
-          else if (lc === "show mac address-table" && d.type === "sw") { var eps = endpointsFrom(d); say("Mac Address Table\n------------------\n" + (eps.length ? eps.map(function (e, i) { return "0001.42" + ("0" + (e.id * 17 % 256).toString(16)).slice(-2) + ".a" + ("0" + i).slice(-2) + "   DYNAMIC   Fa0/" + (i + 1) + "   " + e.name; }).join("\n") : "(empty)")); }
+          else if (lc === "show mac address-table" && d.type === "sw") { var eps = endpointsFrom(d); say("Mac Address Table\n------------------\n" + (eps.length ? eps.map(function (e, i) { return "0001.42" + ("0" + (e.id * 17 % 256).toString(16)).slice(-2) + ".0a" + ("0" + i).slice(-2) + "   DYNAMIC   Fa0/" + (i + 1) + "   " + e.name; }).join("\n") : "(empty)")); }
           else if (lc === "show interfaces status" && d.type === "sw") { var nb = neighbors(d); say("Port    Status       Connected to\n" + (nb.length ? nb.map(function (id, i) { return "Fa0/" + (i + 1) + "    connected    " + dev(id).name; }).join("\n") : "(no cables)")); }
           else say("% Unknown command. Type help.");
         }
@@ -880,7 +880,7 @@
     var list = h("div", { "class": "plist" }), nextSet = false;
     p.rooms.forEach(function (r, i) {
       var done = r.tasks > 0 && r.solved >= r.tasks, isNext = !done && !nextSet; if (isNext) nextSet = true;
-      list.appendChild(h("button", { "class": "prow" + (done ? " done" : "") + (isNext ? " next" : ""), type: "button", onclick: function () { location.hash = "#/room/" + r.slug; } },
+      list.appendChild(h("button", { "class": "prow ppr" + (done ? " done" : "") + (isNext ? " next" : ""), type: "button", onclick: function () { location.hash = "#/room/" + r.slug; } },
         h("span", { "class": "pn", text: done ? "\u2713" : String(i + 1) }),
         h("span", { "class": "pt" }, h("b", { text: pick(r, "title") }), h("small", { text: r.solved + " / " + r.tasks + " " + tr("tasks", "مهمة") + " · ~" + fmtMins(r.tasks * MINS) }), progress(r.solved, r.tasks)),
         diffPill(r.difficulty), isNext ? h("span", { "class": "pill", text: tr("Next", "التالي") }) : null));
