@@ -86,3 +86,14 @@ body[data-page=admin] .panel label{display:block;font-size:13px;color:var(--m);m
 body[data-page=admin] .panel table{table-layout:auto}
 @media (max-width:900px){.ags{grid-template-columns:1fr;min-width:0;max-width:none}}
 @media(max-width:600px){.tabs{flex-wrap:wrap}.tabs button{flex:1 1 auto;min-width:0;padding:8px 10px}}
+
+/* admin list rows: name on the start side taking the free space, controls spread to the end, bigger text, one card per row (works in RTL and LTR) */
+body[data-page=admin] .panel .row.lr{display:flex;flex-wrap:wrap;align-items:center;gap:12px 14px;padding:16px 18px;margin-top:12px;border:1px solid var(--b);border-radius:12px;background:var(--p);font-size:16px}
+body[data-page=admin] .panel .row.lr>span:first-child,body[data-page=admin] .panel .row.lr>b:first-child{flex:1 1 260px;min-width:0;font-size:17px;line-height:1.45;overflow-wrap:anywhere}
+body[data-page=admin] .panel .row.lr>.btn,body[data-page=admin] .panel .row.lr>button{flex:0 0 auto;min-height:42px;padding:8px 20px;font-size:15px}
+body[data-page=admin] .panel .row.lr input{min-height:42px;font-size:16px;padding:6px 10px;box-sizing:border-box}
+body[data-page=admin] .panel .row.lrp>input[type=text]:not([maxlength="3"]){width:130px}
+body[data-page=admin] .panel .row.lrp>input[type=date]{width:165px}
+body[data-page=admin] .panel .row.lrp>span:not(:first-child){color:var(--m);font-size:14px}
+body[data-page=admin] .panel .row.lrp>.btn{margin-inline-start:auto}
+@media(max-width:640px){body[data-page=admin] .panel .row.lr{padding:14px;gap:10px}body[data-page=admin] .panel .row.lr>span:first-child,body[data-page=admin] .panel .row.lr>b:first-child{flex-basis:100%}body[data-page=admin] .panel .row.lr>.btn,body[data-page=admin] .panel .row.lr>button{flex:1 1 40%}body[data-page=admin] .panel .row.lrp>.btn{margin-inline-start:0;flex-basis:100%}}
