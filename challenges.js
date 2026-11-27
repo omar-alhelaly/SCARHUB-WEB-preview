@@ -696,7 +696,7 @@
   var root, state = { stats: null };
   function setTabs(active) {
     var t = h("div", { "class": "chtabs" });
-    [["roadmap", "#/roadmap", tr("Roadmap", "خريطة الطريق")], ["rooms", "#/", tr("Rooms", "الغرف")], ["paths", "#/paths", tr("Learning paths", "مسارات التعلم")], ["board", "#/board", tr("Leaderboard", "المتصدرين")], ["me", "#/me", tr("My progress", "تقدمي")]].concat(isStaff() ? [["admin", "#/admin", tr("Manage", "الإدارة")]] : []).forEach(function (x) {
+    [["roadmap", "#/roadmap", tr("Roadmap", "خريطة الطريق")], ["rooms", "#/", tr("Rooms", "الغرف")], ["paths", "#/paths", tr("Learning paths", "مسارات التعلم")], ["ai", "#/ai", tr("AI Upskilling", "الذكاء الاصطناعي")], ["live", "#/live", tr("Live classes", "حصص مباشرة")], ["board", "#/board", tr("Leaderboard", "المتصدرين")], ["me", "#/me", tr("My progress", "تقدمي")]].concat(isStaff() ? [["admin", "#/admin", tr("Manage", "الإدارة")]] : []).forEach(function (x) {
       t.appendChild(h("button", { "class": "tab" + (active === x[0] ? " on" : ""), type: "button", onclick: function () { location.hash = x[1]; } , text: x[2] }));
     });
     [["guides.html", tr("Walkthroughs", "شروحات")], ["blog.html", tr("Recent threats", "تهديدات حديثة")]].forEach(function (x) { t.appendChild(h("a", { "class": "tab", href: x[0], text: x[1] })); });
@@ -751,7 +751,7 @@
     if (t.solved) done();
     return box;
   }
-  async function pageRooms() {
+  async function pageRooms(folder) {
     var cat = await rpc("ch_catalog"), stats = null;
     var dly = await dailyData(cat);
     if (me) { try { stats = await rpc("ch_my_stats"); } catch (e) {} }
@@ -759,23 +759,34 @@
     if (!me) root.appendChild(h("div", { "class": "strip" }, h("div", null, tr("Sign in to save your progress, earn points and appear on the leaderboard.", "سجّل دخول عشان تحفظ تقدمك وتكسب نقاط وتظهر في المتصدرين."), h("br"), h("a", { href: "login.html", text: tr("Sign in", "تسجيل الدخول") }))));
     else if (stats) root.appendChild(h("div", { "class": "strip" }, h("div", null, tr("Points", "النقاط"), h("b", { text: String(stats.points || 0) })), h("div", null, tr("Solved tasks", "مهام محلولة"), h("b", { text: String(stats.solves || 0) })), h("div", null, tr("Overall rank", "الترتيب العام"), h("b", { text: stats.rank ? "#" + stats.rank : "-" }))));
     if (dly) root.appendChild(dailyBox(dly));
-    var any = false, HUES = [210, 28, 280, 150, 340, 50, 180], cards = [], bar = h("div", { "class": "fbar", role: "group", "aria-label": tr("Filter by section", "فلتر بالقسم") }), g = h("div", { "class": "rooms" }), cur = "all", fbtns = [];
-    function setF(k) { cur = k; fbtns.forEach(function (x) { var on = x.k === k; x.b.className = "tab" + (on ? " on" : ""); x.b.setAttribute("aria-pressed", on ? "true" : "false"); }); cards.forEach(function (c) { c.el.style.display = (k === "all" || c.sec === k) ? "" : "none"; }); }
-    function fb(k, label) { var b = h("button", { type: "button", "class": "tab", text: label, onclick: function () { setF(k); } }); fbtns.push({ k: k, b: b }); bar.appendChild(b); }
-    fb("all", tr("All", "الكل"));
-    cat.sections.forEach(function (s, si) {
-      if (!s.rooms.length) return; any = true; fb(s.slug, pick(s, "title"));
-      var hue = HUES[si % HUES.length];
-      s.rooms.forEach(function (r) {
-        var el = h("button", { "class": "room", type: "button", style: "--sh:" + hue, onclick: function () { location.hash = "#/room/" + r.slug; } },
-          h("div", { "class": "meta" }, h("span", { "class": "stag", text: pick(s, "title") }), diffPill(r.difficulty), r.published ? null : h("span", { "class": "pill", text: tr("Draft", "مسودة") })),
-          h("h3", { text: pick(r, "title") }), h("p", { text: pick(r, "summary") }), progress(r.solved, r.tasks),
-          h("div", { "class": "meta", text: r.solved + " / " + r.tasks + " " + tr("solved", "اتحل") + " · " + r.points + " " + tr("pts", "نقطة") }));
-        cards.push({ el: el, sec: s.slug }); g.appendChild(el);
-      });
+    var HUES = [210, 28, 280, 150, 340, 50, 180], secs = cat.sections.filter(function (s) { return s.rooms.length; });
+    function hueOf(s) { return HUES[cat.sections.indexOf(s) % HUES.length]; }
+    function roomCard(s, r) {
+      return h("button", { "class": "room", type: "button", style: "--sh:" + hueOf(s), onclick: function () { location.hash = "#/room/" + r.slug; } },
+        h("div", { "class": "meta" }, h("span", { "class": "stag", text: pick(s, "title") }), diffPill(r.difficulty), r.published ? null : h("span", { "class": "pill", text: tr("Draft", "مسودة") })),
+        h("h3", { text: pick(r, "title") }), h("p", { text: pick(r, "summary") }), progress(r.solved, r.tasks),
+        h("div", { "class": "meta", text: r.solved + " / " + r.tasks + " " + tr("solved", "اتحل") + " · " + r.points + " " + tr("pts", "نقطة") }));
+    }
+    var fs = folder ? secs.filter(function (s) { return s.slug === folder; })[0] : null;
+    if (folder && fs) {
+      root.appendChild(h("button", { "class": "back", type: "button", onclick: function () { location.hash = "#/"; }, text: tr("< All folders", "< كل الفولدرات") }));
+      var fl = 0, fd = 0; fs.rooms.forEach(function (r) { fl += r.tasks; fd += r.solved; });
+      root.appendChild(h("div", { "class": "roomh" }, h("h2", { text: pick(fs, "title") }), h("p", { text: fs.rooms.length + " " + tr("rooms", "غرفة") + " · " + fd + " / " + fl + " " + tr("solved", "اتحل") })));
+      var g2 = h("div", { "class": "rooms" }); fs.rooms.forEach(function (r) { g2.appendChild(roomCard(fs, r)); }); root.appendChild(g2);
+      return;
+    }
+    if (!secs.length) { root.appendChild(h("div", { "class": "empty", text: tr("No rooms yet.", "مفيش غرف لسه.") })); return; }
+    var g = h("div", { "class": "folders" });
+    secs.forEach(function (s) {
+      var tl = 0, ts = 0, pts = 0; s.rooms.forEach(function (r) { tl += r.tasks; ts += r.solved; pts += r.points; });
+      var names = h("ul", { "class": "fnames" }); s.rooms.slice(0, 3).forEach(function (r) { names.appendChild(h("li", { text: pick(r, "title") })); });
+      if (s.rooms.length > 3) names.appendChild(h("li", { "class": "more", text: "+" + (s.rooms.length - 3) + " " + tr("more", "كمان") }));
+      g.appendChild(h("button", { "class": "folder", type: "button", style: "--sh:" + hueOf(s), onclick: function () { location.hash = "#/folder/" + s.slug; } },
+        h("div", { "class": "ftab" }), h("div", { "class": "fbody" }, h("h3", { text: pick(s, "title") }),
+        h("div", { "class": "meta", text: s.rooms.length + " " + tr("rooms", "غرفة") + " · " + tl + " " + tr("tasks", "مهمة") }), names, progress(ts, tl),
+        h("div", { "class": "meta", text: ts + " / " + tl + " " + tr("solved", "اتحل") + " · " + tr("Open folder", "افتح الفولدر") }))));
     });
-    if (any) { root.appendChild(bar); root.appendChild(g); setF("all"); }
-    if (!any) root.appendChild(h("div", { "class": "empty", text: tr("No rooms yet.", "مفيش غرف لسه.") }));
+    root.appendChild(g);
   }
 
   async function pageRoom(slug) {
@@ -1103,6 +1114,103 @@
     { en: "Stage 2: Pick a direction", ar: "المرحلة 2: اختار اتجاهك", d: ["Defence, offence or infrastructure. Each path has theory, then practice that eases in.", "دفاع أو هجوم أو بنية تحتية. كل مسار فيه نظرية وبعدين تطبيق بالتدريج."], paths: ["soc-analyst-start", "junior-pentester", "network-access-ip-connectivity", "web-app-security", "forensics-timeline-analysis", "crypto-in-practice"] },
     { en: "Stage 3: Go deeper", ar: "المرحلة 3: ادخل أعمق", d: ["Services, security and a mock exam on the networking topic outline. Finish for a certificate.", "الخدمات والأمان وامتحان تجريبي على محاور الشبكات. خلّص واخد شهادة."], paths: ["network-services-security", "web-secure-review", "forensics-casework", "crypto-applied-security"] }
   ];
+  /* ---------- Live classes: scheduled sessions with time, host, registration, a join link and recordings. Own design; the link is any https meeting URL pasted by staff. ---------- */
+  var liveTimer = null;
+  function lvLocale() { return EN() ? "en-GB" : "ar-EG"; }
+  function lvWhen(iso) { try { return new Date(iso).toLocaleString(lvLocale(), { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); } catch (e) { return iso; } }
+  function lvTz() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) { return ""; } }
+  function lvLeft(ms) {
+    var m = Math.max(0, Math.floor(ms / 60000)), d = Math.floor(m / 1440), hh = Math.floor((m % 1440) / 60), mm = m % 60;
+    if (d >= 1) return d + tr(" d ", " يوم ") + hh + tr(" h", " س");
+    if (hh >= 1) return hh + tr(" h ", " س ") + mm + tr(" min", " د");
+    return mm + tr(" min", " د");
+  }
+  function lvSafe(u) { return typeof u === "string" && /^https:\/\/[^\s<>"']{4,300}$/.test(u) ? u : null; }
+  function lvLocalInput(iso) { var d = new Date(iso), p = function (n) { return (n < 10 ? "0" : "") + n; }; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "T" + p(d.getHours()) + ":" + p(d.getMinutes()); }
+  function lvEditor(c, done) {
+    var f = h("form", { "class": "box lvform", novalidate: "novalidate" }), err = h("div", { "class": "note" });
+    function fld(label, el) { return h("label", { "class": "lvf" }, h("span", { text: label }), el); }
+    var title = h("input", { type: "text", maxlength: "120", value: c ? c.title : "" }), host = h("input", { type: "text", maxlength: "80", value: c ? c.host : "" }), topic = h("input", { type: "text", maxlength: "40", value: c && c.topic ? c.topic : "" });
+    var desc = h("textarea", { rows: "3", maxlength: "1000" }); desc.value = c && c.description ? c.description : "";
+    var when = h("input", { type: "datetime-local", value: c ? lvLocalInput(c.starts_at) : "" }), mins = h("input", { type: "number", min: "15", max: "480", step: "5", value: c ? String(c.minutes) : "60" }), cap = h("input", { type: "number", min: "1", max: "1000", value: c && c.capacity ? String(c.capacity) : "" });
+    var ju = h("input", { type: "url", maxlength: "300", placeholder: "https://...", value: c && c.join_url ? c.join_url : "" }), ru = h("input", { type: "url", maxlength: "300", placeholder: "https://...", value: c && c.recording_url ? c.recording_url : "" });
+    var pub = h("input", { type: "checkbox" }); pub.checked = c ? !!c.published : true;
+    var sv = h("button", { type: "submit", "class": "btn", text: tr("Save session", "احفظ الجلسة") }), cx = h("button", { type: "button", "class": "btn2", text: tr("Cancel", "إلغاء"), onclick: function () { done(false); } });
+    f.appendChild(h("h3", { text: c ? tr("Edit session", "تعديل الجلسة") : tr("New session", "جلسة جديدة") }));
+    [[tr("Title", "العنوان"), title], [tr("Host", "المقدّم"), host], [tr("Topic (optional)", "الموضوع (اختياري)"), topic], [tr("Description (optional)", "الوصف (اختياري)"), desc], [tr("Start (your local time)", "البداية (بتوقيتك)"), when], [tr("Length in minutes", "المدة بالدقايق"), mins], [tr("Seats (empty = unlimited)", "عدد المقاعد (فاضي = مفتوح)"), cap], [tr("Join link (any https meeting URL)", "لينك الدخول (أي لينك اجتماع https)"), ju], [tr("Recording link (after the session)", "لينك التسجيل (بعد الجلسة)"), ru]].forEach(function (x) { f.appendChild(fld(x[0], x[1])); });
+    f.appendChild(h("label", { "class": "lvf lvck" }, pub, h("span", { text: tr("Published (visible to everyone)", "منشورة (ظاهرة للكل)") })));
+    f.appendChild(h("div", { "class": "lvact" }, sv, cx)); f.appendChild(err);
+    f.addEventListener("submit", async function (e) {
+      e.preventDefault(); var t = title.value.trim(), hs = host.value.trim(), j = ju.value.trim(), r = ru.value.trim(), m = parseInt(mins.value, 10);
+      if (t.length < 3 || hs.length < 2 || /[<>]/.test(t + hs)) { err.textContent = tr("Title (3+) and host (2+) are required, without < or >.", "العنوان (3+) والمقدّم (2+) مطلوبين، من غير < أو >."); return; }
+      if (!when.value) { err.textContent = tr("Pick the start time.", "اختار وقت البداية."); return; }
+      if (!(m >= 15 && m <= 480)) { err.textContent = tr("Length must be 15 to 480 minutes.", "المدة من 15 لـ 480 دقيقة."); return; }
+      if ((j && !lvSafe(j)) || (r && !lvSafe(r))) { err.textContent = tr("Links must start with https://", "اللينكات لازم تبدأ بـ https://"); return; }
+      sv.disabled = true;
+      try { await rpc("ch_class_save", { p: { id: c ? c.id : null, title: t, host: hs, topic: topic.value.trim(), description: desc.value.trim(), starts_at: new Date(when.value).toISOString(), minutes: m, capacity: cap.value ? parseInt(cap.value, 10) : null, join_url: j, recording_url: r, published: pub.checked } }); done(true); }
+      catch (x) { sv.disabled = false; err.textContent = tr("Could not save. Check the fields.", "ماتحفظش. راجع الخانات."); }
+    });
+    return f;
+  }
+  async function pageLive() {
+    var list = [];
+    try { list = await rpc("ch_classes_list"); } catch (e) { list = []; }
+    clear(root); root.appendChild(setTabs("live"));
+    root.appendChild(h("div", { "class": "roomh" }, h("h2", { text: tr("Live classes", "الحصص المباشرة") }), h("p", { text: tr("Scheduled sessions with a host. Register for a seat, and the Join button opens 15 minutes before the start. Past sessions keep their recordings here. Times are shown in your local time" + (lvTz() ? " (" + lvTz() + ")" : "") + ".", "جلسات مجدولة مع مقدّم. سجّل مقعدك وزر الدخول بيتفتح قبل البداية بـ 15 دقيقة. الجلسات اللي خلصت بتفضل تسجيلاتها هنا. الأوقات بتوقيتك" + (lvTz() ? " (" + lvTz() + ")" : "") + ".") })));
+    var wrap = h("div", { "class": "lvwrap" }); root.appendChild(wrap);
+    var now = Date.now();
+    function end(c) { return new Date(c.starts_at).getTime() + c.minutes * 60000; }
+    var up = list.filter(function (c) { return end(c) > now; }).sort(function (a, b) { return new Date(a.starts_at) - new Date(b.starts_at); });
+    var past = list.filter(function (c) { return end(c) <= now; }).sort(function (a, b) { return new Date(b.starts_at) - new Date(a.starts_at); });
+    function reload() { pageLive(); }
+    function stateOf(c) { var s = new Date(c.starts_at).getTime(); return now >= s && now < end(c) ? "live" : now >= s - 15 * 60000 && now < s ? "soon" : "later"; }
+    function card(c, big) {
+      var st = stateOf(c), d = new Date(c.starts_at), full = c.capacity && c.taken >= c.capacity && !c.registered;
+      var tile = h("div", { "class": "lvdate" }, h("b", { text: String(d.getDate()) }), h("span", { text: d.toLocaleString(lvLocale(), { month: "short" }) }));
+      var tag = st === "live" ? h("span", { "class": "lvbadge live", text: tr("Live now", "مباشر دلوقتي") }) : h("span", { "class": "lvbadge", text: tr("Starts in ", "بتبدأ بعد ") + lvLeft(d.getTime() - now) });
+      var meta = h("div", { "class": "meta" }, h("span", { text: lvWhen(c.starts_at) }), h("span", { text: c.minutes + tr(" min", " د") }), h("span", { text: tr("Host: ", "المقدّم: ") + c.host }), c.topic ? h("span", { "class": "stag", text: c.topic }) : null, h("span", { text: c.capacity ? (c.taken + " / " + c.capacity + tr(" seats", " مقعد")) : (c.taken + tr(" registered", " مسجّل")) }), c.published ? null : h("span", { "class": "pill", text: tr("Draft", "مسودة") }));
+      var act = h("div", { "class": "lvact" }), ju = lvSafe(c.join_url);
+      if (ju && (st !== "later" || isStaff())) act.appendChild(h("a", { "class": "btn lvjoin", href: ju, target: "_blank", rel: "noopener noreferrer", text: tr("Join session", "ادخل الجلسة") }));
+      if (!me) act.appendChild(h("a", { "class": "btn2", href: "login.html", text: tr("Log in to register", "سجّل دخول عشان تسجّل") }));
+      else if (c.registered) { act.appendChild(h("span", { "class": "lvok", text: "\u2713 " + tr("You are registered", "انت مسجّل") })); act.appendChild(h("button", { "class": "btn2", type: "button", text: tr("Cancel seat", "إلغاء المقعد"), onclick: async function () { try { await rpc("ch_class_unregister", { p_id: c.id }); } catch (e) {} reload(); } })); }
+      else act.appendChild(h("button", { "class": "btn", type: "button", disabled: full ? "disabled" : null, text: full ? tr("Full", "المقاعد خلصت") : tr("Register", "سجّل"), onclick: async function (ev) { ev.target.disabled = true; try { await rpc("ch_class_register", { p_id: c.id }); toast(tr("You are registered.", "اتسجّلت.")); } catch (e) { toast(tr("Could not register.", "التسجيل ماتمش.")); } reload(); } }));
+      if (c.registered && !ju && st !== "live") act.appendChild(h("span", { "class": "note", text: tr("The Join button opens 15 minutes before the start.", "زر الدخول بيتفتح قبل البداية بـ 15 دقيقة.") }));
+      if (isStaff()) { act.appendChild(h("button", { "class": "btn2", type: "button", text: tr("Edit", "تعديل"), onclick: function () { openEd(c); } })); act.appendChild(h("button", { "class": "btn2", type: "button", text: tr("Delete", "مسح"), onclick: async function () { if (!confirm(tr("Delete this session?", "تمسح الجلسة؟"))) return; try { await rpc("ch_class_delete", { p_id: c.id }); } catch (e) {} reload(); } })); }
+      return h("div", { "class": "box lvcard" + (big ? " lvbig" : "") + (st === "live" ? " islive" : "") }, tile, h("div", { "class": "lvmain" }, tag, h("h3", { text: c.title }), c.description ? h("p", { "class": "lvdesc", text: c.description }) : null, meta, act));
+    }
+    function openEd(c) { var ed = lvEditor(c, function (ok) { if (ok) reload(); else ed.remove(); }); wrap.insertBefore(ed, wrap.firstChild); ed.scrollIntoView({ block: "nearest" }); }
+    if (isStaff()) wrap.appendChild(h("div", { "class": "lvbar" }, h("button", { "class": "btn", type: "button", text: tr("+ New session", "+ جلسة جديدة"), onclick: function () { openEd(null); } })));
+    wrap.appendChild(h("h3", { "class": "lvh", text: tr("Upcoming", "الجاية") }));
+    if (!up.length) wrap.appendChild(h("div", { "class": "empty", text: tr("No sessions are scheduled right now. Check back soon.", "مفيش جلسات مجدولة دلوقتي. ارجع تشوف قريب.") }));
+    up.forEach(function (c, i) { wrap.appendChild(card(c, i === 0)); });
+    wrap.appendChild(h("h3", { "class": "lvh", text: tr("Past sessions and recordings", "الجلسات اللي خلصت والتسجيلات") }));
+    if (!past.length) wrap.appendChild(h("div", { "class": "empty", text: tr("Past sessions will appear here with their recordings.", "الجلسات اللي خلصت هتظهر هنا مع تسجيلاتها.") }));
+    past.forEach(function (c) {
+      var ru = lvSafe(c.recording_url);
+      wrap.appendChild(h("div", { "class": "box lvpast" }, h("div", { "class": "lvmain" }, h("h3", { text: c.title }), h("div", { "class": "meta" }, h("span", { text: lvWhen(c.starts_at) }), h("span", { text: c.minutes + tr(" min", " د") }), h("span", { text: tr("Host: ", "المقدّم: ") + c.host }), c.topic ? h("span", { "class": "stag", text: c.topic }) : null, c.published ? null : h("span", { "class": "pill", text: tr("Draft", "مسودة") })), h("div", { "class": "lvact" }, ru ? h("a", { "class": "btn", href: ru, target: "_blank", rel: "noopener noreferrer", text: tr("Watch recording", "شاهد التسجيل") }) : h("span", { "class": "note", text: tr("Recording not added yet.", "التسجيل لسه ماتضافش.") }), isStaff() ? h("button", { "class": "btn2", type: "button", text: tr("Edit", "تعديل"), onclick: function () { openEd(c); } }) : null, isStaff() ? h("button", { "class": "btn2", type: "button", text: tr("Delete", "مسح"), onclick: async function () { if (!confirm(tr("Delete this session?", "تمسح الجلسة؟"))) return; try { await rpc("ch_class_delete", { p_id: c.id }); } catch (e) {} reload(); } }) : null))));
+    });
+    if (up.length) liveTimer = setInterval(function () { if (document.hidden || root.querySelector(".lvform")) return; pageLive(); }, 60000);
+  }
+
+  /* ---------- AI Upskilling: our own AI-for-security modules (rooms in the "ai" section) shown as learning cards ---------- */
+  async function pageAi() {
+    var cat = await rpc("ch_catalog"), sec = null;
+    cat.sections.forEach(function (s) { if (s.slug === "ai") sec = s; });
+    clear(root); root.appendChild(setTabs("ai"));
+    root.appendChild(h("div", { "class": "roomh" }, h("h2", { text: tr("AI Upskilling", "تطوير مهارات الذكاء الاصطناعي") }), h("p", { text: tr("Short, practical modules on using AI tools safely and on defending against AI-related risks. Original content, made-up data, no real systems.", "موديولات قصيرة وعملية عن استخدام أدوات الذكاء الاصطناعي بأمان والدفاع ضد مخاطره. محتوى أصلي وبيانات متألفة ومن غير أي أنظمة حقيقية.") })));
+    var rooms = sec ? sec.rooms : [];
+    if (!rooms.length) { root.appendChild(h("div", { "class": "empty", text: tr("The first AI modules are being prepared.", "أول موديولات الذكاء الاصطناعي بتتجهز.") })); return; }
+    var tl = 0, ts = 0; rooms.forEach(function (r) { tl += r.tasks; ts += r.solved; });
+    root.appendChild(h("div", { "class": "strip" }, h("div", null, tr("Modules", "موديولات"), h("b", { text: String(rooms.length) })), h("div", null, tr("Lessons and questions", "الدروس والأسئلة"), h("b", { text: String(tl) })), h("div", null, tr("Estimated time", "الوقت المتوقع"), h("b", { text: fmtMins(tl * MINS) })), me ? h("div", null, tr("Your progress", "تقدمك"), h("b", { text: ts + " / " + tl })) : null));
+    var g = h("div", { "class": "rooms aigrid" });
+    rooms.forEach(function (r) {
+      g.appendChild(h("button", { "class": "room", type: "button", style: "--sh:265", onclick: function () { location.hash = "#/room/" + r.slug; } },
+        h("div", { "class": "meta" }, h("span", { "class": "stag", text: tr("AI", "ذكاء اصطناعي") }), diffPill(r.difficulty), h("span", { "class": "pill", text: "~" + fmtMins(r.tasks * MINS) }), r.published ? null : h("span", { "class": "pill", text: tr("Draft", "مسودة") })),
+        h("h3", { text: pick(r, "title") }), h("p", { text: pick(r, "summary") }), progress(r.solved, r.tasks),
+        h("div", { "class": "meta", text: r.solved + " / " + r.tasks + " " + tr("done", "خلص") + " · " + r.points + " " + tr("pts", "نقطة") })));
+    });
+    root.appendChild(g);
+  }
   async function pageRoadmap() {
     var ps = await rpc("ch_paths_list");
     clear(root); root.appendChild(setTabs("roadmap"));
@@ -1137,6 +1245,7 @@
   var busy = 0;
   async function render() {
     var my = ++busy;
+    if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
     try {
       await init();
       if (my !== busy) return;
@@ -1146,9 +1255,12 @@
       else if ((m = hs.match(/^#\/cert\/([A-Za-z0-9-]+)/))) await pageCert(decodeURIComponent(m[1]));
       else if (hs.indexOf("#/roadmap") === 0) await pageRoadmap();
       else if (hs.indexOf("#/paths") === 0) await pagePaths();
+      else if (hs.indexOf("#/ai") === 0) await pageAi();
+      else if (hs.indexOf("#/live") === 0) await pageLive();
       else if (hs.indexOf("#/board") === 0) await pageBoard(BSEC);
       else if (hs.indexOf("#/me") === 0) await pageMe();
       else if (hs.indexOf("#/admin") === 0) await pageAdmin(null);
+      else if ((m = hs.match(/^#\/folder\/([a-z0-9-]+)/))) await pageRooms(m[1]);
       else await pageRooms();
     } catch (e) {
       if (my !== busy) return;
