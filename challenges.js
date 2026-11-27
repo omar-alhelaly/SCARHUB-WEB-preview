@@ -227,13 +227,14 @@
     var PORTS = { pc: 1, sw: 8, rt: 2 }, LBL = { pc: "PC", sw: "SW", rt: "RT" };
     var wrap = h("div", { "class": "netlab" }), cv = h("div", { "class": "ncv" }), svg = document.createElementNS("http://www.w3.org/2000/svg", "svg"); svg.setAttribute("class", "nsvg");
     cv.appendChild(svg);
-    var bar = h("div", { "class": "nbar" }), panel = h("div", { "class": "npanel" });
+    var bar = h("div", { "class": "nbar" });
     function ip2n(s) { var m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(String(s || "").trim()); if (!m) return null; var n = 0; for (var i = 1; i <= 4; i++) { if (+m[i] > 255) return null; n = n * 256 + +m[i]; } return n; }
     function maskOk(s) { var n = ip2n(s); if (n == null) return false; var b = n.toString(2); return /^1*0*$/.test(("00000000000000000000000000000000" + b).slice(-32)) && n > 0; }
     function same(ip1, m1, ip2) { var x = ip2n(ip1), y = ip2n(ip2), m = ip2n(m1); return x != null && y != null && m != null && ((x & m) >>> 0) === ((y & m) >>> 0); }
     function add(type, x, y) { var d = { id: devs.length ? devs[devs.length - 1].id + 1 : 1, type: type, name: (type === "pc" ? "PC" : type === "sw" ? "Switch" : "Router") + (++seq[type]), x: x, y: y, ip: "", mask: "", gw: "", ifs: [{ n: "g0/0", ip: "", mask: "", up: false }, { n: "g0/1", ip: "", mask: "", up: false }], mode: "user", cur: null, hist: [] }; devs.push(d); sel = d.id; draw(); return d; }
     function dev(id) { return devs.filter(function (d) { return d.id === id; })[0]; }
-    function degree(id) { return links.filter(function (l) { return l.a === id || l.b === id; }).length; }
+    function dlinks() { return links.filter(function (l) { return l.t !== "console"; }); }
+    function degree(id) { return dlinks().filter(function (l) { return l.a === id || l.b === id; }).length; }
     function connect(x, y) {
       if (x === y) return tr("Pick two different devices.", "اختار جهازين مختلفين.");
       if (links.some(function (l) { return (l.a === x && l.b === y) || (l.a === y && l.b === x); })) return tr("These two are already connected.", "الجهازين دول متوصلين بالفعل.");
@@ -246,10 +247,10 @@
       var seen = {}, out = [], q = [viaId]; seen[startId] = 1; seen[viaId] = 1;
       while (q.length) { var id = q.shift(), d = dev(id);
         if (d.type !== "sw") { out.push(d); continue; }
-        links.forEach(function (l) { var o = l.a === id ? l.b : l.b === id ? l.a : null; if (o != null && !seen[o]) { seen[o] = 1; q.push(o); } }); }
+        dlinks().forEach(function (l) { var o = l.a === id ? l.b : l.b === id ? l.a : null; if (o != null && !seen[o]) { seen[o] = 1; q.push(o); } }); }
       return out;
     }
-    function neighbors(d) { var r = []; links.forEach(function (l) { var o = l.a === d.id ? l.b : l.b === d.id ? l.a : null; if (o != null) r.push(o); }); return r; }
+    function neighbors(d) { var r = []; dlinks().forEach(function (l) { var o = l.a === d.id ? l.b : l.b === d.id ? l.a : null; if (o != null) r.push(o); }); return r; }
     function endpointsFrom(d) { var out = []; neighbors(d).forEach(function (n) { var nd = dev(n); if (nd.type === "sw") { domain(d.id, n).forEach(function (e) { if (e !== d && out.indexOf(e) < 0) out.push(e); }); } else if (out.indexOf(nd) < 0) out.push(nd); }); return out; }
     function holders(set, ip) { var n = ip2n(ip); return set.filter(function (e) { return e.type === "pc" ? ip2n(e.ip) === n : e.type === "rt" ? e.ifs.some(function (f) { return f.up && ip2n(f.ip) === n; }) : false; })[0] || null; }
     function ifaceFor(rt, ip) { return rt.ifs.filter(function (f) { return f.up && f.ip && f.mask && same(f.ip, f.mask, ip); })[0] || null; }
@@ -310,7 +311,7 @@
           else say("'" + t[0] + "' is not recognized here. Type help.");
         } else {
           var m = d.mode, lc = raw.toLowerCase();
-          if (c === "help" || c === "?") say("enable | configure terminal | interface g0/0 | ip address <ip> <mask> | no shutdown | shutdown | exit | end | show ip interface brief | ping <address>");
+          if (c === "help" || c === "?") say("enable | configure terminal | hostname <name> | interface g0/0 | ip address <ip> <mask> | no shutdown | shutdown | exit | end | show ip interface brief | show running-config | show mac address-table (switch) | show interfaces status (switch) | ping <address>");
           else if (c === "enable") { d.mode = "priv"; }
           else if ((c === "configure" || c === "conf") && /^(conf|configure)\s+t/.test(lc)) { if (m === "user") say("% Type enable first."); else d.mode = "conf"; }
           else if (c === "interface" || c === "int") { if (m !== "conf" && m !== "if") say("% Use configure terminal first."); else { var f = d.ifs.filter(function (x) { return x.n === (t[1] || "").toLowerCase().replace(/^gigabitethernet/, "g").replace(/^gi/, "g"); })[0]; if (f) { d.cur = f; d.mode = "if"; } else say("% Unknown interface. Use g0/0 or g0/1."); } }
@@ -321,56 +322,158 @@
           else if (c === "end") { d.mode = "priv"; }
           else if (lc === "show ip interface brief") { if (m === "user") say("% Type enable first."); else say("Interface   IP-Address      Status\n" + d.ifs.map(function (x) { return (x.n + "          ").slice(0, 12) + ((x.ip || "unassigned") + "               ").slice(0, 16) + (x.up ? "up" : "administratively down"); }).join("\n")); }
           else if (c === "ping") { if (m === "user") say("% Type enable first."); else if (!t[1]) say("usage: ping <address>"); else { var f2 = ifaceFor(d, t[1]); var lines = ["Pinging " + t[1] + " with 32 bytes of data:", ""], okc = 0; var hd = f2 && holders(endpointsFrom2(d, f2), t[1]); for (var i = 0; i < 4; i++) { if (hd) { lines.push("Reply from " + t[1] + ": bytes=32 time<1ms TTL=128"); okc++; } else lines.push("Request timed out."); } lines.push("", "Packets: Sent = 4, Received = " + okc + ", Lost = " + (4 - okc)); say(lines.join("\n")); } }
+          else if (c === "hostname") { if (m !== "conf") say("% Use configure terminal first."); else if (!t[1] || !/^[A-Za-z][A-Za-z0-9_-]{0,13}$/.test(t[1])) say("% Invalid hostname."); else { d.name = t[1]; } }
+          else if (/^show\s+run/.test(lc)) { if (m === "user") say("% Type enable first."); else say("hostname " + d.name + "\n!\n" + d.ifs.map(function (x) { return "interface " + x.n + "\n " + (x.ip ? "ip address " + x.ip + " " + x.mask : "no ip address") + "\n " + (x.up ? "no shutdown" : "shutdown") + "\n!"; }).join("\n") + "\nend"); }
+          else if (lc === "show mac address-table" && d.type === "sw") { var eps = endpointsFrom(d); say("Mac Address Table\n------------------\n" + (eps.length ? eps.map(function (e, i) { return "0001.42" + ("0" + (e.id * 17 % 256).toString(16)).slice(-2) + ".a" + ("0" + i).slice(-2) + "   DYNAMIC   Fa0/" + (i + 1) + "   " + e.name; }).join("\n") : "(empty)")); }
+          else if (lc === "show interfaces status" && d.type === "sw") { var nb = neighbors(d); say("Port    Status       Connected to\n" + (nb.length ? nb.map(function (id, i) { return "Fa0/" + (i + 1) + "    connected    " + dev(id).name; }).join("\n") : "(no cables)")); }
           else say("% Unknown command. Type help.");
         }
         ps.textContent = pr();
       }
       inp.addEventListener("keydown", function (e) { if (e.key === "Enter") { var v = inp.value; inp.value = ""; run(v); } });
-      say(d.type === "pc" ? "Simulated PC. Type help." : "Simulated router. Type help.");
+      say(d.type === "pc" ? "Simulated PC. Type help." : d.type === "sw" ? "Simulated switch. Type help." : "Simulated router. Type help.");
       return box;
     }
-    function panelDraw() {
-      clear(panel); var d = sel != null ? dev(sel) : null;
-      if (!d) { panel.appendChild(h("p", { "class": "note", text: tr("Click a device to configure it.", "اضغط على جهاز عشان تظبطه.") })); return; }
-      panel.appendChild(h("h4", { text: d.name + " (" + (d.type === "pc" ? tr("computer", "كمبيوتر") : d.type === "sw" ? tr("switch", "سويتش") : tr("router", "راوتر")) + ")" }));
-      if (d.type === "sw") { panel.appendChild(h("p", { "class": "note", text: tr("A switch connects devices in the same network. It needs no setup here. Ports used: ", "السويتش بيوصّل الأجهزة في نفس الشبكة. مش محتاج إعداد هنا. البورتات المستخدمة: ") + degree(d.id) + " / 8" })); return; }
-      if (d.type === "pc") {
-        var fi = ltr(h("input", { type: "text", value: d.ip, placeholder: "192.168.1.10" })), fm = ltr(h("input", { type: "text", value: d.mask, placeholder: "255.255.255.0" })), fg = ltr(h("input", { type: "text", value: d.gw, placeholder: tr("optional", "اختياري") })), st = h("div", { "class": "note" });
-        panel.appendChild(h("div", { "class": "nform" }, h("label", { text: "IP" }), fi, h("label", { text: tr("Subnet mask", "الماسك") }), fm, h("label", { text: tr("Gateway", "الجيتواي") }), fg,
-          h("button", { "class": "btn2 f", type: "button", text: tr("Apply", "تطبيق"), onclick: function () { if ((fi.value && ip2n(fi.value) == null) || (fm.value && !maskOk(fm.value)) || (fg.value && ip2n(fg.value) == null)) { st.textContent = tr("Check the values: four numbers 0-255, and a valid mask like 255.255.255.0.", "راجع القيم: أربع أرقام من 0 لـ 255، وماسك صحيح زي 255.255.255.0."); return; } d.ip = fi.value.trim(); d.mask = fm.value.trim(); d.gw = fg.value.trim(); st.textContent = tr("Saved.", "اتحفظ."); } }), st));
-      }
-      if (d.type === "rt") panel.appendChild(h("p", { "class": "note", text: tr("Interfaces follow cable order: the first cable on this router is g0/0, the second is g0/1.", "الإنترفيسات بترتيب الكابلات: أول كابل على الراوتر هو g0/0 والتاني g0/1.") }));
-      panel.appendChild(termFor(d));
+    /* ---- Packet-Tracer-style canvas: SVG device icons, typed cables, device windows ---- */
+    var wl = h("div", { "class": "nwl" }), dl = h("div", { "class": "ndl" }), wins = {}, selL = null, zTop = 5, cab = "auto";
+    cv.appendChild(dl); cv.appendChild(wl);
+    var ICON = {
+      pc: '<svg viewBox="0 0 64 56" width="64" height="56"><rect x="9" y="3" width="46" height="32" rx="4" fill="#1b2638" stroke="#6fa8ff" stroke-width="2"/><rect x="13" y="7" width="38" height="24" rx="2" fill="#07101d"/><path d="M17 13l5 4-5 4M25 22h9" fill="none" stroke="#6fe3a1" stroke-width="2" stroke-linecap="round"/><path d="M26 35h12l3 8H23z" fill="#2c3b55"/><rect x="14" y="45" width="36" height="8" rx="2" fill="#2c3b55" stroke="#6fa8ff"/><path d="M18 49h28" stroke="#6fa8ff" stroke-dasharray="3 3"/></svg>',
+      sw: '<svg viewBox="0 0 64 56" width="64" height="56"><rect x="3" y="15" width="58" height="26" rx="4" fill="#0f3a33" stroke="#22d3a6" stroke-width="2"/><g fill="#06201c" stroke="#22d3a6"><rect x="9" y="27" width="6" height="8" rx="1"/><rect x="17" y="27" width="6" height="8" rx="1"/><rect x="25" y="27" width="6" height="8" rx="1"/><rect x="33" y="27" width="6" height="8" rx="1"/><rect x="41" y="27" width="6" height="8" rx="1"/><rect x="49" y="27" width="6" height="8" rx="1"/></g><g fill="#6fe3a1"><circle cx="12" cy="21" r="1.6"/><circle cx="20" cy="21" r="1.6"/><circle cx="28" cy="21" r="1.6"/><circle cx="36" cy="21" r="1.6"/></g><path d="M44 20h12" stroke="#22d3a6" stroke-width="2"/></svg>',
+      rt: '<svg viewBox="0 0 64 56" width="64" height="56"><rect x="4" y="13" width="56" height="30" rx="15" fill="#3b2a0f" stroke="#f2a33a" stroke-width="2"/><g stroke="#ffd08a" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M32 19v18M27 24l5-5 5 5M27 32l5 5 5-5"/><path d="M20 28h24M25 23l-5 5 5 5M39 23l5 5-5 5"/></g></svg>'
+    };
+    var CAB = { straight: { en: "Straight-through", ar: "مستقيم", c: "var(--cabk)", d: "" }, cross: { en: "Crossover", ar: "متقاطع", c: "var(--cabk)", d: "9 6" }, console: { en: "Console", ar: "كونسول", c: "#38bdf8", d: "" }, serial: { en: "Serial", ar: "سيريال", c: "#ef4444", d: "" }, fiber: { en: "Fiber", ar: "فايبر", c: "#f59e0b", d: "3 4" } };
+    function cls(d) { return d.type === "sw" ? "s" : "h"; }
+    function autoType(A, B) { return cls(A) === cls(B) ? "cross" : "straight"; }
+    function cableCheck(t, A, B) {
+      if (t === "console") return ((A.type === "pc") !== (B.type === "pc")) ? "" : tr("A console cable joins a PC to a router or switch.", "كابل الكونسول بيوصل كمبيوتر براوتر أو سويتش.");
+      if (t === "serial") return (A.type === "rt" && B.type === "rt") ? "" : tr("A serial cable joins two routers.", "كابل السيريال بيوصل راوترين ببعض.");
+      if (t === "fiber") return (A.type !== "pc" && B.type !== "pc") ? "" : tr("Fiber is used between switches and routers here, not for PCs.", "الفايبر هنا بين السويتشات والراوترات مش للكمبيوترات.");
+      if (t === "straight") return cls(A) !== cls(B) ? "" : tr("Same kind of device on both ends needs a crossover cable (PC-PC, PC-router, router-router, switch-switch).", "نفس نوع الجهاز على الطرفين محتاج كابل متقاطع (كمبيوتر-كمبيوتر، كمبيوتر-راوتر، راوتر-راوتر، سويتش-سويتش).");
+      if (t === "cross") return cls(A) === cls(B) ? "" : tr("Different kinds of device (for example PC and switch) use a straight-through cable.", "أجهزة مختلفة (مثلاً كمبيوتر وسويتش) بتستخدم كابل مستقيم.");
+      return "";
     }
+    function connect2(x, y) {
+      if (x === y) return tr("Pick two different devices.", "اختار جهازين مختلفين.");
+      var A = dev(x), B = dev(y), t = cab === "auto" ? autoType(A, B) : cab;
+      if (links.some(function (l) { return ((l.a === x && l.b === y) || (l.a === y && l.b === x)) && (l.t === "console") === (t === "console"); })) return tr("These two are already connected with this kind of cable.", "الجهازين دول متوصلين بالفعل بالنوع ده من الكابلات.");
+      var bad = cableCheck(t, A, B); if (bad) return bad;
+      if (t !== "console" && (degree(x) >= PORTS[A.type] || degree(y) >= PORTS[B.type])) return tr("No free port on one of them.", "مفيش بورت فاضي على واحد منهم.");
+      links.push({ a: x, b: y, t: t }); return tr("Connected with a " + CAB[t].en + " cable.", "اتوصل بكابل " + CAB[t].ar + ".");
+    }
+    function closeWin(id) { if (wins[id]) { wins[id].el.remove(); delete wins[id]; } }
+    function delDev(id) { links = links.filter(function (l) { return l.a !== id && l.b !== id; }); devs = devs.filter(function (x) { return x.id !== id; }); closeWin(id); if (sel === id) sel = null; selL = null; }
+    function ipForm(d, after) {
+      var fi = ltr(h("input", { type: "text", value: d.ip, placeholder: "192.168.1.10" })), fm = ltr(h("input", { type: "text", value: d.mask, placeholder: "255.255.255.0" })), fg = ltr(h("input", { type: "text", value: d.gw, placeholder: tr("optional", "اختياري") })), st = h("div", { "class": "note" });
+      return h("div", { "class": "nform" }, h("label", { text: "IP" }), fi, h("label", { text: tr("Subnet mask", "الماسك") }), fm, h("label", { text: tr("Gateway", "الجيتواي") }), fg,
+        h("button", { "class": "btn2 f", type: "button", text: tr("Apply", "تطبيق"), onclick: function () { if ((fi.value && ip2n(fi.value) == null) || (fm.value && !maskOk(fm.value)) || (fg.value && ip2n(fg.value) == null)) { st.textContent = tr("Check the values: four numbers 0-255, and a valid mask like 255.255.255.0.", "راجع القيم: أربع أرقام من 0 لـ 255 وماسك صحيح زي 255.255.255.0."); return; } d.ip = fi.value.trim(); d.mask = fm.value.trim(); d.gw = fg.value.trim(); st.textContent = tr("Saved.", "اتحفظ."); if (after) after(); } }), st);
+    }
+    function rtConfig(d) {
+      var box = h("div", { "class": "nform" });
+      d.ifs.forEach(function (f) {
+        var ip = ltr(h("input", { type: "text", value: f.ip, placeholder: "192.168.1.1" })), mk = ltr(h("input", { type: "text", value: f.mask, placeholder: "255.255.255.0" })), on = h("input", { type: "checkbox" }); on.checked = !!f.up;
+        var st = h("div", { "class": "note" });
+        box.appendChild(h("label", { text: f.n })); box.appendChild(ip); box.appendChild(h("label", { text: tr("Mask", "الماسك") })); box.appendChild(mk);
+        box.appendChild(h("label", { text: tr("Port on", "تشغيل") })); box.appendChild(on);
+        box.appendChild(h("button", { "class": "btn2 f", type: "button", text: tr("Apply " + f.n, "تطبيق " + f.n), onclick: function () { if ((ip.value && ip2n(ip.value) == null) || (mk.value && !maskOk(mk.value))) { st.textContent = tr("Invalid address or mask.", "عنوان أو ماسك غير صحيح."); return; } f.ip = ip.value.trim(); f.mask = mk.value.trim(); f.up = on.checked; st.textContent = tr("Saved.", "اتحفظ."); } }));
+        box.appendChild(st);
+      });
+      return box;
+    }
+    function winBody(d, win, setTab) {
+      var tabs = d.type === "pc" ? [["desk", tr("Desktop", "سطح المكتب")], ["cfg", tr("Config", "الإعدادات")]] : [["cli", "CLI"], ["cfg", tr("Config", "الإعدادات")]];
+      var body = h("div", { "class": "nwb" });
+      function show(k) {
+        win.tab = k; clear(body); [].forEach.call(win.tabs.children, function (b, i) { b.classList.toggle("on", tabs[i][0] === k); });
+        if (k === "cli") { if (!d.tbox) d.tbox = termFor(d); body.appendChild(d.tbox); }
+        else if (k === "desk") {
+          var tiles = h("div", { "class": "ntiles" });
+          tiles.appendChild(h("button", { type: "button", "class": "ntile", onclick: function () { clear(body); body.appendChild(h("button", { type: "button", "class": "back", text: tr("< Desktop", "< سطح المكتب"), onclick: function () { show("desk"); } })); body.appendChild(ipForm(d)); } }, h("i", { "class": "ti ip" }), h("span", { text: tr("IP Configuration", "إعدادات IP") })));
+          tiles.appendChild(h("button", { type: "button", "class": "ntile", onclick: function () { clear(body); body.appendChild(h("button", { type: "button", "class": "back", text: tr("< Desktop", "< سطح المكتب"), onclick: function () { show("desk"); } })); if (!d.tbox) d.tbox = termFor(d); body.appendChild(d.tbox); } }, h("i", { "class": "ti cmd" }), h("span", { text: tr("Command Prompt", "موجه الأوامر") })));
+          body.appendChild(tiles);
+        } else {
+          var nm = ltr(h("input", { type: "text", value: d.name, maxlength: "14" }));
+          nm.addEventListener("change", function () { var v = nm.value.trim().replace(/[^A-Za-z0-9_-]/g, ""); if (v) { d.name = v; win.title.textContent = v; draw(); } });
+          body.appendChild(h("div", { "class": "nform" }, h("label", { text: tr("Name", "الاسم") }), nm));
+          if (d.type === "pc") body.appendChild(ipForm(d)); else if (d.type === "rt") body.appendChild(rtConfig(d)); else body.appendChild(h("p", { "class": "note", text: tr("A switch joins devices in one network. Ports used: ", "السويتش بيوصل الأجهزة في نفس الشبكة. البورتات المستخدمة: ") + degree(d.id) + " / " + PORTS.sw }));
+        }
+      }
+      win.tabs = h("div", { "class": "nwt" }); tabs.forEach(function (t) { win.tabs.appendChild(h("button", { type: "button", text: t[1], onclick: function () { show(t[0]); } })); });
+      win.show = show; return { tabs: win.tabs, body: body, first: tabs[0][0] };
+    }
+    function openWin(d) {
+      if (wins[d.id]) { wins[d.id].el.style.zIndex = ++zTop; return; }
+      var win = { id: d.id }, n = Object.keys(wins).length, kind = d.type === "pc" ? tr("Computer", "كمبيوتر") : d.type === "sw" ? tr("Switch", "سويتش") : tr("Router", "راوتر");
+      win.title = h("b", { text: d.name });
+      var x = h("button", { type: "button", "class": "nx", text: "\u00D7", "aria-label": tr("Close", "اقفل"), onclick: function () { closeWin(d.id); } });
+      var tbar = h("div", { "class": "nwh" }, h("span", { "class": "nwk", text: kind }), win.title, x);
+      var b = winBody(d, win);
+      win.el = h("div", { "class": "nwin " + d.type, style: "left:" + Math.max(8, cv.clientWidth - 440 - n * 24) + "px;top:" + (10 + n * 26) + "px;z-index:" + (++zTop) }, tbar, b.tabs, b.body);
+      var drag = null;
+      tbar.addEventListener("pointerdown", function (e) { if (e.target === x) return; win.el.style.zIndex = ++zTop; drag = { sx: e.clientX, sy: e.clientY, ox: win.el.offsetLeft, oy: win.el.offsetTop }; try { tbar.setPointerCapture(e.pointerId); } catch (z) {} });
+      tbar.addEventListener("pointermove", function (e) { if (!drag) return; win.el.style.left = Math.max(0, Math.min(cv.clientWidth - 120, drag.ox + e.clientX - drag.sx)) + "px"; win.el.style.top = Math.max(0, Math.min(cv.clientHeight - 40, drag.oy + e.clientY - drag.sy)) + "px"; });
+      tbar.addEventListener("pointerup", function () { drag = null; });
+      win.el.addEventListener("pointerdown", function () { win.el.style.zIndex = ++zTop; });
+      wl.appendChild(win.el); wins[d.id] = win; win.show(b.first);
+      var inp = win.el.querySelector(".ntin"); if (inp && window.innerWidth > 700) inp.focus();
+    }
+    function pt(d) { return { x: d.x + 32, y: d.y + 28 }; }
     function draw() {
-      clear(cv); while (svg.firstChild) svg.removeChild(svg.firstChild); cv.appendChild(svg);
-      links.forEach(function (l, i) { var A = dev(l.a), B = dev(l.b), ln = document.createElementNS("http://www.w3.org/2000/svg", "line"); ln.setAttribute("x1", A.x + 30); ln.setAttribute("y1", A.y + 24); ln.setAttribute("x2", B.x + 30); ln.setAttribute("y2", B.y + 24); ln.setAttribute("class", "nln" + (tool === "del" ? " del" : "")); ln.addEventListener("click", function () { if (tool === "del") { links.splice(i, 1); draw(); } }); svg.appendChild(ln); });
+      while (svg.firstChild) svg.removeChild(svg.firstChild); clear(dl);
+      var NS = "http://www.w3.org/2000/svg";
+      links.forEach(function (l) {
+        var A = dev(l.a), B = dev(l.b), p = pt(A), q = pt(B), c = CAB[l.t || "straight"], dx = q.x - p.x, dy = q.y - p.y, len = Math.sqrt(dx * dx + dy * dy) || 1, ux = dx / len, uy = dy / len, nx = -uy, ny = ux, dd;
+        if (l.t === "serial") { var m1 = 0.42, m2 = 0.58, a1 = [p.x + dx * m1, p.y + dy * m1], a2 = [p.x + dx * 0.5 + nx * 11, p.y + dy * 0.5 + ny * 11], a3 = [p.x + dx * 0.5 - nx * 11, p.y + dy * 0.5 - ny * 11], a4 = [p.x + dx * m2, p.y + dy * m2]; dd = "M" + p.x + " " + p.y + "L" + a1.join(" ") + "L" + a2.join(" ") + "L" + a3.join(" ") + "L" + a4.join(" ") + "L" + q.x + " " + q.y; }
+        else dd = "M" + p.x + " " + p.y + "L" + q.x + " " + q.y;
+        var g = document.createElementNS(NS, "g"), hit = document.createElementNS(NS, "path"), ln = document.createElementNS(NS, "path");
+        hit.setAttribute("d", dd); hit.setAttribute("class", "nhit"); ln.setAttribute("d", dd); ln.setAttribute("fill", "none"); ln.setAttribute("stroke", c.c); ln.setAttribute("stroke-width", l.t === "console" ? 3 : 3.5); ln.setAttribute("stroke-linejoin", "round"); if (c.d) ln.setAttribute("stroke-dasharray", c.d);
+        ln.setAttribute("class", "nln" + (tool === "del" ? " del" : "") + (selL === l ? " sel" : ""));
+        g.appendChild(hit); g.appendChild(ln);
+        if (l.t !== "console") [[p, 1], [q, -1]].forEach(function (e) { var cr = document.createElementNS(NS, "circle"); cr.setAttribute("cx", e[0].x + ux * 36 * e[1]); cr.setAttribute("cy", e[0].y + uy * 36 * e[1]); cr.setAttribute("r", 4.5); cr.setAttribute("class", "nlt"); g.appendChild(cr); });
+        g.addEventListener("pointerup", function (e) { e.stopPropagation(); if (tool === "del") { links = links.filter(function (z) { return z !== l; }); selL = null; draw(); } else { selL = l; sel = null; draw(); msg.textContent = tr("Cable selected: " + c.en + ". Press Delete to remove it.", "الكابل اتحدد: " + c.ar + ". دوس Delete لمسحه."); } });
+        svg.appendChild(g);
+      });
       devs.forEach(function (d) {
-        var el = h("div", { "class": "ndev " + d.type + (sel === d.id ? " sel" : "") + (pend === d.id ? " pend" : ""), style: "left:" + d.x + "px;top:" + d.y + "px", role: "button", tabindex: "0" }, h("b", { text: LBL[d.type] }), h("span", { text: d.name }));
+        var ic = h("span", { "class": "nic" }); ic.innerHTML = ICON[d.type];
+        var el = h("div", { "class": "ndev " + d.type + (sel === d.id ? " sel" : "") + (pend === d.id ? " pend" : ""), style: "left:" + d.x + "px;top:" + d.y + "px", role: "button", tabindex: "0", title: d.name }, ic, h("span", { "class": "nlb", text: d.name }));
         var drag = null, moved = false;
         el.addEventListener("pointerdown", function (e) { drag = { sx: e.clientX, sy: e.clientY, ox: d.x, oy: d.y }; moved = false; try { el.setPointerCapture(e.pointerId); } catch (x) {} });
-        el.addEventListener("pointermove", function (e) { if (!drag || tool !== "move") return; var dx = e.clientX - drag.sx, dy = e.clientY - drag.sy; if (Math.abs(dx) + Math.abs(dy) > 3) moved = true; d.x = Math.max(0, Math.min(cv.clientWidth - 62, drag.ox + dx)); d.y = Math.max(0, Math.min(cv.clientHeight - 50, drag.oy + dy)); el.style.left = d.x + "px"; el.style.top = d.y + "px"; var ls = svg.querySelectorAll("line"); links.forEach(function (l, i) { if (l.a === d.id || l.b === d.id) { var A = dev(l.a), B = dev(l.b); ls[i].setAttribute("x1", A.x + 30); ls[i].setAttribute("y1", A.y + 24); ls[i].setAttribute("x2", B.x + 30); ls[i].setAttribute("y2", B.y + 24); } }); });
-        el.addEventListener("pointerup", function () { drag = null; if (moved) return;
-          if (tool === "cable") { if (pend == null) { pend = d.id; msg.textContent = tr("Now click the second device.", "دوس على الجهاز التاني."); draw(); } else { var r = connect(pend, d.id); pend = null; msg.textContent = r; draw(); panelDraw(); } }
-          else if (tool === "del") { links = links.filter(function (l) { return l.a !== d.id && l.b !== d.id; }); devs = devs.filter(function (x) { return x.id !== d.id; }); if (sel === d.id) sel = null; draw(); panelDraw(); }
-          else { sel = d.id; draw(); panelDraw(); } });
-        cv.appendChild(el);
+        el.addEventListener("pointermove", function (e) { if (!drag || tool !== "move") return; var dx = e.clientX - drag.sx, dy = e.clientY - drag.sy; if (Math.abs(dx) + Math.abs(dy) > 3) moved = true; if (!moved) return; d.x = Math.max(0, Math.min(cv.clientWidth - 66, drag.ox + dx)); d.y = Math.max(0, Math.min(cv.clientHeight - 76, drag.oy + dy)); el.style.left = d.x + "px"; el.style.top = d.y + "px"; relink(); });
+        el.addEventListener("pointerup", function () { var was = drag; drag = null; if (moved) { draw(); return; }
+          if (tool === "cable") { if (pend == null) { pend = d.id; msg.textContent = tr("Now click the second device.", "دوس على الجهاز التاني."); draw(); } else { var r = connect2(pend, d.id); pend = null; msg.textContent = r; draw(); } }
+          else if (tool === "del") { delDev(d.id); draw(); }
+          else { sel = d.id; selL = null; draw(); openWin(d); } });
+        el.addEventListener("keydown", function (e) { if (e.key === "Enter") { sel = d.id; openWin(d); } });
+        dl.appendChild(el);
       });
     }
+    function relink() { draw0(); }
+    function draw0() { /* light redraw while dragging: only cables */ var keep = dl.innerHTML; var s = svg; while (s.firstChild) s.removeChild(s.firstChild); var save = tool; draw1(); }
+    function draw1() { var NS = "http://www.w3.org/2000/svg"; links.forEach(function (l) { var A = dev(l.a), B = dev(l.b), p = pt(A), q = pt(B), c = CAB[l.t || "straight"], ln = document.createElementNS(NS, "line"); ln.setAttribute("x1", p.x); ln.setAttribute("y1", p.y); ln.setAttribute("x2", q.x); ln.setAttribute("y2", q.y); ln.setAttribute("stroke", c.c); ln.setAttribute("stroke-width", 3.5); if (c.d) ln.setAttribute("stroke-dasharray", c.d); if (l.t === "serial") ln.setAttribute("stroke-dasharray", "2 0"); svg.appendChild(ln); }); }
     var msg = h("div", { "class": "note nmsg" });
-    function tb(label, fn, k) { var b = h("button", { type: "button", "class": "tab" + (k && tool === k ? " on" : ""), text: label, onclick: function () { fn(); [].forEach.call(bar.querySelectorAll("button[data-k]"), function (x) { x.classList.toggle("on", x.getAttribute("data-k") === tool); }); } }); if (k) b.setAttribute("data-k", k); return b; }
-    function put(t) { return function () { add(t, 20 + (devs.length % 5) * 90, 20 + Math.floor(devs.length / 5) * 80 + (devs.length % 2) * 30); panelDraw(); }; }
-    bar.appendChild(h("span", { "class": "note", text: tr("Add:", "ضيف:") }));
-    bar.appendChild(tb("+ PC", put("pc"))); bar.appendChild(tb("+ Switch", put("sw")));
-    if (!a.noRouter) bar.appendChild(tb("+ Router", put("rt")));
-    bar.appendChild(tb(tr("Move / select", "تحريك / اختيار"), function () { tool = "move"; pend = null; msg.textContent = ""; draw(); }, "move"));
-    bar.appendChild(tb(tr("Cable", "كابل"), function () { tool = "cable"; pend = null; msg.textContent = tr("Click the first device, then the second.", "دوس على أول جهاز وبعدين التاني."); draw(); }, "cable"));
-    bar.appendChild(tb(tr("Delete", "مسح"), function () { tool = "del"; pend = null; msg.textContent = tr("Click a device or a cable to remove it.", "دوس على جهاز أو كابل عشان تمسحه."); draw(); }, "del"));
-    bar.appendChild(tb(tr("Reset", "إعادة"), function () { devs = []; links = []; sel = null; pend = null; seq = { pc: 0, sw: 0, rt: 0 }; draw(); panelDraw(); }));
-    bar.querySelector('button[data-k="move"]').classList.add("on");
-    wrap.appendChild(bar); wrap.appendChild(msg); wrap.appendChild(cv); wrap.appendChild(panel);
+    function tb(label, fn, k, extra) { var b = h("button", { type: "button", "class": "tab" + (extra ? " " + extra : ""), onclick: function () { fn(); sync(); } }); if (typeof label === "string") b.textContent = label; else b.appendChild(label); if (k) b.setAttribute("data-k", k); return b; }
+    function sync() { [].forEach.call(bar.querySelectorAll("button[data-k]"), function (x) { var k = x.getAttribute("data-k"); x.classList.toggle("on", k === tool || (k.indexOf("c:") === 0 && tool === "cable" && k === "c:" + cab)); }); }
+    function put(t) { return function () { var i = devs.length; add(t, 24 + (i % 6) * 100, 18 + Math.floor(i / 6) * 96 + (i % 2) * 24); openWin(devs[devs.length - 1]); }; }
+    function devBtn(t, label) { var s = h("span", { "class": "tbi" }); s.innerHTML = ICON[t]; var w = h("span", null, s, h("em", { text: label })); return tb(w, put(t), null, "tbd"); }
+    function cabBtn(t, label) { var s = h("span", { "class": "tbl" }); var NS = "http://www.w3.org/2000/svg"; var c = t === "auto" ? { c: "var(--cabk)", d: "" } : CAB[t]; s.innerHTML = '<svg viewBox="0 0 44 14" width="44" height="14"><path d="' + (t === "serial" ? "M2 7h12l4-5 6 10 4-5h14" : "M2 7h40") + '" fill="none" stroke="' + (t === "auto" ? "#a78bfa" : c.c) + '" stroke-width="3" ' + (c.d ? 'stroke-dasharray="' + c.d + '"' : "") + ' stroke-linecap="round"/></svg>'; var w = h("span", null, s, h("em", { text: label })); return tb(w, function () { cab = t; tool = "cable"; pend = null; msg.textContent = tr("Click the first device, then the second.", "دوس على أول جهاز وبعدين التاني."); draw(); }, "c:" + t, "tbc"); }
+    bar.appendChild(h("span", { "class": "nlab", text: tr("Devices", "الأجهزة") }));
+    bar.appendChild(devBtn("pc", tr("PC", "كمبيوتر"))); bar.appendChild(devBtn("sw", tr("Switch", "سويتش")));
+    if (!a.noRouter) bar.appendChild(devBtn("rt", tr("Router", "راوتر")));
+    bar.appendChild(h("span", { "class": "nlab", text: tr("Cables", "الكابلات") }));
+    bar.appendChild(cabBtn("auto", tr("Auto", "تلقائي"))); bar.appendChild(cabBtn("straight", tr("Straight", "مستقيم"))); bar.appendChild(cabBtn("cross", tr("Crossover", "متقاطع"))); bar.appendChild(cabBtn("console", tr("Console", "كونسول")));
+    if (!a.noRouter) { bar.appendChild(cabBtn("serial", tr("Serial", "سيريال"))); bar.appendChild(cabBtn("fiber", tr("Fiber", "فايبر"))); }
+    bar.appendChild(h("span", { "class": "nlab", text: tr("Tools", "أدوات") }));
+    bar.appendChild(tb(tr("Select / move", "اختيار / تحريك"), function () { tool = "move"; pend = null; msg.textContent = tr("Click a device to open it. Drag to move it.", "اضغط على جهاز لفتحه. اسحبه لتحريكه."); draw(); }, "move"));
+    bar.appendChild(tb(tr("Delete tool", "أداة المسح"), function () { tool = "del"; pend = null; msg.textContent = tr("Click a device or a cable to delete it.", "دوس على جهاز أو كابل عشان تمسحه."); draw(); }, "del"));
+    bar.appendChild(tb(tr("Delete selected", "امسح المحدد"), function () { if (sel != null) { var d = dev(sel); if (d && confirm(tr("Delete " + d.name + " and its cables?", "تمسح " + d.name + " وكابلاته؟"))) { delDev(sel); draw(); } } else if (selL) { links = links.filter(function (z) { return z !== selL; }); selL = null; draw(); } else msg.textContent = tr("Select a device or a cable first.", "حدد جهاز أو كابل الأول."); }, null, "tbx"));
+    bar.appendChild(tb(tr("Clear lab", "امسح اللاب"), function () { if (!devs.length || confirm(tr("Delete every device and cable in this lab?", "تمسح كل الأجهزة والكابلات في اللاب ده؟"))) { devs = []; links = []; sel = null; selL = null; pend = null; seq = { pc: 0, sw: 0, rt: 0 }; Object.keys(wins).forEach(closeWin); draw(); } }, null, "tbx"));
+    cv.addEventListener("scroll", function () { cv.scrollLeft = 0; cv.scrollTop = 0; });
+    wrap.setAttribute("tabindex", "0");
+    wrap.addEventListener("keydown", function (e) { if ((e.key === "Delete" || e.key === "Backspace") && !/INPUT|TEXTAREA/.test((e.target || {}).tagName || "")) { e.preventDefault(); if (sel != null) { delDev(sel); draw(); } else if (selL) { links = links.filter(function (z) { return z !== selL; }); selL = null; draw(); } } });
+    cv.addEventListener("pointerup", function (e) { if (e.target === cv || e.target === svg) { sel = null; selL = null; draw(); } });
+    wrap.appendChild(bar); wrap.appendChild(msg); wrap.appendChild(cv);
     if (a.note) wrap.appendChild(h("p", { "class": "note", text: pick(a, "note") }));
-    draw(); panelDraw();
+    sync(); draw();
     return wrap;
   }
   var VIEWERS = { log: viewLog, hex: viewHex, text: viewText, web: viewWeb, term: viewTerm, net: viewNet };
