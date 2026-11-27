@@ -208,3 +208,4 @@ nav>*:not(.links){flex:none}
 .poster ul{margin:14px 0 0;padding-inline-start:20px;color:var(--m);line-height:1.8}
 @media (max-width:760px){.poster{grid-template-columns:1fr}}
 @media (min-width:1101px) and (max-width:1400px){nav .links a{padding:7px 5px;font-size:12.5px}nav{column-gap:5px}}
+#backbtn{white-space:nowrap}
