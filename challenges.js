@@ -286,14 +286,14 @@
     /* layer 2: endpoints reachable from device d through switches only */
     function domain(startId, viaId) {
       var seen = {}, out = [], q = [viaId], v0 = dev(viaId) && dev(viaId).type === "sw" ? ((dev(viaId).pv || {})[startId] || 1) : 1; seen[startId] = 1; seen[viaId] = 1;
-      while (q.length) { var id = q.shift(), d = dev(id);
+      while (q.length) { var id = q.shift(), d = dev(id); if (d.off) continue;
         if (d.type !== "sw") { out.push(d); continue; }
         dlinks().forEach(function (l) { var o = l.a === id ? l.b : l.b === id ? l.a : null; if (o == null || seen[o]) return; var od = dev(o); if (od.type !== "sw" && ((d.pv || {})[o] || 1) !== v0) return; seen[o] = 1; q.push(o); }); }
       return out;
     }
     function neighbors(d) { var r = []; dlinks().forEach(function (l) { var o = l.a === d.id ? l.b : l.b === d.id ? l.a : null; if (o != null) r.push(o); }); return r; }
-    function endpointsFrom(d) { var out = []; neighbors(d).forEach(function (n) { var nd = dev(n); if (nd.type === "sw") { domain(d.id, n).forEach(function (e) { if (e !== d && out.indexOf(e) < 0) out.push(e); }); } else if (out.indexOf(nd) < 0) out.push(nd); }); return out; }
-    function holders(set, ip) { var n = ip2n(ip); return set.filter(function (e) { return e.type === "pc" ? ip2n(e.ip) === n : e.type === "rt" ? e.ifs.some(function (f) { return f.up && ip2n(f.ip) === n; }) : false; })[0] || null; }
+    function endpointsFrom(d) { var out = []; neighbors(d).forEach(function (n) { var nd = dev(n); if (nd.type === "sw") { domain(d.id, n).forEach(function (e) { if (e !== d && out.indexOf(e) < 0) out.push(e); }); } else if (out.indexOf(nd) < 0 && !nd.off) out.push(nd); }); return out; }
+    function holders(set, ip) { var n = ip2n(ip); return set.filter(function (e) { return e.off ? false : e.type === "pc" ? ip2n(e.ip) === n : e.type === "rt" ? e.ifs.some(function (f) { return f.up && ip2n(f.ip) === n; }) : false; })[0] || null; }
     function ifaceFor(rt, ip) { return rt.ifs.filter(function (f) { return f.up && f.ip && f.mask && same(f.ip, f.mask, ip); })[0] || null; }
     function aclAllows(rt, inF, sIp, dIp) { var L = rt.acl || []; if (!L.length || !inF || rt.aclIf !== inF.n) return true; for (var i = 0; i < L.length; i++) { var r = L[i]; if (same(r.sn, r.sm, sIp) && same(r.dn, r.dm, dIp)) return r.a === "permit"; } return false; }
     function privIp(ip) { var n = ip2n(ip); if (n == null) return false; return (n >>> 24) === 10 || (n >>> 20) === 0xAC1 || (n >>> 16) === 0xC0A8; }
@@ -362,7 +362,7 @@
       var box = h("div", { "class": "nterm", onclick: function () { inp.focus(); } }, out, h("div", { "class": "ntl" }, h("span", { "class": "ntp", text: pr() }), inp));
       var ps = box.querySelector(".ntp");
       function run(line) {
-        var raw = line.trim(); say(pr() + " " + line); if (!raw) return; var t = raw.split(/\s+/), c = t[0].toLowerCase();
+        var raw = line.trim(); say(pr() + " " + line); if (!raw) return; if (d.off) { say(tr("This device is powered off. Switch it on in the Physical tab.", "الجهاز ده مطفي. شغّله من تبويب Physical.")); return; } var t = raw.split(/\s+/), c = t[0].toLowerCase();
         if (d.type === "pc") {
           if (c === "help") say("ipconfig            show this PC's address, mask and gateway\nping <address>      send 4 test packets\nclear               clear the screen"); 
           else if (c === "clear" || c === "cls") clear(out);
@@ -519,10 +519,12 @@
     function delDev(id) { links = links.filter(function (l) { return l.a !== id && l.b !== id; }); devs = devs.filter(function (x) { return x.id !== id; }); closeWin(id); if (sel === id) sel = null; selL = null; }
     function winBody(d, win, setTab) {
       var tabs = d.type === "pc" ? [["desk", tr("Desktop", "سطح المكتب")], ["cfg", tr("Config", "الإعدادات")]] : [["cli", "CLI"], ["cfg", tr("Config", "الإعدادات")]];
+      tabs.push(["phy", tr("Physical", "Physical")]);
       var body = h("div", { "class": "nwb" });
       function show(k) {
         win.tab = k; clear(body); [].forEach.call(win.tabs.children, function (b, i) { b.classList.toggle("on", tabs[i][0] === k); });
-        if (k === "cli") { if (!d.tbox) d.tbox = termFor(d); body.appendChild(d.tbox); }
+        if (k === "phy") body.appendChild(physView(d, function () { draw(); show("phy"); }));
+        else if (k === "cli") { if (!d.tbox) d.tbox = termFor(d); body.appendChild(d.tbox); }
         else if (k === "desk") {
           var tiles = h("div", { "class": "ntiles" });
           tiles.appendChild(h("button", { type: "button", "class": "ntile", onclick: function () { clear(body); body.appendChild(h("button", { type: "button", "class": "back", text: tr("< Desktop", "< سطح المكتب"), onclick: function () { show("desk"); } })); body.appendChild(pcConfig(d)); } }, h("i", { "class": "ti ip" }), h("span", { text: tr("IP Configuration", "إعدادات IP") })));
@@ -555,12 +557,25 @@
       var inp = win.el.querySelector(".ntin"); if (inp && window.innerWidth > 700) inp.focus();
     }
     function pt(d) { return { x: d.x + 40, y: d.y + 33 }; }
+    function physView(d, again) { /* front panel: power switch, status lights and ports. Own drawing, a training model. */
+      var nb = neighbors(d), nports = d.type === "pc" ? 1 : d.type === "rt" ? d.ifs.length : Math.max(d.ports || 8, nb.length);
+      var box = h("div", { "class": "phy" });
+      var pw = h("button", { type: "button", "class": "phyp" + (d.off ? "" : " on"), "aria-pressed": d.off ? "false" : "true", text: d.off ? tr("Power: OFF", "الطاقة: مطفي") : tr("Power: ON", "الطاقة: شغال"), onclick: function () { d.off = !d.off; again(); } });
+      box.appendChild(h("div", { "class": "phyh" }, h("b", { text: d.name }), h("span", { text: d.type === "pc" ? tr("PC", "كمبيوتر") : d.type === "rt" ? tr("Router", "راوتر") : tr("Switch", "سويتش") }), pw));
+      var panel = h("div", { "class": "phyf" + (d.off ? " off" : "") }, h("span", { "class": "phyl" + (d.off ? "" : " on"), title: tr("Power light", "لمبة الطاقة") }));
+      for (var i = 0; i < nports; i++) { var lk = nb[i] != null ? dev(nb[i]) : null, lab = d.type === "rt" ? d.ifs[i].n : d.type === "pc" ? "NIC" : "Fa0/" + (i + 1); panel.appendChild(h("span", { "class": "phyk" + (lk && !d.off ? " up" : ""), title: lab + (lk ? " > " + lk.name : "") }, h("i"), h("small", { text: lab }))); }
+      box.appendChild(panel);
+      box.appendChild(h("p", { "class": "note", text: d.off ? tr("This device is off: it does not answer pings, switches stop forwarding, and its CLI is locked.", "الجهاز مطفي: مبيرُدش على ping، والسويتش بيوقف التمرير، والـ CLI مقفول.") : tr("Green port light = a cable is plugged in and the device is on. Turn the power off to see what the rest of the network loses.", "لمبة البورت الخضرا = فيه كابل متوصل والجهاز شغال. اطفي الجهاز وشوف الشبكة هتخسر إيه.") }));
+      var rows = h("div", { "class": "phyr" }); for (var j = 0; j < nports; j++) { var o = nb[j] != null ? dev(nb[j]) : null; rows.appendChild(h("div", { text: (d.type === "rt" ? d.ifs[j].n : d.type === "pc" ? "NIC" : "Fa0/" + (j + 1)) + ": " + (o ? o.name : tr("empty", "فاضي")) })); }
+      box.appendChild(rows); return box;
+    }
     function devIp(d) { if (d.type === "pc") return d.ip || ""; if (d.type === "rt") { var f = d.ifs.filter(function (x) { return x.up && x.ip; })[0]; return f ? f.ip : ""; } return ""; }
     function pathIds(a, b) { var prev = {}, q = [a], seen = {}; seen[a] = 1; while (q.length) { var c = q.shift(); if (c === b) break; neighbors(dev(c)).forEach(function (n) { if (!seen[n]) { seen[n] = 1; prev[n] = c; q.push(n); } }); } if (!seen[b]) return null; var r = [b]; while (r[0] !== a) r.unshift(prev[r[0]]); return r; }
     var animBusy = false;
     function sendPacket(aId, bId) { /* simulation mode: animate one echo request along the cables, then show the outcome. The drop point is approximate. */
       var A = dev(aId), B = dev(bId); if (!A || !B || animBusy) return;
       if (A.type !== "pc") { msg.textContent = tr("Pick a PC as the sender first.", "اختار كمبيوتر كمرسل الأول."); return; }
+      if (A.off) { msg.textContent = tr("The sender is powered off. Switch it on in its Physical tab.", "المرسل مطفي. شغّله من تبويب Physical."); return; }
       var tip = devIp(B), path = pathIds(aId, bId);
       if (!A.ip) { msg.textContent = tr("The sender has no IP address yet. Set one in its Config tab.", "المرسل لسه معاه IP. حطه من تبويب الإعدادات."); return; }
       if (!tip) { msg.textContent = tr("The target needs an IP address (a switch has none). Pick a PC or a configured router.", "الهدف لازم يبقى له IP (السويتش مالوش). اختار كمبيوتر أو راوتر متظبط."); return; }
@@ -595,7 +610,7 @@
       });
       devs.forEach(function (d) {
         var ic = h("span", { "class": "nic" }); ic.innerHTML = ICON[d.kind || d.type];
-        var el = h("div", { "class": "ndev " + d.type + " k-" + (d.kind || d.type) + (sel === d.id ? " sel" : "") + (pend === d.id ? " pend" : ""), style: "left:" + d.x + "px;top:" + d.y + "px", role: "button", tabindex: "0", title: d.name }, ic, h("span", { "class": "nlb", text: d.name }));
+        var el = h("div", { "class": "ndev " + d.type + " k-" + (d.kind || d.type) + (d.off ? " off" : "") + (sel === d.id ? " sel" : "") + (pend === d.id ? " pend" : ""), style: "left:" + d.x + "px;top:" + d.y + "px", role: "button", tabindex: "0", title: d.name }, ic, h("span", { "class": "nlb", text: d.name }));
         var drag = null, moved = false;
         el.addEventListener("pointerdown", function (e) { drag = { sx: e.clientX, sy: e.clientY, ox: d.x, oy: d.y }; moved = false; try { el.setPointerCapture(e.pointerId); } catch (x) {} });
         el.addEventListener("pointermove", function (e) { if (!drag || tool !== "move") return; var dx = e.clientX - drag.sx, dy = e.clientY - drag.sy; if (Math.abs(dx) + Math.abs(dy) > 3) moved = true; if (!moved) return; d.x = Math.max(0, Math.min(cv.clientWidth - 66, drag.ox + dx)); d.y = Math.max(0, Math.min(cv.clientHeight - 76, drag.oy + dy)); el.style.left = d.x + "px"; el.style.top = d.y + "px"; relink(); });
