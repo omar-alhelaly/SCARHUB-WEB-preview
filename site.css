@@ -258,3 +258,11 @@ img,svg,video{max-width:100%}
 @media (max-width:1100px){.hero .wrap{grid-template-columns:1fr!important;gap:28px}.hero h1{overflow-wrap:break-word}.term{max-width:100%;width:100%}}
 @media (max-width:1100px){nav{flex-wrap:nowrap;column-gap:6px;padding-left:max(10px,env(safe-area-inset-left));padding-right:max(10px,env(safe-area-inset-right))}nav .brand{flex:0 1 auto;min-width:0}nav .brand span{letter-spacing:.1em}nav>a.lang,nav>button{padding-left:8px;padding-right:8px;font-size:12.5px}}
 @media (max-width:480px){nav>a.lang#commlink{display:none}nav .brand svg{width:26px;height:26px}}
+
+/* phone only: theme + language live inside the menu */
+nav .links .mx{display:none}
+@media (max-width:700px){
+nav #theme,nav #lang{display:none!important}
+nav .links .mx{display:flex;align-items:center;justify-content:flex-start;width:100%;min-height:44px;padding:14px 12px;font:inherit;font-size:16px;color:var(--t);background:none;border:0;border-top:1px solid var(--b);border-radius:0;cursor:pointer;text-align:start}
+nav .links .mx:first-of-type{margin-top:6px}
+}
