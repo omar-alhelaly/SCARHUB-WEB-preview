@@ -163,3 +163,16 @@ html[data-theme=light] #ch .ndev{background:#fff}
 #ch .certp .cqr{background:#fff;padding:6px;border:1px solid #d8c9a0;border-radius:6px;line-height:0;margin-top:8px}
 
 #ch .rg.solo{grid-template-columns:minmax(0,1fr)}#ch .rg.solo>div:first-child{display:none}#ch .rg.solo>div:last-child{max-width:none;width:100%}
+
+#ch .podium{display:flex;justify-content:center;align-items:flex-end;gap:14px;margin:18px 0 22px;flex-wrap:wrap}
+#ch .pstep{flex:1 1 170px;max-width:240px;display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px 12px;border-radius:14px;border:1px solid var(--b);background:var(--p);text-align:center;box-sizing:border-box}
+#ch .pstep.clk,#ch .prow.clk{cursor:pointer}#ch .pstep.clk:hover,#ch .prow.clk:hover{border-color:var(--r)}
+#ch .pstep .pm{font-size:30px;line-height:1}#ch .pstep .pn{font-size:16px;overflow-wrap:anywhere}#ch .pstep .pp{font-weight:700;color:var(--r2)}#ch .pstep .ps{font-size:12px;color:var(--m)}#ch .pstep .pr{font-size:12px;font-weight:700;opacity:.8}
+#ch .pstep.p1{min-height:250px;border:2px solid #e0b020;background:linear-gradient(180deg,#e0b02022,transparent);box-shadow:0 8px 28px #e0b02033}#ch .pstep.p1 .pm{font-size:38px}
+#ch .pstep.p2{min-height:210px;border:2px solid #aab2bd;background:linear-gradient(180deg,#aab2bd22,transparent)}
+#ch .pstep.p3{min-height:185px;border:2px solid #c07a3c;background:linear-gradient(180deg,#c07a3c22,transparent)}
+#ch .pstep.me,#ch .prow.me{outline:2px solid var(--r);outline-offset:2px}
+#ch .plist{display:flex;flex-direction:column;gap:8px;max-width:760px;margin:0 auto}
+#ch .prow{display:flex;align-items:center;gap:12px;padding:8px 14px;border:1px solid var(--b);border-radius:10px;background:var(--p)}
+#ch .prow .rk{width:38px;font-weight:700;color:var(--m)}#ch .prow .pn{flex:1;min-width:0;overflow-wrap:anywhere}#ch .prow .ps{font-size:12px;color:var(--m)}#ch .prow .pp{font-weight:700;color:var(--r2);min-width:70px;text-align:end}
+@media (max-width:560px){#ch .podium{gap:8px}#ch .pstep{flex-basis:100px;padding:12px 6px}#ch .pstep .pn{font-size:13px}}
