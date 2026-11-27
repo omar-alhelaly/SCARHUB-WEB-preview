@@ -648,12 +648,59 @@
   function maskPh(mk) { if (!mk || !/^[0-9]+( [0-9]+)*$/.test(mk)) return tr("Your answer", "إجابتك"); return mk.split(" ").map(function (n) { var k = Math.min(+n, 60), o = []; for (var i = 0; i < k; i++) o.push("\u2022"); return o.join(" "); }).join("   "); }
   function progress(done, total) { var b = h("div", { "class": "bar" + (total && done >= total ? " done" : "") }, h("i")); b.firstChild.style.width = (total ? Math.round(100 * done / total) : 0) + "%"; return b; }
 
+  /* ---------- Daily Lab: one small theory task per day, the same for everybody, chosen from the published rooms by the date.
+     It only reads room data and answers through the existing server check (rate limited, solved once), so it adds no new write path. ---------- */
+  async function dailyData(cat) {
+    try {
+      var slugs = []; cat.sections.forEach(function (s) { s.rooms.forEach(function (r) { slugs.push(r.slug); }); }); slugs.sort();
+      var day = Math.floor(Date.now() / 864e5);
+      for (var k = 0; k < slugs.length; k++) {
+        var r = await rpc("ch_room", { p_slug: slugs[(day + k) % slugs.length] });
+        if (!r || !r.tasks || !r.tasks.length) continue;
+        var b = r.body || {}; if ((b.artifacts || []).length || !b.modules) continue;
+        var i = day % r.tasks.length, learn = [];
+        b.modules.forEach(function (m) { if ((m.tasks || []).indexOf(i) >= 0) (m.learn || []).forEach(function (x) { if (x.t === "p") learn.push(EN() ? x.en : (x.ar || x.en)); }); });
+        return { room: r, task: r.tasks[i], learn: learn };
+      }
+    } catch (e) {}
+    return null;
+  }
+  function dailyBox(d) {
+    var t = d.task, st = h("div", { "class": "st" }), inp = h("input", { type: "text", maxlength: "200", autocomplete: "off", spellcheck: "false", "aria-label": tr("answer", "إجابة") });
+    var btn = h("button", { "class": "btn2 f", type: "button", text: tr("Check", "تحقق") });
+    function done() { inp.disabled = true; btn.disabled = true; inp.placeholder = tr("Solved", "اتحلت"); st.className = "st good"; st.textContent = "✓ " + tr("Done for today. Come back tomorrow.", "خلصت النهارده. ارجع بكرة."); }
+    async function check() {
+      if (!me) { st.className = "st warn"; st.textContent = tr("Sign in first.", "سجّل دخول الأول."); return; }
+      if (!inp.value.trim()) return; btn.disabled = true;
+      try {
+        var res = await rpc("ch_check", { p_task: t.id, p_answer: inp.value });
+        if (res.status === "correct") { t.solved = true; done(); toast("+" + res.points + " " + tr("points", "نقطة") + " · " + res.total); }
+        else if (res.status === "already") { t.solved = true; done(); }
+        else if (res.status === "wrong") { st.className = "st bad"; st.textContent = tr("Not correct. Read the text above and try again.", "مش صح. اقرا النص اللي فوق وجرّب تاني."); }
+        else if (res.status === "rate") { st.className = "st warn"; st.textContent = tr("Too many attempts. Wait a minute.", "محاولات كتير. استنى دقيقة."); }
+        else if (res.status === "login") { st.className = "st warn"; st.textContent = tr("Sign in first.", "سجّل دخول الأول."); }
+        else { st.className = "st warn"; st.textContent = tr("Cannot check this task now.", "مش قادر أتحقق من المهمة دلوقتي."); }
+      } catch (e) { st.className = "st warn"; st.textContent = tr("Connection problem. Try again.", "مشكلة اتصال. جرّب تاني."); }
+      if (!t.solved) btn.disabled = false;
+    }
+    btn.addEventListener("click", check); inp.addEventListener("keydown", function (e) { if (e.key === "Enter") check(); });
+    var learn = h("details", { "class": "dlearn" }, h("summary", { text: tr("Read first", "اقرا الأول") }));
+    d.learn.forEach(function (p) { learn.appendChild(h("p", { text: p })); });
+    var box = h("div", { "class": "box daily" }, h("div", { "class": "dtag", text: tr("Daily Lab", "تحدي اليوم") }),
+      h("h3", { text: pick(d.room, "title") }), h("p", { "class": "q", text: pick(t, "question") + "  (" + t.points + " " + tr("pts", "نقطة") + ")" }),
+      d.learn.length ? learn : null, h("div", { "class": "row" }, inp, btn), st,
+      h("button", { "class": "btn2", type: "button", text: tr("Open the full room", "افتح الغرفة كاملة"), onclick: function () { location.hash = "#/room/" + d.room.slug; } }));
+    if (t.solved) done();
+    return box;
+  }
   async function pageRooms() {
     var cat = await rpc("ch_catalog"), stats = null;
+    var dly = await dailyData(cat);
     if (me) { try { stats = await rpc("ch_my_stats"); } catch (e) {} }
     clear(root); root.appendChild(setTabs("rooms"));
     if (!me) root.appendChild(h("div", { "class": "strip" }, h("div", null, tr("Sign in to save your progress, earn points and appear on the leaderboard.", "سجّل دخول عشان تحفظ تقدمك وتكسب نقاط وتظهر في المتصدرين."), h("br"), h("a", { href: "login.html", text: tr("Sign in", "تسجيل الدخول") }))));
     else if (stats) root.appendChild(h("div", { "class": "strip" }, h("div", null, tr("Points", "النقاط"), h("b", { text: String(stats.points || 0) })), h("div", null, tr("Solved tasks", "مهام محلولة"), h("b", { text: String(stats.solves || 0) })), h("div", null, tr("Overall rank", "الترتيب العام"), h("b", { text: stats.rank ? "#" + stats.rank : "-" }))));
+    if (dly) root.appendChild(dailyBox(dly));
     var any = false, HUES = [210, 28, 280, 150, 340, 50, 180], cards = [], bar = h("div", { "class": "fbar", role: "group", "aria-label": tr("Filter by section", "فلتر بالقسم") }), g = h("div", { "class": "rooms" }), cur = "all", fbtns = [];
     function setF(k) { cur = k; fbtns.forEach(function (x) { var on = x.k === k; x.b.className = "tab" + (on ? " on" : ""); x.b.setAttribute("aria-pressed", on ? "true" : "false"); }); cards.forEach(function (c) { c.el.style.display = (k === "all" || c.sec === k) ? "" : "none"; }); }
     function fb(k, label) { var b = h("button", { type: "button", "class": "tab", text: label, onclick: function () { setF(k); } }); fbtns.push({ k: k, b: b }); bar.appendChild(b); }
