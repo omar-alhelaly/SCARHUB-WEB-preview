@@ -1456,7 +1456,7 @@
     var allT0 = (await TSQ("id,name,third_party", function (q) { return q.order("name"); })).data || [], allT = allT0.filter(function (x) { return !x.third_party; }), ptR = (await sb.from("plan_tools").select("plan_id,tool_id")).data || [], tName = {}; allT0.forEach(function (x) { tName[x.id] = x.name; });
     (pl.data || []).forEach(function (p) {
       var cov = p.scope === "tools" ? tr("only: ", "بس: ") + ptR.filter(function (q) { return q.plan_id === p.id; }).map(function (q) { return tName[q.tool_id] || "?"; }).join(", ") : tr("all tools", "كل الأدوات");
-      var planLbl = h("span", { text: p.name + ": " + (p.price_minor / 100).toFixed(2) + " " + p.currency + "/" + p.period + " (" + cov + ")" + (p.description ? " - " + p.description : "") + (p.active ? "" : " (OFF)") + "  " });
+      var planLbl = h("span", { text: p.name + ": " + (p.price_minor / 100).toFixed(2) + " " + p.currency + "/" + p.period + " (" + cov + ")" + (p.description ? " - " + p.description : "") + (p.active ? "" : tr(" (DISABLED, not for sale)", " (معطلة، مش للبيع)")) + "  " });
       var planRow = h("p", null, planLbl); pp.appendChild(planRow);
       if (owner) {
         var editPlanBox = h("div", { style: "display:none;padding:6px 0 12px" });
@@ -1481,17 +1481,21 @@
         editPlanBox.appendChild(h("div", { "class": "row" }, saveP));
         planRow.appendChild(h("button", { "class": "btn", type: "button", text: tr("Edit", "تعديل"), on: { click: function () { editPlanBox.style.display = editPlanBox.style.display === "none" ? "block" : "none"; } } }));
         planRow.appendChild(document.createTextNode(" "));
-        planRow.appendChild(h("button", { "class": "btn", type: "button", text: p.active ? tr("Turn off", "إيقاف") : tr("Turn on", "تشغيل"), on: { click: async function () {
-          var o = await sb.from("plans").update({ active: !p.active }).eq("id", p.id).select("id");
-          say(pmsg, o.error || !o.data || !o.data.length ? tr("Not changed.", "ماتغيرش.") : (p.active ? tr("Plan is off: not sold anymore. Current holders keep access until their period ends. Reload.", "الخطة اتوقفت: مبتتباعش. اللي معاه اشتراك يكمل لحد ما يخلص. حدّث الصفحة.") : tr("Plan is on. Reload.", "الخطة اشتغلت. حدّث الصفحة.")), o.error || !o.data || !o.data.length ? "err" : "ok");
+        var OFFTXT = tr(" (DISABLED, not for sale)", " (معطلة، مش للبيع)");
+        planRow.appendChild(h("button", { "class": "btn", type: "button", text: p.active ? tr("Disable", "تعطيل") : tr("Enable", "تفعيل"), on: { click: async function (ev) {
+          var btn = ev.currentTarget, o = await sb.from("plans").update({ active: !p.active }).eq("id", p.id).select("id");
+          if (o.error || !o.data || !o.data.length) { var bad = o.error ? o.error.message : tr("Not changed.", "ماتغيرش."); say(pmsg, bad, "err"); toast("\u2717 " + bad); return; }
+          p.active = !p.active; btn.textContent = p.active ? tr("Disable", "تعطيل") : tr("Enable", "تفعيل");
+          planLbl.textContent = planLbl.textContent.replace(OFFTXT.replace(/^ /, "") , "").replace(/\s+$/, "") + (p.active ? "" : OFFTXT) + "  ";
+          var okm = p.active ? tr("Plan enabled: it is for sale again.", "الخطة اتفعلت: رجعت للبيع.") : tr("Plan disabled: it is not sold anymore. Current holders keep access until their period ends.", "الخطة اتعطلت: مبتتباعش. اللي معاه اشتراك يكمل لحد ما يخلص.");
+          say(pmsg, okm, "ok"); toast("\u2713 " + okm);
         } } }));
         planRow.appendChild(document.createTextNode(" "));
         var delPlanBtn = h("button", { "class": "btn", type: "button", text: tr("Delete", "حذف"), on: { click: async function () {
           if (!window.confirm(tr("Delete the plan \"" + p.name + "\"? This cannot be undone.", "تحذف الخطة \"" + p.name + "\"؟ مينفعش ترجع."))) return;
-          var dl = await sb.from("plans").delete().eq("id", p.id).select("id");
-          if (dl.error) return say(pmsg, tr("This plan already has payments or holders, so it cannot be deleted. Use Turn off instead.", "الخطة دي عليها دفعات أو مشتركين فمينفعش تتحذف. استخدم إيقاف بدلها."), "err");
-          if (!dl.data || !dl.data.length) return say(pmsg, tr("Not deleted.", "ماتحذفتش."), "err");
-          planRow.remove(); editPlanBox.remove(); say(pmsg, tr("Plan deleted.", "الخطة اتحذفت."), "ok");
+          var dl = await sb.rpc("delete_plan", { p_id: p.id }), why = dl.error ? tr("Delete failed: ", "الحذف فشل: ") + dl.error.message : dl.data === "paid" ? tr("Not deleted: this plan has an approved payment, so it must stay in the records. Use Disable instead.", "ماتحذفتش: الخطة دي عليها دفعة متأكدة ولازم تفضل في السجلات. استخدم تعطيل بدلها.") : dl.data === "holders" ? tr("Not deleted: someone still has access through this plan. Use Disable instead.", "ماتحذفتش: في ناس لسه معاهم وصول بالخطة دي. استخدم تعطيل بدلها.") : dl.data === "pending" ? tr("Not deleted: a payment for this plan is waiting for review. Approve or reject it first.", "ماتحذفتش: في دفعة على الخطة دي مستنية المراجعة. وافق عليها أو ارفضها الأول.") : dl.data !== "ok" ? tr("Not deleted.", "ماتحذفتش.") : "";
+          if (why) { say(pmsg, why, "err"); toast("\u2717 " + why); window.alert(why); return; }
+          planRow.remove(); editPlanBox.remove(); say(pmsg, tr("Plan deleted.", "الخطة اتحذفت."), "ok"); toast("\u2713 " + tr("Plan deleted.", "الخطة اتحذفت."));
         } } });
         planRow.appendChild(delPlanBtn);
         pp.appendChild(editPlanBox);
