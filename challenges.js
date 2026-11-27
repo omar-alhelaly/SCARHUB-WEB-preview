@@ -231,7 +231,7 @@
     function ip2n(s) { var m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(String(s || "").trim()); if (!m) return null; var n = 0; for (var i = 1; i <= 4; i++) { if (+m[i] > 255) return null; n = n * 256 + +m[i]; } return n; }
     function maskOk(s) { var n = ip2n(s); if (n == null) return false; var b = n.toString(2); return /^1*0*$/.test(("00000000000000000000000000000000" + b).slice(-32)) && n > 0; }
     function same(ip1, m1, ip2) { var x = ip2n(ip1), y = ip2n(ip2), m = ip2n(m1); return x != null && y != null && m != null && ((x & m) >>> 0) === ((y & m) >>> 0); }
-    function add(type, x, y) { var d = { id: devs.length ? devs[devs.length - 1].id + 1 : 1, type: type, name: (type === "pc" ? "PC" : type === "sw" ? "Switch" : "Router") + (++seq[type]), x: x, y: y, ip: "", mask: "", gw: "", ifs: [{ n: "g0/0", ip: "", mask: "", up: false }, { n: "g0/1", ip: "", mask: "", up: false }], mode: "user", cur: null, hist: [] }; devs.push(d); sel = d.id; draw(); return d; }
+    function add(type, x, y) { var d = { id: devs.length ? devs[devs.length - 1].id + 1 : 1, type: type, name: (type === "pc" ? "PC" : type === "sw" ? "Switch" : "Router") + (++seq[type]), x: x, y: y, ip: "", mask: "", gw: "", ifs: [{ n: "g0/0", ip: "", mask: "", up: false, dhcp: false, start: 10, dns: "" }, { n: "g0/1", ip: "", mask: "", up: false, dhcp: false, start: 10, dns: "" }], routes: [], dhcp: false, dns: "", vlans: { 1: "default" }, pv: {}, mode: "user", cur: null, hist: [] }; devs.push(d); sel = d.id; draw(); return d; }
     function dev(id) { return devs.filter(function (d) { return d.id === id; })[0]; }
     function dlinks() { return links.filter(function (l) { return l.t !== "console"; }); }
     function degree(id) { return dlinks().filter(function (l) { return l.a === id || l.b === id; }).length; }
@@ -244,10 +244,10 @@
     }
     /* layer 2: endpoints reachable from device d through switches only */
     function domain(startId, viaId) {
-      var seen = {}, out = [], q = [viaId]; seen[startId] = 1; seen[viaId] = 1;
+      var seen = {}, out = [], q = [viaId], v0 = dev(viaId) && dev(viaId).type === "sw" ? ((dev(viaId).pv || {})[startId] || 1) : 1; seen[startId] = 1; seen[viaId] = 1;
       while (q.length) { var id = q.shift(), d = dev(id);
         if (d.type !== "sw") { out.push(d); continue; }
-        dlinks().forEach(function (l) { var o = l.a === id ? l.b : l.b === id ? l.a : null; if (o != null && !seen[o]) { seen[o] = 1; q.push(o); } }); }
+        dlinks().forEach(function (l) { var o = l.a === id ? l.b : l.b === id ? l.a : null; if (o == null || seen[o]) return; var od = dev(o); if (od.type !== "sw" && ((d.pv || {})[o] || 1) !== v0) return; seen[o] = 1; q.push(o); }); }
       return out;
     }
     function neighbors(d) { var r = []; dlinks().forEach(function (l) { var o = l.a === d.id ? l.b : l.b === d.id ? l.a : null; if (o != null) r.push(o); }); return r; }
@@ -271,7 +271,7 @@
           if (!g || g.type !== "rt") res = "to";
           else {
             var inF = g.ifs.filter(function (f) { return f.up && ip2n(f.ip) === ip2n(gw); })[0], outF = ifaceFor(g, target);
-            if (!outF || outF === inF) { res = "unr"; from = gw; }
+            if (!outF || outF === inF) { var vr = viaRoutes(g, inF || outF, target, 0); if (vr && vr.last) { var back = viaRoutes(vr.last, vr.lastOut, srcIp, 0, true); if (back) { res = "ok"; ttl = 127 - vr.hops; } else res = "to"; } else { res = "unr"; from = gw; } }
             else {
               var set3 = endpointsFrom2(g, outF), hd2 = holders(set3, target);
               if (hd2 && hd2.type === "pc" && hd2.gw && same(hd2.ip, hd2.mask, hd2.gw) && ifaceHas(g, outF, hd2.gw)) { res = "ok"; ttl = 127; } else res = hd2 ? "to" : "unr2";
@@ -290,6 +290,16 @@
       out.push("", "Ping statistics for " + target + ":", "    Packets: Sent = 4, Received = " + okc + ", Lost = " + (4 - okc) + " (" + (100 - okc * 25) + "% loss)");
       return out;
     }
+    function viaRoutes(rt, inF, target, hops, isBack) {
+      if (hops > 5) return null; var tn = ip2n(target), best = null;
+      (rt.routes || []).forEach(function (r) { if (same(r.net, r.mask, target) && (!best || ip2n(r.mask) > ip2n(best.mask))) best = r; });
+      if (!best) return null; var nhF = ifaceFor(rt, best.nh); if (!nhF) return null;
+      var nr = holders(endpointsFrom2(rt, nhF), best.nh); if (!nr || nr.type !== "rt") return null;
+      var nin = nr.ifs.filter(function (f) { return f.up && ip2n(f.ip) === ip2n(best.nh); })[0]; if (!nin) return null;
+      var out2 = ifaceFor(nr, target);
+      if (out2 && out2 !== nin) { var hd = holders(endpointsFrom2(nr, out2), target); if (hd && hd.type === "pc" && hd.gw && same(hd.ip, hd.mask, hd.gw) && ip2n(out2.ip) === ip2n(hd.gw)) return { hops: hops + 1, last: nr, lastOut: out2 }; return null; }
+      return viaRoutes(nr, nin, target, hops + 1, isBack);
+    }
     function endpointsFrom2(rt, f) { /* endpoints reachable out of one router interface (links are assigned to interfaces in order) */
       var idx = rt.ifs.indexOf(f), ns = neighbors(rt), n = ns[idx]; if (n == null) return []; var nd = dev(n); if (nd.type === "sw") return domain(rt.id, n); return [nd]; }
     function ifaceHas(rt, f, gw) { return ip2n(f.ip) === ip2n(gw); }
@@ -306,7 +316,8 @@
         if (d.type === "pc") {
           if (c === "help") say("ipconfig            show this PC's address, mask and gateway\nping <address>      send 4 test packets\nclear               clear the screen"); 
           else if (c === "clear" || c === "cls") clear(out);
-          else if (c === "ipconfig") say("Ethernet adapter:\n   IPv4 Address. . . . . : " + (d.ip || "not set") + "\n   Subnet Mask . . . . . : " + (d.mask || "not set") + "\n   Default Gateway . . . : " + (d.gw || "not set"));
+          else if (c === "ipconfig" && t[1] && t[1].toLowerCase() === "/renew") { if (!d.dhcp) say("The adapter is set to a static address. Turn on DHCP in the Config tab."); else { var rr = dhcpFor(d); say(rr || "Address received from DHCP: " + d.ip); } }
+          else if (c === "ipconfig") say("Ethernet adapter:\n   IPv4 Address. . . . . : " + (d.ip || "not set") + "\n   Subnet Mask . . . . . : " + (d.mask || "not set") + "\n   Default Gateway . . . : " + (d.gw || "not set") + "\n   DNS Server. . . . . . : " + (d.dns || "not set") + "\n   DHCP. . . . . . . . . : " + (d.dhcp ? "Enabled" : "Disabled"));
           else if (c === "ping") { if (!t[1]) say("usage: ping <address>"); else say(pingSim(d, t[1], d.ip, d.mask, d.gw).join("\n")); }
           else say("'" + t[0] + "' is not recognized here. Type help.");
         } else {
@@ -322,8 +333,12 @@
           else if (c === "end") { d.mode = "priv"; }
           else if (lc === "show ip interface brief") { if (m === "user") say("% Type enable first."); else say("Interface   IP-Address      Status\n" + d.ifs.map(function (x) { return (x.n + "          ").slice(0, 12) + ((x.ip || "unassigned") + "               ").slice(0, 16) + (x.up ? "up" : "administratively down"); }).join("\n")); }
           else if (c === "ping") { if (m === "user") say("% Type enable first."); else if (!t[1]) say("usage: ping <address>"); else { var f2 = ifaceFor(d, t[1]); var lines = ["Pinging " + t[1] + " with 32 bytes of data:", ""], okc = 0; var hd = f2 && holders(endpointsFrom2(d, f2), t[1]); for (var i = 0; i < 4; i++) { if (hd) { lines.push("Reply from " + t[1] + ": bytes=32 time<1ms TTL=128"); okc++; } else lines.push("Request timed out."); } lines.push("", "Packets: Sent = 4, Received = " + okc + ", Lost = " + (4 - okc)); say(lines.join("\n")); } }
+          else if (c === "ip" && t[1] === "route") { if (m !== "conf") say("% Use configure terminal first."); else if (d.type !== "rt") say("% Not supported on a switch."); else if (ip2n(t[2]) == null || !maskOk(t[3]) || ip2n(t[4]) == null) say("% Usage: ip route <network> <mask> <next-hop>"); else d.routes.push({ net: t[2], mask: t[3], nh: t[4] }); }
+          else if (c === "no" && t[1] === "ip" && t[2] === "route") { if (m !== "conf") say("% Use configure terminal first."); else d.routes = d.routes.filter(function (r) { return !(r.net === t[3] && r.mask === t[4]); }); }
+          else if (lc === "show ip route" && d.type === "rt") { if (m === "user") say("% Type enable first."); else say("Codes: C - connected, S - static\n" + d.ifs.filter(function (x) { return x.up && x.ip; }).map(function (x) { return "C    " + x.ip + " " + x.mask + " is directly connected, " + x.n; }).join("\n") + (d.routes.length ? "\n" : "") + d.routes.map(function (r) { return "S    " + r.net + " " + r.mask + " via " + r.nh; }).join("\n")); }
+          else if (lc === "show vlan brief" && d.type === "sw") { say("VLAN Name        Ports\n" + Object.keys(d.vlans).sort(function (a, b) { return a - b; }).map(function (v) { var ps2 = neighbors(d).map(function (id, i) { return [id, i]; }).filter(function (x) { var o = dev(x[0]); return o.type !== "sw" && String(d.pv[x[0]] || 1) === v; }).map(function (x) { return "Fa0/" + (x[1] + 1); }); return (v + "    ").slice(0, 5) + (d.vlans[v] + "            ").slice(0, 12) + ps2.join(", "); }).join("\n")); }
           else if (c === "hostname") { if (m !== "conf") say("% Use configure terminal first."); else if (!t[1] || !/^[A-Za-z][A-Za-z0-9_-]{0,13}$/.test(t[1])) say("% Invalid hostname."); else { d.name = t[1]; } }
-          else if (/^show\s+run/.test(lc)) { if (m === "user") say("% Type enable first."); else say("hostname " + d.name + "\n!\n" + d.ifs.map(function (x) { return "interface " + x.n + "\n " + (x.ip ? "ip address " + x.ip + " " + x.mask : "no ip address") + "\n " + (x.up ? "no shutdown" : "shutdown") + "\n!"; }).join("\n") + "\nend"); }
+          else if (/^show\s+run/.test(lc)) { if (m === "user") say("% Type enable first."); else say("hostname " + d.name + "\n!\n" + d.ifs.map(function (x) { return "interface " + x.n + "\n " + (x.ip ? "ip address " + x.ip + " " + x.mask : "no ip address") + "\n " + (x.up ? "no shutdown" : "shutdown") + "\n!"; }).join("\n") + (d.routes && d.routes.length ? "\n" + d.routes.map(function (r) { return "ip route " + r.net + " " + r.mask + " " + r.nh; }).join("\n") : "") + "\nend"); }
           else if (lc === "show mac address-table" && d.type === "sw") { var eps = endpointsFrom(d); say("Mac Address Table\n------------------\n" + (eps.length ? eps.map(function (e, i) { return "0001.42" + ("0" + (e.id * 17 % 256).toString(16)).slice(-2) + ".a" + ("0" + i).slice(-2) + "   DYNAMIC   Fa0/" + (i + 1) + "   " + e.name; }).join("\n") : "(empty)")); }
           else if (lc === "show interfaces status" && d.type === "sw") { var nb = neighbors(d); say("Port    Status       Connected to\n" + (nb.length ? nb.map(function (id, i) { return "Fa0/" + (i + 1) + "    connected    " + dev(id).name; }).join("\n") : "(no cables)")); }
           else say("% Unknown command. Type help.");
@@ -361,25 +376,63 @@
       if (t !== "console" && (degree(x) >= PORTS[A.type] || degree(y) >= PORTS[B.type])) return tr("No free port on one of them.", "مفيش بورت فاضي على واحد منهم.");
       links.push({ a: x, b: y, t: t }); return tr("Connected with a " + CAB[t].en + " cable.", "اتوصل بكابل " + CAB[t].ar + ".");
     }
-    function closeWin(id) { if (wins[id]) { wins[id].el.remove(); delete wins[id]; } }
-    function delDev(id) { links = links.filter(function (l) { return l.a !== id && l.b !== id; }); devs = devs.filter(function (x) { return x.id !== id; }); closeWin(id); if (sel === id) sel = null; selL = null; }
-    function ipForm(d, after) {
-      var fi = ltr(h("input", { type: "text", value: d.ip, placeholder: "192.168.1.10" })), fm = ltr(h("input", { type: "text", value: d.mask, placeholder: "255.255.255.0" })), fg = ltr(h("input", { type: "text", value: d.gw, placeholder: tr("optional", "اختياري") })), st = h("div", { "class": "note" });
-      return h("div", { "class": "nform" }, h("label", { text: "IP" }), fi, h("label", { text: tr("Subnet mask", "الماسك") }), fm, h("label", { text: tr("Gateway", "الجيتواي") }), fg,
-        h("button", { "class": "btn2 f", type: "button", text: tr("Apply", "تطبيق"), onclick: function () { if ((fi.value && ip2n(fi.value) == null) || (fm.value && !maskOk(fm.value)) || (fg.value && ip2n(fg.value) == null)) { st.textContent = tr("Check the values: four numbers 0-255, and a valid mask like 255.255.255.0.", "راجع القيم: أربع أرقام من 0 لـ 255 وماسك صحيح زي 255.255.255.0."); return; } d.ip = fi.value.trim(); d.mask = fm.value.trim(); d.gw = fg.value.trim(); st.textContent = tr("Saved.", "اتحفظ."); if (after) after(); } }), st);
+    /* ---- GUI configuration forms (kept in sync with the CLI: both edit the same device fields) ---- */
+    function fld(v, ph) { return ltr(h("input", { type: "text", value: v || "", placeholder: ph || "" })); }
+    function dhcpFor(pc) {
+      var best = null;
+      devs.forEach(function (r) { if (r.type !== "rt" || best) return; r.ifs.forEach(function (f) { if (best || !f.dhcp || !f.up || !f.ip || !f.mask) return; if (endpointsFrom2(r, f).indexOf(pc) < 0) return; best = { r: r, f: f }; }); });
+      if (!best) return tr("DHCP request failed: no router with DHCP turned on answers on this network.", "طلب DHCP فشل: مفيش راوتر شغّال عليه DHCP بيرد على الشبكة دي.");
+      var f = best.f, base = ip2n(f.ip), m = ip2n(f.mask), net = (base & m) >>> 0, used = {};
+      devs.forEach(function (e) { if (e !== pc) { if (e.ip) used[ip2n(e.ip)] = 1; e.ifs.forEach(function (x) { if (x.ip) used[ip2n(x.ip)] = 1; }); } });
+      for (var i = Math.max(1, +f.start || 10); i < 250; i++) { var cand = (net + i) >>> 0; if (((cand & m) >>> 0) !== net || used[cand]) continue; if (cand === base) continue;
+        pc.ip = [cand >>> 24, (cand >>> 16) & 255, (cand >>> 8) & 255, cand & 255].join("."); pc.mask = f.mask; pc.gw = f.ip; pc.dns = f.dns || ""; return ""; }
+      return tr("DHCP pool is empty.", "الـ DHCP pool فاضي.");
+    }
+    function pcConfig(d, after) {
+      var st = h("div", { "class": "note" }), mode = h("select", null, h("option", { value: "static", text: tr("Static", "ثابت") }), h("option", { value: "dhcp", text: "DHCP" })); mode.value = d.dhcp ? "dhcp" : "static";
+      var fi = fld(d.ip, "192.168.1.10"), fm = fld(d.mask, "255.255.255.0"), fg = fld(d.gw, tr("optional", "اختياري")), fd = fld(d.dns, tr("optional", "اختياري"));
+      function lock() { var on = mode.value === "dhcp"; [fi, fm, fg, fd].forEach(function (x) { x.disabled = on; }); } mode.addEventListener("change", lock); lock();
+      return h("div", { "class": "nform" }, h("label", { text: tr("Mode", "الوضع") }), mode, h("label", { text: "IP" }), fi, h("label", { text: tr("Subnet mask", "الماسك") }), fm, h("label", { text: tr("Gateway", "الجيتواي") }), fg, h("label", { text: "DNS" }), fd,
+        h("button", { "class": "btn2 f", type: "button", text: tr("Apply", "تطبيق"), onclick: function () {
+          if (mode.value === "dhcp") { d.dhcp = true; var r = dhcpFor(d); if (r) { st.textContent = r; return; } fi.value = d.ip; fm.value = d.mask; fg.value = d.gw; fd.value = d.dns; st.textContent = tr("Address received from DHCP: " + d.ip, "اتاخد عنوان من DHCP: " + d.ip); if (after) after(); return; }
+          d.dhcp = false;
+          if ((fi.value && ip2n(fi.value) == null) || (fm.value && !maskOk(fm.value)) || (fg.value && ip2n(fg.value) == null) || (fd.value && ip2n(fd.value) == null)) { st.textContent = tr("Check the values: four numbers 0-255, and a valid mask like 255.255.255.0.", "راجع القيم: أربع أرقام من 0 لـ 255 وماسك صحيح زي 255.255.255.0."); return; }
+          d.ip = fi.value.trim(); d.mask = fm.value.trim(); d.gw = fg.value.trim(); d.dns = fd.value.trim(); st.textContent = tr("Saved.", "اتحفظ."); if (after) after(); } }), st);
     }
     function rtConfig(d) {
-      var box = h("div", { "class": "nform" });
+      var box = h("div", { "class": "ncfg" });
       d.ifs.forEach(function (f) {
-        var ip = ltr(h("input", { type: "text", value: f.ip, placeholder: "192.168.1.1" })), mk = ltr(h("input", { type: "text", value: f.mask, placeholder: "255.255.255.0" })), on = h("input", { type: "checkbox" }); on.checked = !!f.up;
+        var ip = fld(f.ip, "192.168.1.1"), mk = fld(f.mask, "255.255.255.0"), on = h("input", { type: "checkbox" }), dh = h("input", { type: "checkbox" }), ds = fld(f.start || 10, "10"), dn = fld(f.dns, "DNS"); on.checked = !!f.up; dh.checked = !!f.dhcp;
         var st = h("div", { "class": "note" });
-        box.appendChild(h("label", { text: f.n })); box.appendChild(ip); box.appendChild(h("label", { text: tr("Mask", "الماسك") })); box.appendChild(mk);
-        box.appendChild(h("label", { text: tr("Port on", "تشغيل") })); box.appendChild(on);
-        box.appendChild(h("button", { "class": "btn2 f", type: "button", text: tr("Apply " + f.n, "تطبيق " + f.n), onclick: function () { if ((ip.value && ip2n(ip.value) == null) || (mk.value && !maskOk(mk.value))) { st.textContent = tr("Invalid address or mask.", "عنوان أو ماسك غير صحيح."); return; } f.ip = ip.value.trim(); f.mask = mk.value.trim(); f.up = on.checked; st.textContent = tr("Saved.", "اتحفظ."); } }));
-        box.appendChild(st);
+        box.appendChild(h("h5", { text: "Interface " + f.n }));
+        box.appendChild(h("div", { "class": "nform" }, h("label", { text: tr("Port status", "حالة البورت") }), h("label", { "class": "tg" }, on, h("span", { text: tr("On", "شغّال") })), h("label", { text: "IP" }), ip, h("label", { text: tr("Mask", "الماسك") }), mk,
+          h("label", { text: "DHCP" }), h("label", { "class": "tg" }, dh, h("span", { text: tr("Give addresses on this network", "وزّع عناوين على الشبكة دي") })), h("label", { text: tr("First host", "أول عنوان") }), ds, h("label", { text: "DNS" }), dn,
+          h("button", { "class": "btn2 f", type: "button", text: tr("Apply " + f.n, "تطبيق " + f.n), onclick: function () { if ((ip.value && ip2n(ip.value) == null) || (mk.value && !maskOk(mk.value)) || (dn.value && ip2n(dn.value) == null) || !/^\d{1,3}$/.test(ds.value.trim())) { st.textContent = tr("Invalid address, mask or number.", "عنوان أو ماسك أو رقم غير صحيح."); return; } f.ip = ip.value.trim(); f.mask = mk.value.trim(); f.up = on.checked; f.dhcp = dh.checked; f.start = +ds.value.trim(); f.dns = dn.value.trim(); st.textContent = tr("Saved.", "اتحفظ."); } }), st));
       });
+      var rn = fld("", "10.0.2.0"), rm = fld("", "255.255.255.0"), rh = fld("", "10.0.1.2"), rl = h("div", { "class": "rtl" }), rs = h("div", { "class": "note" });
+      function rdraw() { clear(rl); if (!d.routes.length) rl.appendChild(h("div", { "class": "note", text: tr("No static routes.", "مفيش راوتات ثابتة.") })); d.routes.forEach(function (r, i) { rl.appendChild(h("div", { "class": "rte" }, h("code", { text: r.net + " " + r.mask + " via " + r.nh }), h("button", { type: "button", "class": "tab", text: tr("Delete", "مسح"), onclick: function () { d.routes.splice(i, 1); rdraw(); } }))); }); }
+      rdraw();
+      box.appendChild(h("h5", { text: tr("Static routes", "الراوتات الثابتة") })); box.appendChild(rl);
+      box.appendChild(h("div", { "class": "nform" }, h("label", { text: tr("Network", "الشبكة") }), rn, h("label", { text: tr("Mask", "الماسك") }), rm, h("label", { text: tr("Next hop", "الهوب التالي") }), rh,
+        h("button", { "class": "btn2 f", type: "button", text: tr("Add route", "ضيف راوت"), onclick: function () { if (ip2n(rn.value) == null || !maskOk(rm.value) || ip2n(rh.value) == null) { rs.textContent = tr("Invalid network, mask or next hop.", "شبكة أو ماسك أو هوب غير صحيح."); return; } d.routes.push({ net: rn.value.trim(), mask: rm.value.trim(), nh: rh.value.trim() }); rn.value = rm.value = rh.value = ""; rs.textContent = ""; rdraw(); } }), rs));
       return box;
     }
+    function swConfig(d) {
+      var box = h("div", { "class": "ncfg" }), vl = h("div", { "class": "rtl" }), pl = h("div", { "class": "rtl" });
+      function vdraw() { clear(vl); Object.keys(d.vlans).sort(function (a, b) { return a - b; }).forEach(function (id) { vl.appendChild(h("div", { "class": "rte" }, h("code", { text: "VLAN " + id + "  " + d.vlans[id] }), id === "1" ? null : h("button", { type: "button", "class": "tab", text: tr("Delete", "مسح"), onclick: function () { delete d.vlans[id]; Object.keys(d.pv).forEach(function (k) { if (String(d.pv[k]) === id) delete d.pv[k]; }); vdraw(); pdraw(); } }))); }); }
+      function pdraw() { clear(pl); var nb = neighbors(d); if (!nb.length) pl.appendChild(h("div", { "class": "note", text: tr("No cables yet.", "مفيش كابلات لسه.") })); nb.forEach(function (id, i) { var o = dev(id); if (!o || o.type === "sw") { if (o) pl.appendChild(h("div", { "class": "rte" }, h("code", { text: "Fa0/" + (i + 1) + " \u2192 " + o.name }), h("span", { "class": "note", text: tr("trunk (all VLANs)", "ترنك (كل الـ VLANs)") }))); return; }
+        var sel = h("select", null); Object.keys(d.vlans).sort(function (a, b) { return a - b; }).forEach(function (v) { sel.appendChild(h("option", { value: v, text: "VLAN " + v + " " + d.vlans[v] })); }); sel.value = String(d.pv[id] || 1);
+        sel.addEventListener("change", function () { d.pv[id] = +sel.value; }); pl.appendChild(h("div", { "class": "rte" }, h("code", { text: "Fa0/" + (i + 1) + " \u2192 " + o.name }), sel)); }); }
+      var vi = fld("", "10"), vn = fld("", "Sales"), vs = h("div", { "class": "note" });
+      vdraw(); pdraw();
+      box.appendChild(h("h5", { text: tr("VLANs", "الـ VLANs") })); box.appendChild(vl);
+      box.appendChild(h("div", { "class": "nform" }, h("label", { text: "ID" }), vi, h("label", { text: tr("Name", "الاسم") }), vn, h("button", { "class": "btn2 f", type: "button", text: tr("Add VLAN", "ضيف VLAN"), onclick: function () { var n = +vi.value; if (!(n >= 2 && n <= 4094) || !/^[A-Za-z0-9_-]{1,16}$/.test(vn.value.trim())) { vs.textContent = tr("VLAN id 2-4094 and a short name.", "رقم VLAN من 2 لـ 4094 واسم قصير."); return; } d.vlans[n] = vn.value.trim(); vi.value = vn.value = ""; vs.textContent = ""; vdraw(); pdraw(); } }), vs));
+      box.appendChild(h("h5", { text: tr("Ports (access VLAN)", "البورتات (VLAN)") })); box.appendChild(pl);
+      box.appendChild(h("p", { "class": "note", text: tr("Devices in different VLANs cannot reach each other without a router. Switch-to-switch cables carry every VLAN.", "الأجهزة في VLANs مختلفة مش بتوصل لبعض من غير راوتر. كابلات سويتش لسويتش بتشيل كل الـ VLANs.") }));
+      return box;
+    }
+    function closeWin(id) { if (wins[id]) { wins[id].el.remove(); delete wins[id]; } }
+    function delDev(id) { links = links.filter(function (l) { return l.a !== id && l.b !== id; }); devs = devs.filter(function (x) { return x.id !== id; }); closeWin(id); if (sel === id) sel = null; selL = null; }
     function winBody(d, win, setTab) {
       var tabs = d.type === "pc" ? [["desk", tr("Desktop", "سطح المكتب")], ["cfg", tr("Config", "الإعدادات")]] : [["cli", "CLI"], ["cfg", tr("Config", "الإعدادات")]];
       var body = h("div", { "class": "nwb" });
@@ -388,14 +441,14 @@
         if (k === "cli") { if (!d.tbox) d.tbox = termFor(d); body.appendChild(d.tbox); }
         else if (k === "desk") {
           var tiles = h("div", { "class": "ntiles" });
-          tiles.appendChild(h("button", { type: "button", "class": "ntile", onclick: function () { clear(body); body.appendChild(h("button", { type: "button", "class": "back", text: tr("< Desktop", "< سطح المكتب"), onclick: function () { show("desk"); } })); body.appendChild(ipForm(d)); } }, h("i", { "class": "ti ip" }), h("span", { text: tr("IP Configuration", "إعدادات IP") })));
+          tiles.appendChild(h("button", { type: "button", "class": "ntile", onclick: function () { clear(body); body.appendChild(h("button", { type: "button", "class": "back", text: tr("< Desktop", "< سطح المكتب"), onclick: function () { show("desk"); } })); body.appendChild(pcConfig(d)); } }, h("i", { "class": "ti ip" }), h("span", { text: tr("IP Configuration", "إعدادات IP") })));
           tiles.appendChild(h("button", { type: "button", "class": "ntile", onclick: function () { clear(body); body.appendChild(h("button", { type: "button", "class": "back", text: tr("< Desktop", "< سطح المكتب"), onclick: function () { show("desk"); } })); if (!d.tbox) d.tbox = termFor(d); body.appendChild(d.tbox); } }, h("i", { "class": "ti cmd" }), h("span", { text: tr("Command Prompt", "موجه الأوامر") })));
           body.appendChild(tiles);
         } else {
           var nm = ltr(h("input", { type: "text", value: d.name, maxlength: "14" }));
           nm.addEventListener("change", function () { var v = nm.value.trim().replace(/[^A-Za-z0-9_-]/g, ""); if (v) { d.name = v; win.title.textContent = v; draw(); } });
           body.appendChild(h("div", { "class": "nform" }, h("label", { text: tr("Name", "الاسم") }), nm));
-          if (d.type === "pc") body.appendChild(ipForm(d)); else if (d.type === "rt") body.appendChild(rtConfig(d)); else body.appendChild(h("p", { "class": "note", text: tr("A switch joins devices in one network. Ports used: ", "السويتش بيوصل الأجهزة في نفس الشبكة. البورتات المستخدمة: ") + degree(d.id) + " / " + PORTS.sw }));
+          if (d.type === "pc") body.appendChild(pcConfig(d)); else if (d.type === "rt") body.appendChild(rtConfig(d)); else body.appendChild(swConfig(d));
         }
       }
       win.tabs = h("div", { "class": "nwt" }); tabs.forEach(function (t) { win.tabs.appendChild(h("button", { type: "button", text: t[1], onclick: function () { show(t[0]); } })); });
