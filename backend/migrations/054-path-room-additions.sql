@@ -1,0 +1,4 @@
+-- 054: add new Easy/Hard rooms to the existing SOC, pentest and foundations paths (rooms ordered Easy -> Hard)
+update public.ch_paths set rooms=array['start-cyber-security-101','start-how-networks-and-os-work','crypto-encode-or-encrypt','soc-reading-logs','soc-ssh-bruteforce','forensics-first-artifacts','soc-incident-response'] where slug='soc-analyst-start';
+update public.ch_paths set rooms=array['start-cyber-security-101','start-how-networks-and-os-work','crypto-encode-or-encrypt','pentest-scope-and-rules','web-how-the-web-works','web-first-login','pentest-recon-lab','web-vulnerability-concepts','pentest-reporting-and-ethics'] where slug='junior-pentester';
+update public.ch_paths set rooms=array['start-cyber-security-101','start-how-networks-and-os-work','crypto-encode-or-encrypt','forensics-evidence-handling','forensics-first-artifacts','crypto-hashing-and-passwords'] where slug='cyber-foundations';
