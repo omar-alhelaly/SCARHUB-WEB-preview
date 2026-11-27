@@ -1543,7 +1543,17 @@
     if (t.third_party && t.orig_repo) pn.appendChild(creditEl(t));
     var tOpen = await canOpen(t);
     if (t.coming_soon) { pn.appendChild(h("p", { "class": "hint", text: soonText() })); if (me && (me.role === "owner" || (me.role === "admin" && t.created_by === me.id))) pn.appendChild(h("p", null, h("a", { "class": "btn", href: "admin.html#edit-" + encodeURIComponent(slug), text: tr("Edit this tool", "عدّل الأداة دي") }))); box.appendChild(pn); return; }
-    if (!tOpen) pn.appendChild(h("p", { "class": "hint", text: lockText() })); else (t.commands || []).forEach(function (c) { pn.appendChild(h("code", { text: c, style: "display:block;margin:4px 0" })); });
+    if (!tOpen) { pn.appendChild(h("p", { "class": "hint", text: lockText() })); pn.appendChild(h("p", null, h("a", { "class": "btn f", href: me ? "account.html" : "login.html", text: me ? tr("Upgrade to unlock the docs", "رقّي حسابك عشان تفتح الدوكس") : tr("Sign in to unlock", "سجّل دخول عشان تفتح") }))); }
+    else if (!t.coming_soon) {
+      var dsec = function (en, ar) { return h("h2", { text: tr(en, ar), style: "font-size:20px;margin:22px 0 6px" }); };
+      if (!t.third_party) {
+        pn.appendChild(dsec("Install", "التثبيت"));
+        pn.appendChild(h("p", { text: tr("Needs Python 3 only (standard library, no API keys). Download the tool from this page, unzip it and run its script with --help to see every option.", "محتاجة Python 3 بس (المكتبة القياسية، من غير API keys). نزّل الأداة من الصفحة دي، فك الضغط وشغّل السكربت بـ --help عشان تشوف كل الخيارات.") }));
+      }
+      if ((t.commands || []).length) { pn.appendChild(dsec("Usage examples", "أمثلة الاستخدام")); (t.commands || []).forEach(function (c) { pn.appendChild(h("code", { text: c, style: "display:block;margin:4px 0" })); }); }
+      pn.appendChild(dsec("Legal notice", "تنبيه قانوني"));
+      pn.appendChild(h("p", { "class": "hint", text: tr("Use this only on systems, accounts and data you own or have written permission to test. You are responsible for how you use it. Educational use only.", "استخدمها بس على أنظمة وحسابات وبيانات بتاعتك أو معاك إذن مكتوب باختبارها. إنت المسؤول عن طريقة الاستخدام. للتعلّم فقط.") }));
+    }
     if (!a) { pn.appendChild(h("p", { "class": "hint", text: tr("Video, repo and files are for subscribers only.", "الفيديو والريبو والملفات للمشتركين بس.") })); pn.appendChild(h("a", { "class": "btn f", href: me ? "account.html" : "login.html", text: tr("Subscribe", "اشترك") })); }
     else {
       if (a.video_url && /^https:\/\//.test(a.video_url)) pn.appendChild(h("p", null, h("a", { "class": "btn", href: a.video_url, target: "_blank", rel: "noopener noreferrer", text: tr("Watch video", "شاهد الفيديو") })));
