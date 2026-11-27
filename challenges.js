@@ -782,6 +782,7 @@
     clear(root); root.appendChild(setTabs("me"));
     if (!me) { root.appendChild(h("div", { "class": "strip" }, h("div", null, tr("Sign in to see your progress.", "سجّل دخول عشان تشوف تقدمك."), h("br"), h("a", { href: "login.html", text: tr("Sign in", "تسجيل الدخول") })))); return; }
     var s = await rpc("ch_my_stats"), cat = await rpc("ch_catalog");
+    clear(root); root.appendChild(setTabs("me")); /* clear again after the awaits so two overlapping renders cannot stack */
     root.appendChild(h("div", { "class": "strip" }, h("div", null, tr("Points", "النقاط"), h("b", { text: String(s.points) })), h("div", null, tr("Solved tasks", "مهام محلولة"), h("b", { text: String(s.solves) })), h("div", null, tr("Overall rank", "الترتيب العام"), h("b", { text: s.rank ? "#" + s.rank : "-" }))));
     root.appendChild(heatBox(s)); root.appendChild(streakBox(s));
     var by = {}; (s.sections || []).forEach(function (x) { by[x.section] = x; });
