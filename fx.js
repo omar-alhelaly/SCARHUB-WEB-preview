@@ -163,11 +163,11 @@ html[data-theme=light] #radar{opacity:.55}\
 #intro .bar i{position:absolute;inset:0;background:var(--r);transform-origin:0 50%;transform:scaleX(0);transition:transform 2.6s cubic-bezier(.455,.03,.515,.955)}\
 #intro .bar.go i{transform:scaleX(1)}\
 .mq{border-block:1px solid var(--b);overflow:hidden;white-space:nowrap;padding:16px 0;margin:0;background:transparent}\
-.mq div{display:inline-flex;gap:34px;padding-inline-end:34px;animation:mq 38s linear infinite;font:800 clamp(20px,3.4vw,40px)/1 var(--fd-display,system-ui),system-ui,sans-serif;text-transform:uppercase;letter-spacing:.04em;color:var(--t)}\
-.mq div span{display:inline-flex;align-items:center;gap:34px}\
+.mq div{display:inline-flex;width:max-content;will-change:transform;gap:34px;padding-inline-end:34px;animation:mq var(--mqd,38s) linear infinite!important;font:800 clamp(20px,3.4vw,40px)/1 var(--fd-display,system-ui),system-ui,sans-serif;text-transform:uppercase;letter-spacing:.04em;color:var(--t)}\
+.mq div span{flex:none;white-space:nowrap;display:inline-flex;align-items:center;gap:34px}\
 .mq div span:after{content:"\\25B8";color:var(--r);font-size:.6em}\
+@keyframes mq{from{transform:translate3d(0,0,0)}to{transform:translate3d(-50%,0,0)}}\
 .mq:hover div{animation-play-state:paused}\
-@keyframes mq{to{transform:translateX(-50%)}}\
 [dir=rtl] .mq div{animation-direction:reverse}\
 .wm{max-width:1360px;margin:0 auto;padding:10px 5vw 0;overflow:hidden;line-height:.8;user-select:none;pointer-events:none}\
 .wm b{display:block;text-align:center;font:800 clamp(90px,26vw,420px)/.82 var(--fd-display,system-ui),system-ui,sans-serif;letter-spacing:.06em;color:transparent;-webkit-text-stroke:1.5px var(--b);margin-bottom:-.12em}\
@@ -207,7 +207,9 @@ function sections(){if(app())return;var main=D.getElementById('main')||D.querySe
 function marquee(){var hero=D.querySelector('main > header.hero');if(!hero||D.querySelector('.mq'))return;var L=localStorage.l||'en';
  var items=[['Offline first','أوفلاين أولاً'],['Authorized use only','للاستخدام المصرّح بيه بس'],['No API keys','من غير مفاتيح API'],['Stdlib first','المكتبة القياسية الأول'],['Simulated labs','معامل محاكاة']];
  var mk=function(){return items.map(function(i){return '<span data-en="'+i[0]+'" data-ar="'+i[1]+'">'+(L=='ar'?i[1]:i[0])+'</span>'}).join('')};
- var m=D.createElement('div');m.className='mq';m.setAttribute('aria-hidden','true');m.innerHTML='<div>'+mk()+mk()+mk()+mk()+'</div>';hero.parentNode.insertBefore(m,hero.nextSibling)}
+ var m=D.createElement('div');m.className='mq';m.setAttribute('aria-hidden','true');m.innerHTML='<div>'+mk()+mk()+'</div>';hero.parentNode.insertBefore(m,hero.nextSibling);
+ var inner=m.firstChild;function fit(){var one=mk(),n=2;inner.innerHTML=one+one;var half=inner.scrollWidth/2,need=Math.max(innerWidth,screen.width||0)*1.1;if(!half)return;var k=Math.max(1,Math.ceil(need/half));inner.innerHTML=new Array(2*k+1).join(one);inner.style.setProperty('--mqd',Math.round(half*k/70)+'s')}
+ fit();W.addEventListener('resize',function(){clearTimeout(fit.t);fit.t=setTimeout(fit,250)});if(D.fonts&&D.fonts.ready)D.fonts.ready.then(fit)}
 function wordmark(){var f=D.querySelector('footer.site');if(!f||D.querySelector('.wm'))return;var w=D.createElement('div');w.className='wm';w.setAttribute('aria-hidden','true');w.innerHTML='<b>SCAR</b>';f.parentNode.insertBefore(w,f.nextSibling);f.parentNode.insertBefore(f,w)}
 
 /* intro (home, once per session) */
