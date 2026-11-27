@@ -270,7 +270,7 @@
       clear(pnl); pnl.appendChild(h("b", { text: tr("Inbox", "صندوق الرسائل") }));
       if (!list.length) pnl.appendChild(h("p", { "class": "hint", text: tr("No messages yet.", "مفيش رسايل لسه.") }));
       list.slice(0, 15).forEach(function (n) {
-        var r = h("div", { "class": "nrow" + (n.read_at ? "" : " u") }, h("span", { text: noteText(n) }), h("span", { "class": "hint", text: new Date(n.created_at).toLocaleString(EN() ? "en-GB" : "ar-EG") }));
+        var r = h("div", { "class": "nrow" + (n.read_at ? "" : " u") }, h("span", { text: noteText(n) }), h("span", { "class": "hint", text: new Date(n.created_at).toLocaleString(EN() ? "en-GB" : "ar-EG", { hour12: true }) }));
         if (n.kind === "payment_submitted" && isStaff()) r.appendChild(h("a", { href: "admin.html#payments", text: tr("Open Admin > payments", "افتح الإدارة > المدفوعات") }));
         pnl.appendChild(r); noteExtras(n, r);
       });
@@ -308,7 +308,7 @@
     if (!list.length) { p.appendChild(h("p", { "class": "hint", text: tr("No messages yet.", "مفيش رسايل لسه.") })); return; }
     list.forEach(function (n) {
       var nr = h("div", { "class": "row", style: "flex-direction:column;align-items:flex-start;gap:2px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.08)" + (n.read_at ? "" : ";border-inline-start:3px solid var(--r);padding-inline-start:8px") },
-        h("span", { text: noteText(n) }), h("span", { "class": "hint", text: new Date(n.created_at).toLocaleString(EN() ? "en-GB" : "ar-EG") }));
+        h("span", { text: noteText(n) }), h("span", { "class": "hint", text: new Date(n.created_at).toLocaleString(EN() ? "en-GB" : "ar-EG", { hour12: true }) }));
       p.appendChild(nr); noteExtras(n, nr);
     });
     if (list.some(function (n) { return !n.read_at; })) { await sb.rpc("mark_notifications_read"); var d = document.getElementById("inboxdot"); if (d) d.remove(); var il = document.getElementById("inboxlink"); if (il) il.textContent = tr("Inbox", "الرسائل"); }
@@ -630,7 +630,7 @@
     return w;
   }
   function fmtDate(v) { return v ? new Date(v).toLocaleDateString(EN() ? "en-GB" : "ar-EG") : "-"; }
-  function fmtTime(v) { return v ? new Date(v).toLocaleString(EN() ? "en-GB" : "ar-EG") : "-"; }
+  function fmtTime(v) { return v ? new Date(v).toLocaleString(EN() ? "en-GB" : "ar-EG", { hour12: true }) : "-"; }
   var ACT_LBL = { signup: ["Sign up", "تسجيل جديد"], block_user: ["Blocked", "حظر"], unblock_user: ["Unblocked", "فك حظر"], ban_user: ["Banned", "حظر"], unban_user: ["Unbanned", "فك حظر"], grant_plan: ["Free plan granted", "اشتراك مجاني اتمنح"], revoke_plan: ["Free plan revoked", "اشتراك مجاني اتسحب"], review_manual_payment: ["Payment reviewed", "مراجعة دفعة"], set_role: ["Role changed", "تغيير صلاحية"] };
   window.scarOpenProfile = function (id) { return openProfile(id); };
   async function openProfile(id) {
@@ -831,7 +831,10 @@
     var chans = [["general", tr("General chat", "الشات العام"), true], ["help", tr("Help", "مساعدة"), true], ["labs", tr("Lab talk", "كلام اللابز"), true], ["admins", tr("Admins only", "للإدارة فقط"), isStaff()], ["dmlist", tr("Private", "خاص"), true]].filter(function (c) { return c[2]; });
     var box = h("div", { "class": "wide" }), tabs = h("div", { "class": "tabs" }), log = h("div", { "class": "chatbox", role: "log", "aria-live": "polite" });
     var input = h("input", { type: "text", maxlength: "1000", "aria-label": tr("Message", "رسالة"), style: "flex:1;padding:11px;border-radius:10px;border:1px solid var(--b);background:var(--bg);color:var(--t)" });
-    var err = h("div", { "class": "msg" }), cur = "general", names = {}, urls = {}, urlsAt = Date.now(), sub = null, lastSig = "", lastRsig = "", rx = {}, pop = null, rxBusy = 0, myBlk = ((await sb.rpc("my_blocks")).data || [])[0] || null;
+    var err = h("div", { "class": "msg" }), cur = "general", names = {}, urls = {}, urlsAt = Date.now(), sub = null, lastSig = "", lastRsig = "", rx = {}, pop = null, rxBusy = 0, myBlk = ((await sb.rpc("my_blocks")).data || [])[0] || null, cadm = {}, cadmAt = 0;
+    async function refreshCA() { var q = await sb.rpc("chat_admin_ids"); cadm = {}; (q.data || []).forEach(function (x) { cadm[x] = 1; }); cadmAt = Date.now(); }
+    function amCA() { return !isStaff() && !!cadm[me.id]; }
+    await refreshCA();
     setInterval(function () { if (!document.hidden) load(); }, 2000);
     async function who(ids) {
       var need = ids.filter(function (i) { return !names[i]; }); if (!need.length) return;
@@ -870,9 +873,9 @@
     }
     async function delMsg(scope, id, others) {
       var o = { reason: null, notify: false };
-      if (others) { o = await askRemoval(tr("Delete this message?", "تمسح الرسالة دي؟")); if (!o) return; }
+      if (others && isStaff()) { o = await askRemoval(tr("Delete this message?", "تمسح الرسالة دي؟")); if (!o) return; }
       else if (!confirm(tr("Delete this message?", "تمسح الرسالة دي؟"))) return;
-      var r = await sb.rpc("delete_message", others ? { p_scope: scope, p_id: id, p_reason: o.reason, p_notify: o.notify } : { p_scope: scope, p_id: id });
+      var r = await sb.rpc("delete_message", others && isStaff() ? { p_scope: scope, p_id: id, p_reason: o.reason, p_notify: o.notify } : { p_scope: scope, p_id: id });
       if (r.error) return say(err, tr("Could not delete: ", "ماقدرتش أمسح: ") + (r.error.message || ""), "err");
       var ok = true; if (o.notify) ok = await sendNotices();
       say(err, ok ? "" : noticeNote(false).trim(), ok ? "" : "err"); lastSig = ""; load();
@@ -967,15 +970,47 @@
       else say(err, "");
       rxBusy--; lastRsig = ""; load();
     }
+    function banAsk(uid, nm) {
+      return new Promise(function (res) {
+        var ov = h("div", { style: "position:fixed;inset:0;z-index:99999;background:#000b;display:flex;align-items:center;justify-content:center;padding:12px" });
+        var bx = h("div", { role: "dialog", "aria-modal": "true", style: "background:var(--card,#fff);color:inherit;border:1px solid var(--line,#ccc);border-radius:12px;padding:18px;width:min(420px,100%)" });
+        var why = h("textarea", { maxlength: "200", rows: "3", "aria-label": tr("Reason", "السبب"), style: "width:100%;box-sizing:border-box", placeholder: tr("Reason (required, saved in the log)", "السبب (مطلوب وبيتسجل)") });
+        var hs = h("select", { "aria-label": tr("Duration", "المدة") }); [[1, "1 hour", "ساعة"], [24, "1 day", "يوم"], [168, "7 days", "7 أيام"], [720, "30 days", "30 يوم"]].forEach(function (d) { hs.appendChild(h("option", { value: d[0], text: tr(d[1], d[2]) })); });
+        function done(v) { ov.remove(); res(v); }
+        bx.appendChild(h("h3", { text: tr("Ban from chat: ", "حظر من الشات: ") + nm })); bx.appendChild(h("p", { "class": "hint", text: tr("Chat only. The member can still use the rest of the site.", "الشات بس. العضو يقدر يستخدم باقي الموقع.") })); bx.appendChild(why); bx.appendChild(hs);
+        bx.appendChild(h("div", { "class": "row", style: "display:flex;gap:8px;margin-top:12px;justify-content:flex-end" }, h("button", { "class": "btn", type: "button", text: tr("Cancel", "إلغاء"), on: { click: function () { done(null); } } }), h("button", { "class": "btn f", type: "button", text: tr("Ban", "احظر"), on: { click: function () { if (why.value.trim().length < 3) { why.focus(); return; } done({ reason: why.value.trim(), hours: parseInt(hs.value, 10) }); } } })));
+        ov.appendChild(bx); document.body.appendChild(ov); why.focus();
+      });
+    }
+    async function banUser(uid, nm) {
+      var o = await banAsk(uid, nm); if (!o) return;
+      var r = await sb.rpc("chat_ban_user", { target: uid, p_reason: o.reason, p_hours: o.hours });
+      say(err, r.error ? tr("Could not ban: ", "ماقدرتش أحظر: ") + (r.error.message || "") : nm + " " + tr("is banned from chat.", "اتحظر من الشات."), r.error ? "err" : "ok");
+    }
     function line(m) {
-      var p = names[m.user_id] || { display_name: "?", avatar: "b1" }, del = null;
-      if (!m.deleted_at && (isStaff() || m.user_id === me.id)) del = h("button", { "class": "btn", type: "button", text: isStaff() ? "x" : tr("Delete", "احذف"), "aria-label": tr("Delete message", "احذف الرسالة"), on: { click: function () { delMsg("chat", m.id, m.user_id !== me.id); } } });
+      var p = names[m.user_id] || { display_name: "?", avatar: "b1" }, del = null, ban = null, ctl = [];
+      var aStaff = p.role === "owner" || p.role === "admin", aCA = !!cadm[m.user_id], deleted = !!m.deleted_at;
+      var canDel = isStaff() || m.user_id === me.id || (amCA() && !aStaff && !aCA && cur !== "admins");
+      if (!deleted && canDel) del = h("button", { "class": "btn", type: "button", text: isStaff() ? "x" : tr("Delete", "احذف"), "aria-label": tr("Delete message", "احذف الرسالة"), on: { click: function () { delMsg("chat", m.id, m.user_id !== me.id); } } });
+      if (!deleted && amCA() && m.user_id !== me.id && !aStaff && !aCA) ban = h("button", { "class": "btn", type: "button", text: tr("Ban", "حظر"), title: tr("Ban from chat", "حظر من الشات"), "aria-label": tr("Ban from chat", "حظر من الشات"), on: { click: function () { banUser(m.user_id, p.display_name); } } });
       var av = h("div", { "class": "av", style: "cursor:pointer", title: tr("View profile", "شوف البروفايل"), on: { click: function () { openProfile(m.user_id); } } }, avatarSvg(p.avatar, p.id));
       var nm = h("b", { text: p.display_name, style: "cursor:pointer", on: { click: function () { openProfile(m.user_id); } } });
-      var body = m.audio_path ? (urls[m.audio_path] ? voicePlayer(urls[m.audio_path], m.audio_secs) : h("p", { "class": "hint", text: tr("Voice message (loading)", "رسالة صوتية (بتحمّل)") })) : h("p", { text: m.body });
-      var dby = m.deleted_by && names[m.deleted_by] ? names[m.deleted_by].display_name : "?", hd = h("div", { style: "flex:1" }, nm, badgesEl(p.role, p.subscribed, p.plan_name), m.deleted_at ? h("span", { "class": "tag", style: "margin-inline-start:8px;color:#e55", text: tr("Deleted", "محذوفة") + (m.deleted_by === m.user_id ? "" : " " + tr("by ", "بواسطة ") + dby) }) : null), el = h("div", { "class": "cm" }, av, hd, del);
-      if (m.deleted_at) body.style.opacity = ".55";
-      var pills = reactUi("chat", m.id, hd, el, !m.deleted_at && cur === "general" && (m.user_id === me.id || isStaff()), m.created_at); hd.appendChild(body); hd.appendChild(pills);
+      var dby = m.deleted_by && names[m.deleted_by] ? names[m.deleted_by].display_name : "?", body;
+      if (deleted) {
+        body = h("p", { "class": "hint cdel", style: "font-style:italic;margin:4px 0", text: m.deleted_by === m.user_id ? tr("Deleted by the author", "اتمسحت بواسطة صاحبها") : tr("Deleted by admin ", "اتمسحت بواسطة الأدمن ") + dby });
+      } else body = m.audio_path ? (urls[m.audio_path] ? voicePlayer(urls[m.audio_path], m.audio_secs) : h("p", { "class": "hint", text: tr("Voice message (loading)", "رسالة صوتية (بتحمّل)") })) : h("p", { text: m.body });
+      var hd = h("div", { style: "flex:1;min-width:0" }, nm, badgesEl(p.role, p.subscribed, p.plan_name), aCA ? h("span", { "class": "bdg", style: "background:#6b4fd0;color:#fff", text: tr("Chat admin", "أدمن الشات") }) : null), acts = null, el;
+      if (amCA() && (ban || del)) { acts = h("div", { "class": "cact", style: "display:flex;flex-direction:column;gap:6px;align-self:flex-start;flex:0 0 auto" }, ban, del); [ban, del].forEach(function (b) { if (b) { b.style.padding = "4px 12px"; b.style.fontSize = "12px"; b.style.height = "auto"; b.style.alignSelf = "stretch"; } }); }
+      el = h("div", { "class": "cm" + (deleted ? " cmdel" : "") }, av, hd, acts ? acts : ban, acts ? null : del);
+      if (deleted && isStaff()) {
+        var shown = null, oBtn = h("button", { "class": "btn", type: "button", style: "margin-top:4px", text: tr("Show original (staff)", "اعرض الأصلية (للإدارة)"), on: { click: async function () {
+          if (shown) { shown.remove(); shown = null; return; }
+          var q = await sb.rpc("chat_original", { p_id: m.id }), row = (q.data || [])[0];
+          shown = h("p", { "class": "hint", style: "border-inline-start:3px solid #e55;padding-inline-start:8px", text: q.error || !row ? tr("Not available.", "مش متاحة.") : (row.body || tr("(voice message)", "(رسالة صوتية)")) }); hd.appendChild(shown);
+        } } }); hd.appendChild(body); hd.appendChild(oBtn);
+      } else {
+        var pills = reactUi("chat", m.id, hd, el, !deleted && cur === "general" && (m.user_id === me.id || isStaff()), m.created_at); hd.appendChild(body); if (pills) hd.appendChild(pills);
+      }
       el.setAttribute("data-id", m.id); return el;
     }
     function openDm(id) { closePop(); cur = "dm:" + id; lastSig = ""; lastRsig = ""; rx = {}; Array.prototype.forEach.call(tabs.children, function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-c") === "dmlist"); }); say(err, ""); load(); }
@@ -999,6 +1034,7 @@
     }
     async function load() {
       if (cur === "dmlist") return loadDmList(); if (cur.indexOf("dm:") === 0) return loadDm();
+      if (Date.now() - cadmAt > 30000) { var oc = JSON.stringify(cadm); await refreshCA(); if (JSON.stringify(cadm) !== oc) lastSig = ""; }
       var r = await sb.from("chat_messages").select("id,user_id,body,created_at,audio_path,audio_secs,deleted_at,deleted_by").eq("channel", cur).order("created_at", { ascending: false }).limit(60);
       var rows = (r.data || []).reverse(), sg = cur + ":" + rows.map(function (x) { return x.id + (x.deleted_at ? "d" : ""); }).join(","), changed = await syncRx("chat", rows.map(function (x) { return x.id; })); queueRc("chat", rows, "user_id");
       if (sg === lastSig) { if (changed) paintAll(); return; } lastSig = sg;
@@ -1065,7 +1101,14 @@
     form.insertBefore(micBtn, form.lastChild);
     if (myBlk) { input.disabled = true; micBtn.disabled = true; Array.prototype.forEach.call(form.querySelectorAll("button"), function (b) { b.disabled = true; }); say(err, tr("You are blocked from chat. Reason: ", "إنت محظور من الشات. السبب: ") + myBlk.reason + (myBlk.expires_at ? " (" + tr("until ", "لحد ") + fmtTime(myBlk.expires_at) + ")" : " (" + tr("no end date", "من غير مدة") + ")"), "err"); }
     var rules = h("details", { "class": "crules", style: "margin:8px 0 12px;border:1px solid var(--b,#ddd);border-radius:10px;padding:8px 12px" }, h("summary", { text: tr("Community rules", "قواعد المجتمع"), style: "cursor:pointer;font-weight:600" }), h("ul", { style: "margin:8px 0 0;padding-inline-start:20px;line-height:1.8" }, h("li", { text: tr("Be respectful. No insults, spam or harassment.", "احترم الناس. مفيش شتيمة ولا سبام ولا مضايقة.") }), h("li", { text: tr("No spoilers: do not post answers to challenge tasks. Hints are fine.", "مفيش حرق: متنشرش إجابات مهام التحديات. التلميحات مسموحة.") }), h("li", { text: tr("Only talk about testing systems you own or have written permission to test.", "اتكلم عن اختبار السيستمز اللي بتملكها أو معاك إذن مكتوب باختبارها بس.") }), h("li", { text: tr("Do not share passwords, keys or private data. Admins will never ask for your password.", "متشاركش باسوردات أو مفاتيح أو بيانات خاصة. الإدارة عمرها مش هتطلب الباسورد بتاعك.") }), h("li", { text: tr("If something is wrong, send a private message to an admin.", "لو فيه مشكلة، ابعت رسالة خاصة لأدمن.") })));
-    box.appendChild(h("div", { "class": "panel" }, h("h2", { text: tr("Community", "المجتمع") }), rules, tabs, log, form, err)); app.appendChild(box); var dmh = location.hash.match(/^#dm=([0-9a-f-]{36})$/); if (dmh) { select("dmlist"); openDm(dmh[1]); } else select("general");
+    var bansBox = h("div", { "class": "hint", style: "display:none;border:1px solid var(--b,#ddd);border-radius:10px;padding:8px 12px;margin:0 0 8px" }), bansBtn = null;
+    if (amCA()) { bansBtn = h("button", { "class": "btn", type: "button", text: tr("Chat bans", "حظر الشات"), on: { click: async function () {
+      if (bansBox.style.display !== "none") { bansBox.style.display = "none"; return; }
+      var q = await sb.rpc("chat_bans_list"); clear(bansBox); bansBox.style.display = "block";
+      var rows2 = q.data || []; if (!rows2.length) bansBox.appendChild(h("p", { text: tr("No active chat bans.", "مفيش حظر شغال.") }));
+      rows2.forEach(function (b) { bansBox.appendChild(h("div", { style: "display:flex;gap:8px;align-items:center;justify-content:space-between;padding:4px 0;flex-wrap:wrap" }, h("span", { text: b.name + " - " + (b.reason || "") + " (" + (b.expires_at ? tr("until ", "لحد ") + fmtTime(b.expires_at) : tr("no end date", "من غير تاريخ انتهاء")) + ")" }), h("button", { "class": "btn", type: "button", text: tr("Unban", "فك الحظر"), on: { click: async function () { var x = await sb.rpc("chat_unban_user", { target: b.user_id }); say(err, x.error ? x.error.message : tr("Ban lifted.", "اتفك الحظر."), x.error ? "err" : "ok"); bansBtn.click(); bansBtn.click(); } } }))); });
+    } } }); tabs.appendChild(bansBtn); }
+    box.appendChild(h("div", { "class": "panel" }, h("h2", { text: tr("Community", "المجتمع") }), rules, tabs, bansBox, log, form, err)); app.appendChild(box); var dmh = location.hash.match(/^#dm=([0-9a-f-]{36})$/); if (dmh) { select("dmlist"); openDm(dmh[1]); } else select("general");
   }
 
   /* ---------- admin ---------- */
@@ -1087,8 +1130,9 @@
       tabA.setAttribute("aria-pressed", view === "active" ? "true" : "false"); tabD.setAttribute("aria-pressed", view === "deleted" ? "true" : "false");
       tabA.style.opacity = view === "active" ? "1" : ".6"; tabD.style.opacity = view === "deleted" ? "1" : ".6";
       r.data = r.data.filter(function (u) { return view === "deleted" ? u.status === "deleted" : u.status !== "deleted"; });
-      var gm = {}, plansL = [];
+      var gm = {}, plansL = [], cam = {};
       if (owner) {
+        var cq = await sb.rpc("chat_admin_ids"); (cq.data || []).forEach(function (x) { cam[x] = 1; });
         var gr = await sb.rpc("admin_list_grants"); (gr.data || []).forEach(function (g) { (gm[g.user_id] = gm[g.user_id] || []).push(g); });
         var pr = await sb.from("plans").select("id,name,scope,active"); plansL = pr.data || [];
       }
@@ -1124,6 +1168,13 @@
         if (owner && u.status === "active") act.appendChild(h("button", { "class": "btn", type: "button", "data-g": "mod", text: tr("Profile", "البروفايل"), on: { click: function () { openProfile(u.id); } } }));
         var mine = gm[u.id] || [], subCell = h("td", { text: u.subscribed ? "yes" : "-" });
         if (mine.length) { clear(subCell); subCell.appendChild(h("span", { "class": "tag", text: tr("Free (owner)", "مجاني (من المالك)") })); mine.forEach(function (g) { subCell.appendChild(h("div", { "class": "hint", text: (g.plan_name || tr("All tools", "كل الأدوات")) + " " + endTxt(g.ends) })); }); }
+        if (owner && u.role === "user" && u.status === "active") {
+          var isCA = !!cam[u.id];
+          act.appendChild(h("button", { "class": "btn", type: "button", "data-g": "mod", text: isCA ? tr("Remove chat admin", "شيل أدمن الشات") : tr("Make chat admin", "خليه أدمن شات"), title: tr("Can delete messages and ban from chat only", "يقدر يمسح رسائل ويحظر من الشات بس"), on: { click: async function () {
+            if (!confirm(isCA ? tr("Remove chat admin rights from this user?", "تشيل صلاحية أدمن الشات من المستخدم ده؟") : tr("Make this user a chat admin? They can delete messages and ban members from chat only. They get no other access.", "تخلي المستخدم ده أدمن شات؟ يقدر يمسح رسائل ويحظر أعضاء من الشات بس، ومعندوش أي صلاحية تانية."))) return;
+            var x = await sb.rpc("set_chat_admin", { target: u.id, p_on: !isCA }); if (x.error) alert(x.error.message); users();
+          } } }));
+        }
         if (owner && u.role !== "owner" && u.status === "active") {
           var gs = h("select", { "aria-label": "plan" }); gs.appendChild(h("option", { value: "", text: tr("All tools", "كل الأدوات") }));
           plansL.forEach(function (p) { gs.appendChild(h("option", { value: p.id, text: p.name + (p.scope === "tools" ? "" : " (all)") })); });
@@ -1159,7 +1210,7 @@
         rr.data.forEach(function (u) {
           if (u.status !== "active" || u.role === "owner") return;
           if (u.role === "user") pick.appendChild(h("option", { value: u.id, text: u.username + " - " + (u.email || "") }));
-          else apl.appendChild(h("div", { "class": "row" }, h("span", { text: u.alias + " (" + u.username + ", " + (u.email || "") + ")  " }), h("button", { "class": "btn", type: "button", text: tr("Remove admin", "شيل الأدمن"), on: { click: async function () {
+          else apl.appendChild(h("div", { "class": "row lr" }, h("span", { text: u.alias + " (" + u.username + ", " + (u.email || "") + ")  " }), h("button", { "class": "btn", type: "button", text: tr("Remove admin", "شيل الأدمن"), on: { click: async function () {
             if (!confirm(tr("Remove this admin?", "تشيل الأدمن ده؟"))) return;
             var x = await sb.rpc("set_role", { target: u.id, new_role: "user", new_alias: null }); say(apmsg, x.error ? x.error.message : tr("Removed.", "اتشال."), x.error ? "err" : "ok"); adminsPanel(); users();
           } } })));
@@ -1214,7 +1265,7 @@
     mp.appendChild(h("p", { "class": "hint", text: owner ? tr("You can edit or delete every tool.", "تقدر تعدل أو تمسح أي أداة.") : tr("You can edit or delete the tools you created.", "تقدر تعدل أو تمسح الأدوات اللي إنت عملتها.") })); mp.appendChild(mpl); mp.appendChild(mmsg); box.appendChild(mp);
     function guideRow(slug, canEdit) {
       var st = h("span", { "class": "hint", text: "..." }), msgG = h("span", { "class": "msg" }), fi = h("input", { type: "file", accept: "application/pdf", style: "max-width:220px" });
-      var row = h("div", { "class": "row" }, h("b", { text: slug + ".pdf  " }), st);
+      var row = h("div", { "class": "row lr" }, h("b", { text: slug + ".pdf  " }), st);
       var refresh = async function () { var l = await sb.storage.from("tool-guides").list("", { search: slug + ".pdf", limit: 5 }); var ok = !l.error && (l.data || []).some(function (o) { return o.name === slug + ".pdf"; }); st.textContent = l.error ? tr("cannot check", "مش قادر اتأكد") : ok ? tr("uploaded", "مرفوع") : tr("not uploaded", "مش مرفوع"); st.dataset.ok = ok ? "1" : ""; };
       if (canEdit) {
         row.appendChild(fi);
@@ -1236,7 +1287,7 @@
       if (!rt.data.length) mpl.appendChild(h("p", { "class": "hint", text: tr("No tools yet. Add one above.", "مفيش أدوات لسه. ضيف واحدة فوق.") }));
       rt.data.forEach(function (t) {
         var can = owner || t.created_by === me.id, a = amap[t.id] || {}, holder = h("div");
-        var row = h("div", { "class": "row", id: "tool-" + t.slug }, h("span", { text: t.name + "  [" + t.class + ", " + t.status + ", " + t.visibility + "]" + (can ? "" : tr(" read only", " قراءة فقط")) + "  " }));
+        var row = h("div", { "class": "row lr", id: "tool-" + t.slug }, h("span", { text: t.name + "  [" + t.class + ", " + t.status + ", " + t.visibility + "]" + (can ? "" : tr(" read only", " قراءة فقط")) + "  " }));
         function openEdit() {
           clear(holder);
           var n1 = h("input", { type: "text", maxlength: "40", value: t.name }), c1 = h("select"), d1 = h("textarea", { rows: "3", maxlength: "600" }), d2 = h("textarea", { rows: "3", maxlength: "600" }), cm1 = h("textarea", { rows: "3" });
@@ -1301,7 +1352,7 @@
       var ds = h("input", { type: "number", min: "0", max: "90", value: String(t.discount_percent), style: "width:70px", title: "discount %" });
       var du = h("input", { type: "date", value: t.discount_until ? t.discount_until.slice(0, 10) : "" });
       pr.disabled = cu.disabled = !canPrice; ds.disabled = du.disabled = !owner;
-      var row = h("div", { "class": "row" }, h("span", { text: t.name + (mine ? "" : tr(" (another admin's)", " (لأدمن تاني)")) + "  " }), pr, cu);
+      var row = h("div", { "class": "row lr lrp" }, h("span", { text: t.name + (mine ? "" : tr(" (another admin's)", " (لأدمن تاني)")) + "  " }), pr, cu);
       if (owner) { row.appendChild(h("span", { text: " -% " })); row.appendChild(ds); row.appendChild(h("span", { text: tr(" until ", " لحد ") })); row.appendChild(du); }
       if (canPrice) row.appendChild(h("button", { "class": "btn f", type: "button", text: tr("Save", "حفظ"), on: { click: async function (ev) {
         var btn = ev.currentTarget, upd = {}, v = pr.value.trim(), c = cu.value.trim().toUpperCase();
@@ -1324,7 +1375,7 @@
       var rq = await sb.from("payment_requests").select("id,user_id,amount_minor,currency,period,reference,proof_path,created_at").eq("method", "manual").eq("status", "pending").order("created_at");
       if (!(rq.data || []).length) cp.appendChild(h("p", { "class": "hint", text: tr("None.", "مفيش.") }));
       (rq.data || []).forEach(function (q) {
-        var rowEl = h("div", { style: "padding:10px 0;border-bottom:1px solid rgba(255,255,255,.1)" }, h("span", { text: new Date(q.created_at).toLocaleString() + " - " + (q.amount_minor / 100).toFixed(2) + " " + q.currency + "/" + q.period + (q.reference ? " - ref " + q.reference : "") + " - user " + q.user_id.slice(0, 8) + "  " }));
+        var rowEl = h("div", { "class": "row lr" }, h("span", { text: new Date(q.created_at).toLocaleString(EN() ? "en-GB" : "ar-EG", { hour12: true }) + " - " + (q.amount_minor / 100).toFixed(2) + " " + q.currency + "/" + q.period + (q.reference ? " - ref " + q.reference : "") + " - user " + q.user_id.slice(0, 8) + "  " }));
         noteExtras({ kind: "payment_submitted", meta: { request: q.id } }, rowEl);
         cp.appendChild(rowEl);
       });
@@ -1342,7 +1393,7 @@
       swCb.addEventListener("change", async function () { swCb.disabled = true; var want = swCb.checked, r = await sb.rpc("set_admin_notices", { p_on: want }); if (r.error) { swCb.checked = !want; say(swMsg, tr("Could not save.", "ماتحفظش."), "err"); } else say(swMsg, want ? tr("Admins can email users.", "الأدمن يقدر يبعت إيميل.") : tr("Admin emails are off.", "إيميلات الأدمن مقفولة."), "ok"); swCb.disabled = false; });
     }
     box.appendChild(lp);
-    var LBL = { signup: ["Sign up", "تسجيل جديد"], login: ["Login", "دخول"], view_dm: ["Owner viewed a private chat", "المالك فتح شات خاص"], block_user: ["Block", "حظر"], unblock_user: ["Unblock", "فك حظر"], ban_user: ["Ban", "حظر"], unban_user: ["Unban", "فك حظر"], admin_delete_user: ["Account deleted by admin", "حذف حساب بواسطة أدمن"], delete_account: ["Account deleted by user", "المستخدم حذف حسابه"], grant_plan: ["Free plan granted", "اشتراك مجاني اتمنح"], revoke_plan: ["Free plan revoked", "اشتراك مجاني اتسحب"], review_manual_payment: ["Payment reviewed", "مراجعة دفعة"], set_role: ["Role changed", "تغيير صلاحية"], claim_owner: ["Owner claimed", "استلام الأونر"], tool_price: ["Tool price", "سعر أداة"], set_manual_instructions: ["Wallet details changed", "تغيير بيانات المحفظة"], delete_message: ["Message deleted", "رسالة اتمسحت"], contact_change: ["Contact details changed", "تعديل بيانات التواصل"], tool_added: ["Tool added", "أداة اتضافت"], tool_change: ["Tool changed", "أداة اتعدلت"], tool_deleted: ["Tool deleted", "أداة اتمسحت"], clear_user_chat: ["User chat cleared", "شات مستخدم اتمسح"], notice_sent: ["Notice emailed", "إيميل اتبعت"], notice_failed: ["Notice email failed", "الإيميل فشل"], notice_skipped: ["Notice skipped", "الإيميل اتخطى"], set_alias: ["Alias changed", "تغيير اسم الظهور"], notice_setting: ["Admin email setting", "إعداد إيميلات الأدمن"], paymob_paid: ["Card payment confirmed", "دفع بالكارت اتأكد"] };
+    var LBL = { signup: ["Sign up", "تسجيل جديد"], login: ["Login", "دخول"], view_dm: ["Owner viewed a private chat", "المالك فتح شات خاص"], block_user: ["Block", "حظر"], unblock_user: ["Unblock", "فك حظر"], ban_user: ["Ban", "حظر"], unban_user: ["Unban", "فك حظر"], admin_delete_user: ["Account deleted by admin", "حذف حساب بواسطة أدمن"], delete_account: ["Account deleted by user", "المستخدم حذف حسابه"], grant_plan: ["Free plan granted", "اشتراك مجاني اتمنح"], revoke_plan: ["Free plan revoked", "اشتراك مجاني اتسحب"], review_manual_payment: ["Payment reviewed", "مراجعة دفعة"], set_role: ["Role changed", "تغيير صلاحية"], set_chat_admin: ["Chat admin changed", "تغيير أدمن الشات"], claim_owner: ["Owner claimed", "استلام الأونر"], tool_price: ["Tool price", "سعر أداة"], set_manual_instructions: ["Wallet details changed", "تغيير بيانات المحفظة"], delete_message: ["Message deleted", "رسالة اتمسحت"], contact_change: ["Contact details changed", "تعديل بيانات التواصل"], tool_added: ["Tool added", "أداة اتضافت"], tool_change: ["Tool changed", "أداة اتعدلت"], tool_deleted: ["Tool deleted", "أداة اتمسحت"], clear_user_chat: ["User chat cleared", "شات مستخدم اتمسح"], notice_sent: ["Notice emailed", "إيميل اتبعت"], notice_failed: ["Notice email failed", "الإيميل فشل"], notice_skipped: ["Notice skipped", "الإيميل اتخطى"], set_alias: ["Alias changed", "تغيير اسم الظهور"], notice_setting: ["Admin email setting", "إعداد إيميلات الأدمن"], paymob_paid: ["Card payment confirmed", "دفع بالكارت اتأكد"] };
     lsel.appendChild(h("option", { value: "", text: tr("All", "الكل") })); Object.keys(LBL).forEach(function (k) { lsel.appendChild(h("option", { value: k, text: tr(LBL[k][0], LBL[k][1]) })); });
     var llive = h("span", { "class": "hint", style: "margin-inline-start:10px" }); lp.appendChild(h("div", { "class": "row" }, lsel, llive)); lp.appendChild(h("div", { style: "overflow-x:auto" }, h("table", { "class": "t" }, h("thead", null, h("tr", null, h("th", { text: tr("When", "الوقت") }), h("th", { text: tr("Action", "الإجراء") }), h("th", { text: tr("By", "بواسطة") }), h("th", { text: tr("Target", "الهدف") }), h("th", { text: tr("Details", "التفاصيل") }))), ltb))); lp.appendChild(lmsg);
     var allLogs = [];
@@ -1373,7 +1424,7 @@
       if (l.action === "tool_deleted") return tr("Tool deleted: ", "أداة اتمسحت: ") + nm;
       return tr("Tool changed: ", "أداة اتعدلت: ") + nm + " - " + (m.changes || []).map(lgChange).join("; ");
     }
-    function lgTime(v) { var d = new Date(v), p = function (n) { return String(n).padStart(2, "0"); }; return p(d.getDate()) + "/" + p(d.getMonth() + 1) + "/" + d.getFullYear() + " " + p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds()); }
+    function lgTime(v) { var d = new Date(v), p = function (n) { return String(n).padStart(2, "0"); }, hr = d.getHours(), ap = hr >= 12 ? "PM" : "AM", h12 = hr % 12 || 12; return p(d.getDate()) + "/" + p(d.getMonth() + 1) + "/" + d.getFullYear() + " " + p(h12) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds()) + " " + ap; }
     function lgRole(r) { return r === "owner" ? tr("Owner", "مالك") : r === "admin" ? tr("Admin", "أدمن") : r === "user" ? tr("User", "مستخدم") : (r || "?"); }
     function lgStat(r) { return r === "banned" ? tr("blocked", "محظور") : r === "active" ? tr("active", "نشط") : (r || "?"); }
     function lgMoney2(a, c) { return a == null ? "" : (a / 100).toFixed(2) + " " + (c || ""); }
@@ -1384,7 +1435,7 @@
       if (/^tool_(added|change|deleted)$/.test(A)) return [lgTool(l)];
       if (A === "set_role") o.push(tr("Role: ", "الصلاحية: ") + lgRole(m.old) + ar + lgRole(m.role)), m.alias && o.push(tr("Alias: ", "اسم الظهور: ") + (m.old_alias ? m.old_alias + ar : "") + m.alias), !m.alias && m.old_alias && o.push(tr("Alias removed: ", "اتشال اسم الظهور: ") + m.old_alias);
       else if (A === "ban_user" || A === "unban_user") o.push(tr("Status: ", "الحالة: ") + lgStat(m.old || (A === "ban_user" ? "active" : "banned")) + ar + lgStat(m.new || (A === "ban_user" ? "banned" : "active")));
-      else if (A === "block_user" || A === "unblock_user") { o.push((A === "block_user" ? tr("Blocked in: ", "حظر في: ") : tr("Unblocked in: ", "فك حظر في: ")) + (m.scope === "site" ? tr("the whole site", "الموقع كله") : tr("chat", "الشات"))); if (A === "block_user") o.push(m.until ? tr("Until ", "لحد ") + lgTime(m.until) : tr("Permanent", "دائم")); if (m.reason) o.push(tr("Reason: ", "السبب: ") + m.reason); }
+      else if (A === "block_user" || A === "unblock_user") { o.push((A === "block_user" ? tr("Blocked in: ", "حظر في: ") : tr("Unblocked in: ", "فك حظر في: ")) + (m.scope === "site" ? tr("the whole site", "الموقع كله") : tr("chat", "الشات"))); if (m.chat_admin) o.push(tr("By a chat admin", "بواسطة أدمن شات")); if (A === "block_user") o.push(m.until ? tr("Until ", "لحد ") + lgTime(m.until) : tr("Permanent", "دائم")); if (m.reason) o.push(tr("Reason: ", "السبب: ") + m.reason); }
       else if (A === "signup") o.push(tr("New account", "حساب جديد") + (m.user ? ": " + m.user : ""));
       else if (A === "login") o.push(tr("Signed in", "سجّل دخول"));
       else if (A === "claim_owner") o.push(tr("Became the owner", "بقى هو المالك"));
@@ -1396,7 +1447,8 @@
       else if (A === "review_manual_payment") { o.push((m.approved ? tr("Approved", "اتقبلت") : tr("Rejected", "اترفضت")) + (m._plan ? " - " + m._plan : "") + (m._amount != null ? " - " + lgMoney2(m._amount, m._cur) : "") + (m._period ? " / " + m._period : "") + (m._method ? " (" + m._method + ")" : "")); if (m._rej) o.push(tr("Reason: ", "السبب: ") + m._rej); }
       else if (A === "paymob_paid") o.push(tr("Card payment confirmed", "دفع بالكارت اتأكد") + (m._plan ? " - " + m._plan : "") + (m._amount != null ? " - " + lgMoney2(m._amount, m._cur) : ""));
       else if (A === "tool_price") { o.push(tr("Tool: ", "الأداة: ") + (m._tool || "?")); if (m.price_minor != null) o.push(tr("Price ", "السعر ") + lgMoney2(m.price_minor, m.currency)); if (m.discount) o.push(tr("Discount ", "الخصم ") + m.discount + "%" + (m.until ? " " + lgUntil(m.until) : "")); }
-      else if (A === "delete_message") { o.push((m.scope === "dm" ? tr("Private message deleted", "رسالة خاصة اتمسحت") : tr("Chat message deleted", "رسالة شات اتمسحت")) + (m.channel ? " (#" + m.channel + ")" : "") + (m.self ? tr(" - by its author", " - بواسطة صاحبها") : "")); if (m.reason) o.push(tr("Reason: ", "السبب: ") + m.reason); if (m.notice) o.push(tr("Email to user: ", "إيميل للمستخدم: ") + lgNotice(m.notice)); }
+      else if (A === "set_chat_admin") o.push(m.on ? tr("Made a chat admin", "اتعمل أدمن شات") : tr("Chat admin removed", "اتشال من أدمن الشات"));
+      else if (A === "delete_message") { o.push((m.scope === "dm" ? tr("Private message deleted", "رسالة خاصة اتمسحت") : tr("Chat message deleted", "رسالة شات اتمسحت")) + (m.channel ? " (#" + m.channel + ")" : "") + (m.self ? tr(" - by its author", " - بواسطة صاحبها") : "") + (m.chat_admin ? tr(" - by a chat admin", " - بواسطة أدمن شات") : "")); if (m.reason) o.push(tr("Reason: ", "السبب: ") + m.reason); if (m.notice) o.push(tr("Email to user: ", "إيميل للمستخدم: ") + lgNotice(m.notice)); }
       else if (A === "clear_user_chat") { o.push(tr("Chat messages cleared: ", "رسايل اتمسحت: ") + (m.count != null ? m.count : "?")); if (m.reason) o.push(tr("Reason: ", "السبب: ") + m.reason); if (m.notice) o.push(tr("Email to user: ", "إيميل للمستخدم: ") + lgNotice(m.notice)); }
       else if (A === "notice_sent" || A === "notice_failed" || A === "notice_skipped") { o.push(tr("Type: ", "النوع: ") + (m.kind || "?")); if (m.why) o.push(tr("Why: ", "السبب: ") + m.why); if (m.reason) o.push(tr("Reason: ", "السبب: ") + m.reason); if (m.by_role === "admin") o.push(tr("Sent by an admin, from the site account", "اتبعت من أدمن، من حساب الموقع")); if (m.error || m.err) o.push(String(m.error || m.err)); }
       else if (A === "notice_setting") o.push(tr("Admins may email users: ", "الأدمن يقدر يبعت إيميل للمستخدمين: ") + (m.old ? tr("on", "شغال") : tr("off", "مقفول")) + ar + (m.new ? tr("on", "شغال") : tr("off", "مقفول")));
@@ -1457,7 +1509,7 @@
     (pl.data || []).forEach(function (p) {
       var cov = p.scope === "tools" ? tr("only: ", "بس: ") + ptR.filter(function (q) { return q.plan_id === p.id; }).map(function (q) { return tName[q.tool_id] || "?"; }).join(", ") : tr("all tools", "كل الأدوات");
       var planLbl = h("span", { text: p.name + ": " + (p.price_minor / 100).toFixed(2) + " " + p.currency + "/" + p.period + " (" + cov + ")" + (p.description ? " - " + p.description : "") + (p.active ? "" : tr(" (DISABLED, not for sale)", " (معطلة، مش للبيع)")) + "  " });
-      var planRow = h("p", null, planLbl); pp.appendChild(planRow);
+      var planRow = h("div", { "class": "row lr" }, planLbl); pp.appendChild(planRow);
       if (owner) {
         var editPlanBox = h("div", { style: "display:none;padding:6px 0 12px" });
         var en = h("input", { type: "text", maxlength: "40", value: p.name }), epr = h("input", { type: "text", inputmode: "decimal", value: (p.price_minor / 100).toFixed(2) }), edsc = h("input", { type: "text", maxlength: "300", value: p.description || "", placeholder: tr("Plan details", "تفاصيل الخطة"), style: "min-width:260px" });
