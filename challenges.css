@@ -176,3 +176,4 @@ html[data-theme=light] #ch .ndev{background:#fff}
 #ch .prow{display:flex;align-items:center;gap:12px;padding:8px 14px;border:1px solid var(--b);border-radius:10px;background:var(--p)}
 #ch .prow .rk{width:38px;font-weight:700;color:var(--m)}#ch .prow .pn{flex:1;min-width:0;overflow-wrap:anywhere}#ch .prow .ps{font-size:12px;color:var(--m)}#ch .prow .pp{font-weight:700;color:var(--r2);min-width:70px;text-align:end}
 @media (max-width:560px){#ch .podium{gap:8px}#ch .pstep{flex-basis:100px;padding:12px 6px}#ch .pstep .pn{font-size:13px}}
+#ch .pstep .av{align-self:center}
