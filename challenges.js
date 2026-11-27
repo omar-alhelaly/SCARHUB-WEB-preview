@@ -1231,7 +1231,7 @@
   /* ---------- career roadmaps: original step-by-step plans per career. Static data (roadmaps-data.js); the ticks are kept in this browser only. ---------- */
   function careerBlock(ps) {
     var data = window.SCAR_RM || []; if (!data.length) return null;
-    var wrap = h("div", { "class": "box crbox" }), cur = null;
+    var wrap = h("div", { "class": "box crbox" }), cur = null, openSt = null;
     var m = (location.hash || "").match(/^#\/roadmap\/([a-z0-9-]+)/); if (m) cur = m[1];
     function key(id) { return "scar_rm_" + id; }
     function loadDone(id) { try { return JSON.parse(localStorage.getItem(key(id)) || "[]"); } catch (e) { return []; } }
@@ -1257,17 +1257,26 @@
       if (c.pre) det.appendChild(h("p", { "class": "note", text: tr("Before you start: ", "قبل ما تبدأ: ") + tr(c.pre[0], c.pre[1]) }));
       if (c.tools) { var tc = h("div", { "class": "crtools" }, h("b", { text: tr("Tool types you will meet: ", "أنواع الأدوات اللي هتقابلها: ") })); c.tools.forEach(function (x) { tc.appendChild(h("span", { "class": "pill", text: tr(x[0], x[1]) })); }); det.appendChild(tc); }
       det.appendChild(progress(done.length, c.st.length));
-      var tl = h("ol", { "class": "crtl" });
+      var tl = h("div", { "class": "crflow", role: "list" });
+      tl.appendChild(h("div", { "class": "crend crstart", role: "listitem", text: tr("Start here", "ابدأ من هنا") }));
       c.st.forEach(function (s, i) {
-        var on = done.indexOf(i) >= 0, ck = h("input", { type: "checkbox", "aria-label": tr("Stage done", "المرحلة خلصت") }); ck.checked = on;
+        var on = done.indexOf(i) >= 0, isOpen = openSt === c.id + ":" + i, ck = h("input", { type: "checkbox", "aria-label": tr("Stage done", "المرحلة خلصت") }); ck.checked = on;
         ck.addEventListener("change", function () { var a = loadDone(c.id).filter(function (x) { return x !== i; }); if (ck.checked) a.push(i); saveDone(c.id, a); draw(); });
         var learn = h("ul"); s.l.forEach(function (x) { learn.appendChild(h("li", { text: tr(x[0], x[1]) })); });
         var prac = h("ul"); s.p.forEach(function (x) { prac.appendChild(h("li", { text: tr(x[0], x[1]) })); });
-        tl.appendChild(h("li", { "class": "crstage" + (on ? " done" : "") },
-          h("div", { "class": "crhead" }, h("span", { "class": "crn", text: on ? "\u2713" : String(i + 1) }), h("b", { text: tr(s.t[0], s.t[1]) }), h("small", { text: s.w + " " + tr("weeks", "أسابيع") }), h("label", { "class": "crck" }, ck, h("span", { text: tr("Done", "خلصت") }))),
+        tl.appendChild(h("div", { "class": "crarrow", "aria-hidden": "true" }));
+        var btn = h("button", { "class": "crhead", type: "button", "aria-expanded": isOpen ? "true" : "false", onclick: function () { openSt = isOpen ? null : c.id + ":" + i; draw(); } },
+          h("span", { "class": "crn", text: on ? "\u2713" : String(i + 1) }), h("b", { text: tr(s.t[0], s.t[1]) }), h("small", { text: s.w + " " + tr("weeks", "أسابيع") }), h("span", { "class": "crchev", "aria-hidden": "true", text: isOpen ? "\u25B2" : "\u25BC" }));
+        var node = h("div", { "class": "crstage" + (on ? " done" : "") + (isOpen ? " open" : ""), role: "listitem" }, btn);
+        if (isOpen) node.appendChild(h("div", { "class": "crbody" },
           h("div", { "class": "crcols" }, h("div", null, h("h4", { text: tr("Learn", "اتعلم") }), learn), h("div", null, h("h4", { text: tr("Practise", "تمرّن") }), prac)),
-          h("p", { "class": "crgoal", text: tr("You are ready to move on when: ", "تبقى جاهز للمرحلة الجاية لما: ") + tr(s.m[0], s.m[1]) })));
+          h("p", { "class": "crgoal", text: tr("You are ready to move on when: ", "تبقى جاهز للمرحلة الجاية لما: ") + tr(s.m[0], s.m[1]) }),
+          h("label", { "class": "crck" }, ck, h("span", { text: tr("Mark this stage as done", "علّم المرحلة دي إنها خلصت") }))));
+        tl.appendChild(node);
       });
+      tl.appendChild(h("div", { "class": "crarrow", "aria-hidden": "true" }));
+      tl.appendChild(h("div", { "class": "crend crgoalnode", role: "listitem", text: tr("Ready for the job", "جاهز للشغل") }));
+      det.appendChild(h("p", { "class": "note", text: tr("Tap a stage to see what to learn and practise.", "اضغط على أي مرحلة تشوف تتعلم وتتمرن على إيه.") }));
       det.appendChild(tl);
       var mine = (c.paths || []).map(function (sl) { return ps.filter(function (x) { return x.slug === sl; })[0]; }).filter(Boolean);
       if (mine.length) {
