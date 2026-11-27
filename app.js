@@ -174,6 +174,7 @@
     add("path", { d: "M28 37q4 3 8 0", stroke: "#111", "stroke-width": 1.6, fill: "none", "stroke-linecap": "round" });
     return s;
   }
+  window.scarAvatar = function (code, uid) { return avatarSvg(code, uid); };
   function avatarBtn(code, pressed, onclick) {
     var b = h("button", { type: "button", "class": "av", "aria-label": "Avatar " + code, "aria-pressed": pressed ? "true" : "false" }, avatarSvg(code));
     if (onclick) b.addEventListener("click", onclick); return b;
@@ -631,6 +632,7 @@
   function fmtDate(v) { return v ? new Date(v).toLocaleDateString(EN() ? "en-GB" : "ar-EG") : "-"; }
   function fmtTime(v) { return v ? new Date(v).toLocaleString(EN() ? "en-GB" : "ar-EG") : "-"; }
   var ACT_LBL = { signup: ["Sign up", "تسجيل جديد"], block_user: ["Blocked", "حظر"], unblock_user: ["Unblocked", "فك حظر"], ban_user: ["Banned", "حظر"], unban_user: ["Unbanned", "فك حظر"], grant_plan: ["Free plan granted", "اشتراك مجاني اتمنح"], revoke_plan: ["Free plan revoked", "اشتراك مجاني اتسحب"], review_manual_payment: ["Payment reviewed", "مراجعة دفعة"], set_role: ["Role changed", "تغيير صلاحية"] };
+  window.scarOpenProfile = function (id) { return openProfile(id); };
   async function openProfile(id) {
     var old = $("profmodal"); if (old) old.remove();
     var ov = h("div", { id: "profmodal", role: "dialog", "aria-modal": "true", style: "position:fixed;inset:0;z-index:1000;background:#000c;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:4vh 12px" });
