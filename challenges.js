@@ -635,7 +635,7 @@
   var MINS = 5;
   function pathStats(p) { var t = 0, s = 0, pts = 0; p.rooms.forEach(function (r) { t += r.tasks; s += r.solved; pts += r.points; }); return { tasks: t, solved: s, pts: pts, mins: t * MINS, done: p.rooms.length > 0 && p.rooms.every(function (r) { return r.tasks > 0 && r.solved >= r.tasks; }) }; }
   function fmtMins(m) { return m >= 60 ? Math.floor(m / 60) + tr(" h ", " س ") + (m % 60 ? (m % 60) + tr(" min", " د") : "") : m + tr(" min", " د"); }
-  var PMETA = { "cyber-foundations": { lv: "easy", hue: 160, ic: "shield" }, "networking-basics": { lv: "easy", hue: 205, ic: "net" }, "soc-analyst-start": { lv: "medium", hue: 35, ic: "eye" }, "junior-pentester": { lv: "medium", hue: 350, ic: "bug" } };
+  var PMETA = { "cyber-foundations": { lv: "easy", hue: 160, ic: "shield", tp: ["Foundations","الأساسيات"] }, "networking-basics": { lv: "easy", hue: 205, ic: "net", tp: ["Networking","الشبكات"] }, "soc-analyst-start": { lv: "medium", hue: 35, ic: "eye", tp: ["SOC","مركز العمليات"] }, "junior-pentester": { lv: "medium", hue: 350, ic: "bug", tp: ["Pentest","اختبار الاختراق"] } };
   var ICONS = { shield: '<path d="M12 2.5l8 3v6c0 5-3.4 8.6-8 10.5-4.6-1.9-8-5.5-8-10.5v-6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>', net: '<circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/><path d="M12 7.5v4M12 11.5l-6 5.5M12 11.5l6 5.5"/>', eye: '<path d="M2 12s3.7-7 10-7 10 7 10 7-3.7 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>', bug: '<rect x="8" y="8" width="8" height="11" rx="4"/><path d="M9 8a3 3 0 016 0M4 12h4M16 12h4M5 19l3-2M19 19l-3-2M5 6l3 3M19 6l-3 3"/>' };
   function pcover(m) { var d = h("div", { "class": "pcov", style: "--ph:" + m.hue }); var sv = document.createElementNS("http://www.w3.org/2000/svg", "svg"); sv.setAttribute("viewBox", "0 0 24 24"); sv.setAttribute("width", "54"); sv.setAttribute("height", "54"); sv.setAttribute("fill", "none"); sv.setAttribute("stroke", "currentColor"); sv.setAttribute("stroke-width", "1.5"); sv.setAttribute("stroke-linecap", "round"); sv.setAttribute("stroke-linejoin", "round"); sv.innerHTML = ICONS[m.ic] || ICONS.shield; d.appendChild(sv); return d; }
   async function pagePaths() {
@@ -648,10 +648,10 @@
       var g = h("div", { "class": "ptiles" });
       grp.forEach(function (p) {
         var st = pathStats(p), m = PMETA[p.slug] || { lv: lv, hue: 210, ic: "shield" }, pct = st.tasks ? Math.round(100 * st.solved / st.tasks) : 0;
-        g.appendChild(h("button", { "class": "ptile", type: "button", onclick: function () { location.hash = "#/path/" + p.slug; } },
+        g.appendChild(h("button", { "class": "ptile", type: "button", style: "--ph:" + m.hue, onclick: function () { location.hash = "#/path/" + p.slug; } },
           pcover(m),
-          h("div", { "class": "pbody" }, h("div", { "class": "meta" }, diffPill(lv), st.done ? h("span", { "class": "pill", text: tr("Completed", "مكتمل") }) : null),
-            h("h3", { text: pick(p, "title") }), h("p", { text: pick(p, "summary") }),
+          h("div", { "class": "pbody" }, h("div", { "class": "meta" }, diffPill(lv), m.tp ? h("span", { "class": "ptopic", text: tr(m.tp[0], m.tp[1]) }) : null, st.done ? h("span", { "class": "pill", text: tr("Completed", "مكتمل") }) : null),
+            h("h3", { "class": "ptitle", text: pick(p, "title") }), h("p", { text: pick(p, "summary") }),
             h("div", { "class": "meta" }, h("span", { text: p.rooms.length + " " + tr("rooms", "غرف") }), h("span", { text: "~" + fmtMins(st.mins) }), h("span", { text: st.pts + " " + tr("pts", "نقطة") })),
             progress(st.solved, st.tasks), h("div", { "class": "meta", text: pct + "% · " + st.solved + " / " + st.tasks + " " + tr("tasks", "مهمة") }))));
       });
@@ -666,7 +666,8 @@
     root.appendChild(h("button", { "class": "back", type: "button", onclick: function () { location.hash = "#/paths"; }, text: tr("< All paths", "< كل المسارات") }));
     if (!p) { root.appendChild(h("div", { "class": "empty", text: tr("Path not found.", "المسار مش موجود.") })); return; }
     var st = pathStats(p);
-    root.appendChild(h("div", { "class": "roomh" }, h("div", { "class": "meta" }, h("span", { "class": "pill easy", text: p.rooms.length + " " + tr("rooms", "غرف") }), h("span", { "class": "pill medium", text: "~" + fmtMins(st.mins) }), h("span", { "class": "pill", text: st.pts + " " + tr("pts", "نقطة") })), h("h2", { text: pick(p, "title") }), h("p", { text: pick(p, "summary") }), progress(st.solved, st.tasks), h("div", { "class": "meta", text: st.solved + " / " + st.tasks + " " + tr("tasks done", "مهمة اتحلت") })));
+    var pm = PMETA[p.slug] || {};
+    root.appendChild(h("div", { "class": "roomh", style: "--ph:" + (pm.hue || 210) }, h("div", { "class": "meta" }, diffPill(pm.lv || "easy"), pm.tp ? h("span", { "class": "ptopic", text: tr(pm.tp[0], pm.tp[1]) }) : null, h("span", { "class": "pill easy", text: p.rooms.length + " " + tr("rooms", "غرف") }), h("span", { "class": "pill medium", text: "~" + fmtMins(st.mins) }), h("span", { "class": "pill", text: st.pts + " " + tr("pts", "نقطة") })), h("h2", { "class": "ptitle", text: pick(p, "title") }), h("p", { text: pick(p, "summary") }), progress(st.solved, st.tasks), h("div", { "class": "meta", text: st.solved + " / " + st.tasks + " " + tr("tasks done", "مهمة اتحلت") })));
     root.appendChild(h("div", { "class": "box" }, h("h3", { text: tr("What this path prepares you for", "المسار ده بيجهزك لإيه") }), h("p", { text: pick(p, "prepares") })));
     var list = h("div", { "class": "plist" }), nextSet = false;
     p.rooms.forEach(function (r, i) {
