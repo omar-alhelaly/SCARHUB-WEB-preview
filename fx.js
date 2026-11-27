@@ -169,7 +169,8 @@ html[data-theme=light] #radar{opacity:.55}\
 .mq div span:after{content:"\\25B8";color:var(--r);font-size:.6em}\
 @keyframes mq{from{transform:translate3d(0,0,0)}to{transform:translate3d(-50%,0,0)}}\
 .mq:hover div{animation-play-state:paused}\
-[dir=rtl] .mq div{animation-direction:reverse}\
+@keyframes mqr{from{transform:translate3d(0,0,0)}to{transform:translate3d(50%,0,0)}}\
+[dir=rtl] .mq div{animation:mqr var(--mqd,38s) linear infinite!important}\
 .wm{max-width:1360px;margin:0 auto;padding:10px 5vw 0;overflow:hidden;line-height:.8;user-select:none;pointer-events:none}\
 .wm b{display:block;text-align:center;font:800 clamp(90px,26vw,420px)/.82 var(--fd-display,system-ui),system-ui,sans-serif;letter-spacing:.06em;color:transparent;-webkit-text-stroke:1.5px var(--b);margin-bottom:-.12em}\
 @media (prefers-reduced-motion:reduce){.mq div{animation:none}#intro .big span{animation:none;opacity:1;transform:none}}';
