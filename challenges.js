@@ -499,7 +499,12 @@
     root.appendChild(tabs);
     if (!d.top.length) { root.appendChild(h("div", { "class": "empty", text: tr("No solves yet. Be the first.", "مفيش حد حل لسه. كن أول واحد.") })); return; }
     var t = h("table", { "class": "lb" }, h("tr", null, h("th", { text: "#" }), h("th", { text: tr("Player", "اللاعب") }), h("th", { text: tr("Solved", "المهام") }), h("th", { text: tr("Points", "النقاط") })));
-    d.top.forEach(function (x) { t.appendChild(h("tr", { "class": x.me ? "me" : "" }, h("td", { text: String(x.rank) }), h("td", { text: x.username }), h("td", { text: String(x.solves) }), h("td", { text: String(x.points) }))); });
+    d.top.forEach(function (x) { t.appendChild(h("tr", { "class": x.me ? "me" : "" }, h("td", { text: String(x.rank) }), h("td", null, (function () {
+      var canP = typeof window.scarOpenProfile === "function" && x.uid && me, w = h("span", { style: "display:inline-flex;align-items:center;gap:8px" + (canP ? ";cursor:pointer" : "") });
+      if (typeof window.scarAvatar === "function") { var av = h("span", { "class": "av", style: "width:28px;height:28px" }); try { av.appendChild(window.scarAvatar(x.avatar || "b1", x.uid)); w.appendChild(av); } catch (e) { } }
+      w.appendChild(h("b", { text: x.username, style: "font-weight:600" }));
+      if (canP) { w.title = tr("View profile", "شوف البروفايل"); w.addEventListener("click", function () { window.scarOpenProfile(x.uid); }); }
+      return w; })()), h("td", { text: String(x.solves) }), h("td", { text: String(x.points) }))); });
     root.appendChild(t);
     if (d.me && !d.top.some(function (x) { return x.me; })) root.appendChild(h("p", { "class": "cnt", text: tr("Your rank: #", "ترتيبك: #") + d.me.rank + " · " + d.me.points + " " + tr("points", "نقطة") }));
   }
