@@ -486,7 +486,7 @@
     });
     cards.forEach(function (c, i) { if (!used[i]) tb.appendChild(c); });
     right.appendChild(tb);
-    root.appendChild(h("div", { "class": "rg" }, left, right));
+    root.appendChild(h("div", { "class": "rg" + (left.childNodes.length ? "" : " solo") }, left, right));
   }
 
   var BSEC = null;
