@@ -85,3 +85,4 @@ body[data-page=admin] .panel label{display:block;font-size:13px;color:var(--m);m
 .ag .btn{flex:1 1 auto}
 body[data-page=admin] .panel table{table-layout:auto}
 @media (max-width:900px){.ags{grid-template-columns:1fr;min-width:0;max-width:none}}
+@media(max-width:600px){.tabs{flex-wrap:wrap}.tabs button{flex:1 1 auto;min-width:0;padding:8px 10px}}
