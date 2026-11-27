@@ -281,3 +281,27 @@ html[data-theme=light] #ch .ptitle{color:hsl(var(--ph,210) 80% 34%)}
 #ch .phyl{width:12px;height:12px;border-radius:50%;background:#555;align-self:center;margin-inline-end:6px}#ch .phyl.on{background:#22c55e;box-shadow:0 0 6px #22c55e}
 #ch .phyk{display:flex;flex-direction:column;align-items:center;gap:3px;color:#cfcfd6}#ch .phyk i{width:26px;height:20px;border-radius:3px;background:#0b0b0d;border:2px solid #666;position:relative}#ch .phyk.up i::after{content:"";position:absolute;right:2px;top:2px;width:6px;height:6px;border-radius:50%;background:#22c55e}#ch .phyk small{font-size:10px}
 #ch .phyr{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px;font-size:13px}
+/* live classes + AI upskilling */
+#ch .lvwrap{display:grid;gap:14px}#ch .lvh{margin:10px 0 0}#ch .lvbar{display:flex;justify-content:flex-end}
+#ch .lvcard,#ch .lvpast{display:flex;gap:16px;align-items:flex-start}#ch .lvmain{flex:1;min-width:0}#ch .lvmain h3{margin:6px 0}
+#ch .lvdate{flex:0 0 64px;text-align:center;border:1px solid var(--b);border-radius:12px;background:var(--p);padding:8px 0}#ch .lvdate b{display:block;font-size:26px;line-height:1.1}#ch .lvdate span{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--m)}
+#ch .lvbadge{display:inline-block;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;border:1px solid var(--b);color:var(--m)}#ch .lvbadge.live{background:#d92d3a;border-color:#d92d3a;color:#fff}
+#ch .lvbig{border-color:var(--r)}#ch .lvbig h3{font-size:1.25em}#ch .islive{box-shadow:0 0 0 2px #d92d3a33}
+#ch .lvdesc{margin:4px 0 8px;white-space:pre-wrap;word-break:break-word}#ch .lvact{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}#ch .lvok{font-weight:700;color:#1e8e5a}
+#ch .lvjoin{text-decoration:none;display:inline-block}
+#ch .lvform{display:grid;gap:10px}#ch .lvf{display:grid;gap:4px;font-size:14px}#ch .lvf input,#ch .lvf textarea{width:100%;box-sizing:border-box;padding:9px 10px;border-radius:9px;border:1px solid var(--b);background:var(--bg);color:var(--t);font:inherit}#ch .lvck{display:flex;gap:8px;align-items:center}#ch .lvck input{width:auto}
+@media (max-width:560px){#ch .lvcard,#ch .lvpast{gap:12px}#ch .lvdate{flex-basis:54px}#ch .lvdate b{font-size:22px}}
+
+#ch .folders{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;margin-top:18px}
+#ch .folder{position:relative;display:block;text-align:start;padding:0;background:none;border:0;color:var(--t);font-family:inherit;cursor:pointer;padding-top:14px;transition:transform .15s}
+#ch .folder{display:flex;flex-direction:column}#ch .folder .fbody{flex:1}
+#ch .folder:hover{transform:translateY(-3px)}
+#ch .folder .ftab{position:absolute;top:0;inset-inline-start:0;width:42%;height:16px;border-radius:10px 10px 0 0;background:hsl(var(--sh,0) 60% 50%)}
+#ch .folder .fbody{background:var(--p);border:1px solid var(--b);border-top:3px solid hsl(var(--sh,0) 60% 50%);border-radius:0 12px 12px 12px;padding:16px;min-height:200px}
+#ch .folder:hover .fbody{border-color:hsl(var(--sh,0) 70% 55%)}
+#ch .folder h3{margin:0 0 6px}
+#ch .fnames{list-style:none;margin:10px 0;padding:0;color:var(--m);font-size:13px}
+#ch .fnames li{padding:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#ch .fnames li:before{content:"\2022  ";color:hsl(var(--sh,0) 60% 50%)}
+#ch .fnames .more:before{content:""}
+@media(max-width:560px){#ch .folders{grid-template-columns:1fr}}
