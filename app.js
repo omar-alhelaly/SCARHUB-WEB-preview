@@ -760,7 +760,7 @@
 
 
   /* ---------- contact page: values come from site_contact (public read); only the owner sees the editor ---------- */
-  var CT_KEYS = [["email", "Email", "الإيميل"], ["whatsapp", "WhatsApp", "واتساب"], ["linkedin", "LinkedIn", "لينكدإن"], ["github", "GitHub", "جيت هاب"], ["tiktok", "TikTok", "تيك توك"], ["facebook", "Facebook", "فيسبوك"], ["instagram", "Instagram", "انستجرام"]];
+  var CT_KEYS = [["email", "Email", "الإيميل"], ["linkedin", "LinkedIn", "لينكدإن"], ["instagram", "Instagram", "انستجرام"]];
   var CT_RE = { email: /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,24}$/, linkedin: /^https:\/\/([a-z]{2,3}\.)?linkedin\.com\/[^\s<>"']{1,255}$/, github: /^https:\/\/github\.com\/[^\s<>"']{1,255}$/, tiktok: /^https:\/\/(www\.)?tiktok\.com\/[^\s<>"']{1,255}$/, facebook: /^https:\/\/(www\.|m\.)?(facebook\.com|fb\.com|fb\.me)\/[^\s<>"']{1,255}$/, instagram: /^https:\/\/(www\.)?instagram\.com\/[^\s<>"']{1,255}$/ };
   function ctValid(k, v) { if (k === "whatsapp") return /^\+?[0-9]{8,15}$/.test(v.replace(/[\s()-]/g, "")); return CT_RE[k] ? CT_RE[k].test(v) : false; }
   function ctHref(k, v) { if (!ctValid(k, v)) return null; if (k === "email") return "mailto:" + v; if (k === "whatsapp") return "https://wa.me/" + v.replace(/[\s()-]/g, "").replace(/^\+/, ""); return v; }
@@ -770,6 +770,31 @@
     if (!r.error) (r.data || []).forEach(function (x) { vals[x.key] = x; });
     function apply() { CT_KEYS.forEach(function (k) { var a = box.querySelector('a[data-k="' + k[0] + '"]'), v = vals[k[0]]; if (!a || !v) return; var href = ctHref(k[0], v.value); if (!href) return; a.setAttribute("href", href); var sm = a.querySelector("small"); if (sm) sm.textContent = v.label; }); }
     apply();
+    /* public contact form: sent through submit_contact (validated and rate limited in the database); only the owner reads the messages */
+    (function () {
+      var fm = h("form", { "class": "panel", style: "max-width:760px;margin:24px auto 0", novalidate: "novalidate" });
+      var nm = h("input", { type: "text", maxlength: "80", autocomplete: "name", required: "required", "aria-label": tr("Your name", "اسمك"), placeholder: tr("Your name", "اسمك") });
+      var em = h("input", { type: "email", maxlength: "254", autocomplete: "email", required: "required", "aria-label": tr("Your email", "إيميلك"), placeholder: tr("Your email", "إيميلك") });
+      var ms = h("textarea", { maxlength: "2000", rows: "5", required: "required", "aria-label": tr("Message", "الرسالة"), placeholder: tr("Your message (10 to 2000 characters)", "رسالتك (من 10 لـ 2000 حرف)") });
+      var hp = h("input", { type: "text", name: "website", tabindex: "-1", autocomplete: "off", "aria-hidden": "true", style: "position:absolute;left:-9999px;width:1px;height:1px;opacity:0" });
+      var out = h("div", { "class": "msg" }), go2 = h("button", { type: "submit", "class": "btn f", text: tr("Send message", "ابعت الرسالة") });
+      [nm, em, ms].forEach(function (x) { x.style.cssText = "width:100%;box-sizing:border-box;padding:11px;border-radius:10px;border:1px solid var(--b);background:var(--bg);color:var(--t);font:inherit;margin:6px 0"; });
+      fm.appendChild(h("h2", { text: tr("Send us a message", "ابعتلنا رسالة") })); fm.appendChild(h("p", { "class": "hint", text: tr("We read every message. Please do not send passwords or private data.", "بنقرا كل رسالة. من فضلك متبعتش باسوردات أو بيانات خاصة.") }));
+      [nm, em, ms, hp, go2, out].forEach(function (x) { fm.appendChild(x); });
+      fm.addEventListener("submit", async function (e) {
+        e.preventDefault(); var n = nm.value.trim(), m = em.value.trim(), t = ms.value.trim();
+        if (n.length < 2 || /[<>]/.test(n)) return say(out, tr("Enter your name (2 to 80 letters, no < or >).", "اكتب اسمك (من 2 لـ 80 حرف، من غير < أو >)."), "err");
+        if (!CT_RE.email.test(m)) return say(out, tr("Enter a valid email.", "اكتب إيميل صحيح."), "err");
+        if (t.length < 10) return say(out, tr("The message is too short (at least 10 characters).", "الرسالة قصيرة (10 حروف على الأقل)."), "err");
+        var last = 0; try { last = +localStorage.getItem("scar_ct_last") || 0; } catch (x) {}
+        if (Date.now() - last < 30000) return say(out, tr("Please wait a moment before sending another message.", "استنى شوية قبل ما تبعت رسالة تانية."), "err");
+        go2.disabled = true; var x = await sb.rpc("submit_contact", { p_name: n, p_email: m, p_message: t, p_hp: hp.value }); go2.disabled = false;
+        if (x.error) return say(out, /slow down/.test(x.error.message || "") ? tr("Too many messages. Try again in a while.", "رسائل كتير. جرب تاني بعد شوية.") : tr("Could not send. Check the fields and try again.", "الرسالة ماتبعتتش. راجع الخانات وجرب تاني."), "err");
+        try { localStorage.setItem("scar_ct_last", String(Date.now())); } catch (x2) {}
+        nm.value = ""; em.value = ""; ms.value = ""; say(out, tr("Thanks, your message was sent.", "شكراً، رسالتك اتبعتت."), "ok");
+      });
+      box.parentNode.appendChild(fm);
+    })();
     if (!me || me.role !== "owner") return;
     var panel = h("div", { "class": "panel", style: "max-width:760px;margin:24px auto 0" }, h("h2", { text: tr("Edit contact details (owner only)", "عدّل بيانات التواصل (للمالك بس)") }), h("p", { "class": "hint", text: tr("Changes show on this page for everyone and are written to the Logs.", "التعديلات بتظهر لكل الناس وبتتسجل في السجل.") }));
     CT_KEYS.forEach(function (k) {
@@ -788,6 +813,17 @@
       panel.appendChild(h("div", { "class": "row", style: "display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0" }, h("b", { style: "min-width:90px", text: tr(k[1], k[2]) }), v, l, sv, msg));
     });
     box.parentNode.appendChild(panel);
+    var inb = h("div", { "class": "panel", style: "max-width:760px;margin:24px auto 0" }, h("h2", { text: tr("Contact messages (owner only)", "رسائل التواصل (للمالك بس)") })), inl = h("div", {}), inm = h("div", { "class": "msg" });
+    async function loadInbox() {
+      var q = await sb.rpc("list_contact_messages"); clear(inl); if (q.error) return say(inm, tr("Could not load messages.", "مقدرتش أحمل الرسائل."), "err");
+      var rows = q.data || []; if (!rows.length) inl.appendChild(h("p", { "class": "hint", text: tr("No messages yet.", "مفيش رسائل لسه.") }));
+      rows.forEach(function (r) {
+        var del = h("button", { type: "button", "class": "btn", text: tr("Delete", "مسح") });
+        del.onclick = async function () { del.disabled = true; var z = await sb.rpc("delete_contact_message", { p_id: r.id }); if (z.error) { del.disabled = false; return say(inm, tr("Could not delete.", "ماتمسحش."), "err"); } loadInbox(); };
+        inl.appendChild(h("div", { style: "border:1px solid var(--b);border-radius:10px;padding:10px 12px;margin:8px 0" }, h("b", { text: r.name + " <" + r.email + ">" }), h("div", { "class": "hint", text: new Date(r.created_at).toLocaleString() }), h("p", { style: "white-space:pre-wrap;word-break:break-word;margin:6px 0", text: r.message }), del));
+      });
+    }
+    inb.appendChild(inl); inb.appendChild(inm); box.parentNode.appendChild(inb); loadInbox();
   }
   /* ---------- community ---------- */
   async function communityPage() {
