@@ -705,17 +705,19 @@
     var d = new Date(c.issued_at), ds = d.toLocaleDateString("en-GB", { year: "numeric", month: "long", day: "numeric" });
     var vurl = location.href.split("#")[0].split("?")[0] + "#/cert/" + c.id;
     root.appendChild(h("div", { "class": "okv", text: "\u2713 " + tr("Verified: this certificate was issued by SCAR.", "تم التحقق: الشهادة دي صادرة من SCAR.") }));
-    var qrBox = h("div", { "class": "cqr" }); var qs = qrSvg(vurl, 132); if (qs) qrBox.appendChild(qs);
+    var qrBox = h("div", { "class": "cqi" }); var qs = qrSvg(vurl, 132); if (qs) qrBox.appendChild(qs);
     var cert = h("div", { "class": "certp" },
       h("div", { "class": "cin" },
         h("div", { "class": "ck", text: "SCAR" }), h("div", { "class": "ct", text: "Certificate of Completion" }),
         h("div", { "class": "cs", text: "This certifies that" }), h("div", { "class": "cn", text: c.holder }),
         h("div", { "class": "cs", text: "has completed all " + c.rooms + " rooms of the learning path" }),
         h("div", { "class": "cp", text: c.title_en }),
-        h("div", { "class": "cf", text: "Issued " + ds }),
-        qrBox, h("div", { "class": "cs", text: "Scan to verify" }),
-        ltr(h("div", { "class": "ci", text: c.id })),
-        h("div", { "class": "cd", text: "SCAR completion certificate. It shows the learner finished this SCAR learning path. It is not an official accreditation or a professional qualification. Verify it at the address the QR code opens, using the ID above." })));
+        h("div", { "class": "cqr" }, qrBox),
+        h("div", { "class": "cbot" },
+          h("div", { "class": "cl" }, h("div", { text: "Issued" }), h("div", { text: ds })),
+          ltr(h("div", { "class": "ci", text: c.id })),
+          h("div", { "class": "cr" }, h("div", { text: "Scan the code to verify" }), h("div", { text: "this certificate on the SCAR site" }))),
+        h("div", { "class": "cd", text: "SCAR completion certificate. It shows the learner finished this SCAR learning path. It is not an official accreditation or a professional qualification." })));
     cert.setAttribute("dir", "ltr"); root.appendChild(cert);
     root.appendChild(h("div", { "class": "rowb noprint" }, h("button", { "class": "btn2 f", type: "button", text: tr("Print / save as PDF", "اطبع / احفظ PDF"), onclick: function () { window.print(); } }), h("button", { "class": "btn2", type: "button", text: tr("Copy verify link", "انسخ لينك التحقق"), onclick: function () { try { navigator.clipboard.writeText(vurl); toast(tr("Copied", "اتنسخ")); } catch (e) {} } })));
   }
