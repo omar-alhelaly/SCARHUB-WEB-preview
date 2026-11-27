@@ -706,59 +706,76 @@
   function maskPh(mk) { if (!mk || !/^[0-9]+( [0-9]+)*$/.test(mk)) return tr("Your answer", "إجابتك"); return mk.split(" ").map(function (n) { var k = Math.min(+n, 60), o = []; for (var i = 0; i < k; i++) o.push("\u2022"); return o.join(" "); }).join("   "); }
   function progress(done, total) { var b = h("div", { "class": "bar" + (total && done >= total ? " done" : "") }, h("i")); b.firstChild.style.width = (total ? Math.round(100 * done / total) : 0) + "%"; return b; }
 
-  /* ---------- Daily Lab: one small theory task per day, the same for everybody, chosen from the published rooms by the date.
-     It only reads room data and answers through the existing server check (rate limited, solved once), so it adds no new write path. ---------- */
-  async function dailyData(cat) {
-    try {
-      var slugs = []; cat.sections.forEach(function (s) { s.rooms.forEach(function (r) { slugs.push(r.slug); }); }); slugs.sort();
-      var day = Math.floor(Date.now() / 864e5);
-      for (var k = 0; k < slugs.length; k++) {
-        var r = await rpc("ch_room", { p_slug: slugs[(day + k) % slugs.length] });
-        if (!r || !r.tasks || !r.tasks.length) continue;
-        var b = r.body || {}; if ((b.artifacts || []).length || !b.modules) continue;
-        var i = day % r.tasks.length, learn = [];
-        b.modules.forEach(function (m) { if ((m.tasks || []).indexOf(i) >= 0) (m.learn || []).forEach(function (x) { if (x.t === "p") learn.push(EN() ? x.en : (x.ar || x.en)); }); });
-        return { room: r, task: r.tasks[i], learn: learn };
-      }
-    } catch (e) {}
-    return null;
-  }
-  function dailyBox(d) {
-    var t = d.task, st = h("div", { "class": "st" }), inp = h("input", { type: "text", maxlength: "200", autocomplete: "off", spellcheck: "false", "aria-label": tr("answer", "إجابة") });
-    var btn = h("button", { "class": "btn2 f", type: "button", text: tr("Check", "تحقق") });
-    function done() { inp.disabled = true; btn.disabled = true; inp.placeholder = tr("Solved", "اتحلت"); st.className = "st good"; st.textContent = "✓ " + tr("Done for today. Come back tomorrow.", "خلصت النهارده. ارجع بكرة."); }
-    async function check() {
-      if (!me) { st.className = "st warn"; st.textContent = tr("Sign in first.", "سجّل دخول الأول."); return; }
-      if (!inp.value.trim()) return; btn.disabled = true;
-      try {
-        var res = await rpc("ch_check", { p_task: t.id, p_answer: inp.value });
-        if (res.status === "correct") { t.solved = true; done(); toast("+" + res.points + " " + tr("points", "نقطة") + " · " + res.total); }
-        else if (res.status === "already") { t.solved = true; done(); }
-        else if (res.status === "wrong") { st.className = "st bad"; st.textContent = tr("Not correct. Read the text above and try again.", "مش صح. اقرا النص اللي فوق وجرّب تاني."); }
-        else if (res.status === "rate") { st.className = "st warn"; st.textContent = tr("Too many attempts. Wait a minute.", "محاولات كتير. استنى دقيقة."); }
-        else if (res.status === "login") { st.className = "st warn"; st.textContent = tr("Sign in first.", "سجّل دخول الأول."); }
-        else { st.className = "st warn"; st.textContent = tr("Cannot check this task now.", "مش قادر أتحقق من المهمة دلوقتي."); }
-      } catch (e) { st.className = "st warn"; st.textContent = tr("Connection problem. Try again.", "مشكلة اتصال. جرّب تاني."); }
-      if (!t.solved) btn.disabled = false;
+  /* ---------- Daily Challenge: one question per day. The user picks ONE field, answers once. A wrong answer is final, a correct one gives 10 points.
+     All of it is enforced in the database (daily_pick / daily_answer), so a refresh, a second tab or a direct call cannot give a second try. ---------- */
+  function dailyChallenge() {
+    var box = h("div", { "class": "box daily" }), body = h("div");
+    box.appendChild(h("div", { "class": "dtag", text: tr("Daily Challenge", "تحدي اليوم") })); box.appendChild(body);
+    function msg(cls, txt) { return h("div", { "class": "st " + cls, text: txt }); }
+    function finished(p) {
+      clear(body);
+      body.appendChild(h("h3", { text: p.ok ? tr("Correct. +10 points", "إجابة صح. +10 نقاط") : tr("Not correct", "الإجابة مش صح") }));
+      body.appendChild(msg(p.ok ? "good" : "bad", p.ok ? tr("Done for today. Come back tomorrow for a new question.", "خلصت النهارده. ارجع بكرة لسؤال جديد.") : tr("One attempt per day, so this one is closed. Come back tomorrow.", "محاولة واحدة في اليوم، فالسؤال اتقفل. ارجع بكرة.")));
     }
-    btn.addEventListener("click", check); inp.addEventListener("keydown", function (e) { if (e.key === "Enter") check(); });
-    var learn = h("details", { "class": "dlearn" }, h("summary", { text: tr("Read first", "اقرا الأول") }));
-    d.learn.forEach(function (p) { learn.appendChild(h("p", { text: p })); });
-    var box = h("div", { "class": "box daily" }, h("div", { "class": "dtag", text: tr("Daily Lab", "تحدي اليوم") }),
-      h("h3", { text: pick(d.room, "title") }), h("p", { "class": "q", text: pick(t, "question") + "  (" + t.points + " " + tr("pts", "نقطة") + ")" }),
-      d.learn.length ? learn : null, h("div", { "class": "row" }, inp, btn), st,
-      h("button", { "class": "btn2", type: "button", text: tr("Open the full room", "افتح الغرفة كاملة"), onclick: function () { location.hash = "#/room/" + d.room.slug; } }));
-    if (t.solved) done();
-    return box;
+    function question(p) {
+      clear(body);
+      var inp = h("input", { type: "text", maxlength: "200", autocomplete: "off", spellcheck: "false", "aria-label": tr("answer", "إجابة") }), st = h("div", { "class": "st" });
+      var btn = h("button", { "class": "btn2 f", type: "button", text: tr("Submit (final)", "إرسال (نهائي)") });
+      var sent = false;
+      async function go() {
+        if (sent || !inp.value.trim()) return; sent = true; btn.disabled = true; inp.disabled = true;
+        try {
+          var r = await rpc("daily_answer", { p_answer: inp.value });
+          if (r.status === "correct") { finished({ ok: true }); toast("+" + r.points + " " + tr("points", "نقطة") + " \u00b7 " + r.total); }
+          else if (r.status === "wrong") finished({ ok: false });
+          else if (r.status === "done") finished({ ok: !!r.ok });
+          else { sent = false; btn.disabled = false; inp.disabled = false; st.className = "st warn"; st.textContent = tr("Cannot check this now. Try again.", "مش قادر أتحقق دلوقتي. جرّب تاني."); }
+        } catch (e) { sent = false; btn.disabled = false; inp.disabled = false; st.className = "st warn"; st.textContent = tr("Connection problem. Try again.", "مشكلة اتصال. جرّب تاني."); }
+      }
+      btn.addEventListener("click", go); inp.addEventListener("keydown", function (e) { if (e.key === "Enter") go(); });
+      body.appendChild(h("h3", { text: pick(p.field || {}, "title") || tr("Today's question", "سؤال النهارده") }));
+      body.appendChild(h("p", { "class": "q", text: pick(p, "q") + "  (10 " + tr("pts", "نقطة") + ")" }));
+      body.appendChild(h("div", { "class": "row" }, inp, btn)); body.appendChild(st);
+      body.appendChild(h("div", { "class": "muted", text: tr("One attempt only. A wrong answer closes today's challenge.", "محاولة واحدة بس. الإجابة الغلط بتقفل تحدي النهارده.") }));
+    }
+    async function load() {
+      if (!me) { clear(body); body.appendChild(h("p", { text: tr("Sign in to play today's challenge: one question, one attempt, 10 points.", "سجّل دخول عشان تلعب تحدي النهارده: سؤال واحد، محاولة واحدة، 10 نقاط.") })); return; }
+      var s; try { s = await rpc("daily_state"); } catch (e) { s = null; }
+      if (!s || s.status !== "ok") { clear(body); body.appendChild(msg("warn", tr("The daily challenge is not available right now.", "تحدي النهارده مش متاح دلوقتي."))); return; }
+      var fields = s.fields || [], by = {}; fields.forEach(function (f) { by[f.slug] = f; });
+      if (s.played) {
+        if (s.played.ok === null || s.played.ok === undefined) { s.played.field = by[s.played.section]; return question(s.played); }
+        return finished(s.played);
+      }
+      clear(body);
+      body.appendChild(h("h3", { text: tr("Pick one field", "اختار مجال واحد") }));
+      body.appendChild(h("p", { "class": "q", text: tr("One question per day, from the field you choose. One attempt only: a wrong answer is final. A correct answer gives 10 points. You cannot switch fields after you pick.", "سؤال واحد في اليوم من المجال اللي تختاره. محاولة واحدة بس: الإجابة الغلط نهائية. الإجابة الصح بتدي 10 نقاط. مش هتقدر تغيّر المجال بعد ما تختار.") }));
+      var chips = h("div", { "class": "dchips" });
+      fields.forEach(function (f) {
+        chips.appendChild(h("button", { "class": "btn2 dchip", type: "button", text: pick(f, "title"), onclick: function () { confirmPick(f); } }));
+      });
+      body.appendChild(chips);
+      function confirmPick(f) {
+        var c = h("div", { "class": "dconfirm" }), yes = h("button", { "class": "btn2 f", type: "button", text: tr("Yes, this field", "أيوه، المجال ده") }), no = h("button", { "class": "btn2", type: "button", text: tr("Cancel", "إلغاء") });
+        c.appendChild(h("p", { text: tr("Take today's question from ", "تاخد سؤال النهارده من ") + pick(f, "title") + tr("? You cannot change it today.", "؟ مش هتقدر تغيّره النهارده.") })); c.appendChild(yes); c.appendChild(no);
+        Array.prototype.forEach.call(body.querySelectorAll(".dconfirm"), function (x) { x.remove(); }); body.appendChild(c);
+        no.addEventListener("click", function () { c.remove(); });
+        yes.addEventListener("click", async function () {
+          yes.disabled = true; no.disabled = true;
+          try { var r = await rpc("daily_pick", { p_section: f.slug }); if (r && r.status === "ok" || r.status === "picked" || r.status === "already_picked") return load(); } catch (e) {}
+          yes.disabled = false; no.disabled = false; c.appendChild(msg("warn", tr("Could not pick. Try again.", "معرفتش أختار. جرّب تاني.")));
+        });
+      }
+    }
+    load(); return box;
   }
   async function pageRooms(folder) {
     var cat = await rpc("ch_catalog"), stats = null;
-    var dly = await dailyData(cat);
     if (me) { try { stats = await rpc("ch_my_stats"); } catch (e) {} }
     clear(root); root.appendChild(setTabs("rooms"));
     if (!me) root.appendChild(h("div", { "class": "strip" }, h("div", null, tr("Sign in to save your progress, earn points and appear on the leaderboard.", "سجّل دخول عشان تحفظ تقدمك وتكسب نقاط وتظهر في المتصدرين."), h("br"), h("a", { href: "login.html", text: tr("Sign in", "تسجيل الدخول") }))));
     else if (stats) root.appendChild(h("div", { "class": "strip" }, h("div", null, tr("Points", "النقاط"), h("b", { text: String(stats.points || 0) })), h("div", null, tr("Solved tasks", "مهام محلولة"), h("b", { text: String(stats.solves || 0) })), h("div", null, tr("Overall rank", "الترتيب العام"), h("b", { text: stats.rank ? "#" + stats.rank : "-" }))));
-    if (dly) root.appendChild(dailyBox(dly));
+    root.appendChild(dailyChallenge());
     var HUES = [210, 28, 280, 150, 340, 50, 180], secs = cat.sections.filter(function (s) { return s.rooms.length; });
     function hueOf(s) { return HUES[cat.sections.indexOf(s) % HUES.length]; }
     function roomCard(s, r) {
@@ -1211,10 +1228,64 @@
     });
     root.appendChild(g);
   }
+  /* ---------- career roadmaps: original step-by-step plans per career. Static data (roadmaps-data.js); the ticks are kept in this browser only. ---------- */
+  function careerBlock(ps) {
+    var data = window.SCAR_RM || []; if (!data.length) return null;
+    var wrap = h("div", { "class": "box crbox" }), cur = null;
+    var m = (location.hash || "").match(/^#\/roadmap\/([a-z0-9-]+)/); if (m) cur = m[1];
+    function key(id) { return "scar_rm_" + id; }
+    function loadDone(id) { try { return JSON.parse(localStorage.getItem(key(id)) || "[]"); } catch (e) { return []; } }
+    function saveDone(id, a) { try { localStorage.setItem(key(id), JSON.stringify(a)); } catch (e) {} }
+    function draw() {
+      clear(wrap);
+      wrap.appendChild(h("h3", { text: tr("Career roadmaps", "خرائط الطريق للمهن") }));
+      wrap.appendChild(h("p", { "class": "note", text: tr("Pick a career to see a step-by-step plan: what to learn, what to practise, and how to know you are ready for the next step. Tick stages as you finish them. Ticks are saved in this browser only.", "اختار مهنة وشوف خطة خطوة بخطوة: تتعلم إيه، وتتمرن على إيه، وإزاي تعرف إنك جاهز للخطوة الجاية. علّم على المراحل لما تخلصها. العلامات بتتحفظ في المتصفح ده بس.") }));
+      var grid = h("div", { "class": "crgrid" });
+      data.forEach(function (c) {
+        var done = loadDone(c.id).length;
+        grid.appendChild(h("button", { "class": "crcard" + (cur === c.id ? " on" : ""), type: "button", "aria-pressed": cur === c.id ? "true" : "false", onclick: function () { cur = cur === c.id ? null : c.id; history.replaceState(null, "", cur ? "#/roadmap/" + cur : "#/roadmap"); draw(); if (cur) { var d = wrap.querySelector(".crdetail"); if (d && d.scrollIntoView) d.scrollIntoView({ block: "nearest", behavior: "smooth" }); } } },
+          c.tag ? h("em", { "class": "crtag " + c.tag, text: c.tag === "blue" ? tr("Blue Team", "الفريق الأزرق") : tr("Red Team", "الفريق الأحمر") }) : null,
+          h("b", { text: tr(c.t[0], c.t[1]) }), h("span", { text: tr(c.b[0], c.b[1]) }),
+          h("small", { text: tr(c.lv[0], c.lv[1]) + " \u00b7 " + c.st.length + " " + tr("stages", "مراحل") + (done ? " \u00b7 " + done + "/" + c.st.length + " \u2713" : "") })));
+      });
+      wrap.appendChild(grid);
+      var c = data.filter(function (x) { return x.id === cur; })[0]; if (!c) return;
+      var done = loadDone(c.id), det = h("div", { "class": "crdetail" });
+      det.appendChild(h("h3", { text: tr(c.t[0], c.t[1]) }));
+      var wlo = 0, whi = 0; c.st.forEach(function (s) { var p = s.w.split("-"); wlo += parseInt(p[0], 10) || 0; whi += parseInt(p[p.length - 1], 10) || 0; });
+      det.appendChild(h("p", { "class": "note", text: tr("About ", "حوالي ") + wlo + "-" + whi + tr(" weeks at a few hours a week, depending on your pace.", " أسبوع لو بتذاكر كام ساعة في الأسبوع، حسب سرعتك.") }));
+      if (c.pre) det.appendChild(h("p", { "class": "note", text: tr("Before you start: ", "قبل ما تبدأ: ") + tr(c.pre[0], c.pre[1]) }));
+      if (c.tools) { var tc = h("div", { "class": "crtools" }, h("b", { text: tr("Tool types you will meet: ", "أنواع الأدوات اللي هتقابلها: ") })); c.tools.forEach(function (x) { tc.appendChild(h("span", { "class": "pill", text: tr(x[0], x[1]) })); }); det.appendChild(tc); }
+      det.appendChild(progress(done.length, c.st.length));
+      var tl = h("ol", { "class": "crtl" });
+      c.st.forEach(function (s, i) {
+        var on = done.indexOf(i) >= 0, ck = h("input", { type: "checkbox", "aria-label": tr("Stage done", "المرحلة خلصت") }); ck.checked = on;
+        ck.addEventListener("change", function () { var a = loadDone(c.id).filter(function (x) { return x !== i; }); if (ck.checked) a.push(i); saveDone(c.id, a); draw(); });
+        var learn = h("ul"); s.l.forEach(function (x) { learn.appendChild(h("li", { text: tr(x[0], x[1]) })); });
+        var prac = h("ul"); s.p.forEach(function (x) { prac.appendChild(h("li", { text: tr(x[0], x[1]) })); });
+        tl.appendChild(h("li", { "class": "crstage" + (on ? " done" : "") },
+          h("div", { "class": "crhead" }, h("span", { "class": "crn", text: on ? "\u2713" : String(i + 1) }), h("b", { text: tr(s.t[0], s.t[1]) }), h("small", { text: s.w + " " + tr("weeks", "أسابيع") }), h("label", { "class": "crck" }, ck, h("span", { text: tr("Done", "خلصت") }))),
+          h("div", { "class": "crcols" }, h("div", null, h("h4", { text: tr("Learn", "اتعلم") }), learn), h("div", null, h("h4", { text: tr("Practise", "تمرّن") }), prac)),
+          h("p", { "class": "crgoal", text: tr("You are ready to move on when: ", "تبقى جاهز للمرحلة الجاية لما: ") + tr(s.m[0], s.m[1]) })));
+      });
+      det.appendChild(tl);
+      var mine = (c.paths || []).map(function (sl) { return ps.filter(function (x) { return x.slug === sl; })[0]; }).filter(Boolean);
+      if (mine.length) {
+        det.appendChild(h("h4", { text: tr("Start with these SCAR paths", "ابدأ بالمسارات دي على SCAR") }));
+        var row = h("div", { "class": "crpaths" }); mine.forEach(function (p) { row.appendChild(h("button", { "class": "btn2", type: "button", text: pick(p, "title"), onclick: function () { location.hash = "#/path/" + p.slug; } })); });
+        det.appendChild(row);
+      }
+      if (c.link) det.appendChild(h("p", null, h("a", { "class": "btn", href: c.link, text: tr("Open the Data Lab (sheet, dashboard, SQL and labs)", "افتح معمل البيانات (شيت ولوحة وSQL ومعامل)") })));
+      det.appendChild(h("p", { "class": "note", text: tr("Educational plan. Practise only in your own labs or on systems you have written permission to test.", "خطة تعليمية. تمرّن في معاملك أو على أنظمة معاك إذن مكتوب باختبارها بس.") }));
+      wrap.appendChild(det);
+    }
+    draw(); return wrap;
+  }
   async function pageRoadmap() {
     var ps = await rpc("ch_paths_list");
     clear(root); root.appendChild(setTabs("roadmap"));
     root.appendChild(h("div", { "class": "roomh" }, h("h2", { text: tr("Your roadmap", "خريطة طريقك") }), h("p", { text: tr("A suggested order from zero to confident. Follow the stages, or jump to any path. Your progress shows on every step. Networking paths follow the public CCNA topic outline in our own words; we are not affiliated with Cisco.", "ترتيب مقترح من الصفر لحد الثقة. امشي على المراحل أو روح لأي مسار. تقدمك ظاهر في كل خطوة. مسارات الشبكات متماشية مع محاور CCNA المنشورة بصياغتنا، ومش تابعين لسيسكو.") })));
+    var cb = careerBlock(ps); if (cb) root.appendChild(cb);
     var seen = {};
     RM_STAGES.forEach(function (sg) {
       var box = h("div", { "class": "box" }, h("h3", { text: tr(sg.en, sg.ar) }), h("p", { "class": "note", text: tr(sg.d[0], sg.d[1]) }));
