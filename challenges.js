@@ -642,6 +642,7 @@
     [["roadmap", "#/roadmap", tr("Roadmap", "خريطة الطريق")], ["rooms", "#/", tr("Rooms", "الغرف")], ["paths", "#/paths", tr("Learning paths", "مسارات التعلم")], ["board", "#/board", tr("Leaderboard", "المتصدرين")], ["me", "#/me", tr("My progress", "تقدمي")]].concat(isStaff() ? [["admin", "#/admin", tr("Manage", "الإدارة")]] : []).forEach(function (x) {
       t.appendChild(h("button", { "class": "tab" + (active === x[0] ? " on" : ""), type: "button", onclick: function () { location.hash = x[1]; } , text: x[2] }));
     });
+    [["guides.html", tr("Walkthroughs", "شروحات")], ["blog.html", tr("Recent threats", "تهديدات حديثة")]].forEach(function (x) { t.appendChild(h("a", { "class": "tab", href: x[0], text: x[1] })); });
     return t;
   }
   /* answer placeholder: one dot per character of the first accepted answer, words apart. Only the lengths are stored, never the answer. */
