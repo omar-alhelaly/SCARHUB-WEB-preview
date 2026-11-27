@@ -498,14 +498,23 @@
     cat.sections.forEach(function (s) { tabs.appendChild(h("button", { "class": "tab" + (sec === s.slug ? " on" : ""), type: "button", text: pick(s, "title"), onclick: function () { BSEC = s.slug; pageBoard(s.slug); } })); });
     root.appendChild(tabs);
     if (!d.top.length) { root.appendChild(h("div", { "class": "empty", text: tr("No solves yet. Be the first.", "مفيش حد حل لسه. كن أول واحد.") })); return; }
-    var t = h("table", { "class": "lb" }, h("tr", null, h("th", { text: "#" }), h("th", { text: tr("Player", "اللاعب") }), h("th", { text: tr("Solved", "المهام") }), h("th", { text: tr("Points", "النقاط") })));
-    d.top.forEach(function (x) { t.appendChild(h("tr", { "class": x.me ? "me" : "" }, h("td", { text: String(x.rank) }), h("td", null, (function () {
-      var canP = typeof window.scarOpenProfile === "function" && x.uid && me, w = h("span", { style: "display:inline-flex;align-items:center;gap:8px" + (canP ? ";cursor:pointer" : "") });
-      if (typeof window.scarAvatar === "function") { var av = h("span", { "class": "av", style: "width:28px;height:28px" }); try { av.appendChild(window.scarAvatar(x.avatar || "b1", x.uid)); w.appendChild(av); } catch (e) { } }
-      w.appendChild(h("b", { text: x.username, style: "font-weight:600" }));
-      if (canP) { w.title = tr("View profile", "شوف البروفايل"); w.addEventListener("click", function () { window.scarOpenProfile(x.uid); }); }
-      return w; })()), h("td", { text: String(x.solves) }), h("td", { text: String(x.points) }))); });
-    root.appendChild(t);
+    function pavatar(x, size) {
+      var av = h("span", { "class": "av", style: "width:" + size + "px;height:" + size + "px" });
+      if (typeof window.scarAvatar === "function") { try { av.appendChild(window.scarAvatar(x.avatar || "b1", x.uid)); } catch (e) { } }
+      return av;
+    }
+    function popen(x, el) { if (typeof window.scarOpenProfile === "function" && x.uid && me) { el.classList.add("clk"); el.title = tr("View profile", "شوف البروفايل"); el.addEventListener("click", function () { window.scarOpenProfile(x.uid); }); } return el; }
+    var medals = ["\ud83d\udc51", "\ud83e\udd48", "\ud83e\udd49"], pod = h("div", { "class": "podium" });
+    [1, 0, 2].forEach(function (k) {
+      var x = d.top[k]; if (!x) return;
+      pod.appendChild(popen(x, h("div", { "class": "pstep p" + (k + 1) + (x.me ? " me" : "") }, h("div", { "class": "pm", text: medals[k] }), pavatar(x, k === 0 ? 84 : 68), h("b", { "class": "pn", text: x.username }), h("div", { "class": "pp", text: x.points + " " + tr("pts", "نقطة") }), h("div", { "class": "ps", text: x.solves + " " + tr("solved", "مهمة") }), h("div", { "class": "pr", text: "#" + x.rank }))));
+    });
+    root.appendChild(pod);
+    if (d.top.length > 3) {
+      var lst = h("div", { "class": "plist" });
+      d.top.slice(3).forEach(function (x) { lst.appendChild(popen(x, h("div", { "class": "prow" + (x.me ? " me" : "") }, h("span", { "class": "rk", text: "#" + x.rank }), pavatar(x, 36), h("b", { "class": "pn", text: x.username }), h("span", { "class": "ps", text: x.solves + " " + tr("solved", "مهمة") }), h("span", { "class": "pp", text: x.points + " " + tr("pts", "نقطة") })))); });
+      root.appendChild(lst);
+    }
     if (d.me && !d.top.some(function (x) { return x.me; })) root.appendChild(h("p", { "class": "cnt", text: tr("Your rank: #", "ترتيبك: #") + d.me.rank + " · " + d.me.points + " " + tr("points", "نقطة") }));
   }
 
