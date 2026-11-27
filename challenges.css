@@ -336,3 +336,20 @@ html[data-theme=light] #ch .ptitle{color:hsl(var(--ph,210) 80% 34%)}
 #ch .crtag.blue{background:#1f6feb}#ch .crtag.red{background:var(--r)}
 #ch .crtools{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0 10px}
 #ch .crtools b{font-size:13px;color:var(--m);font-weight:600}
+
+#ch .crflow{display:flex;flex-direction:column;align-items:center;margin:16px auto;max-width:640px}
+#ch .crend{padding:10px 26px;border-radius:999px;font-weight:700;font-size:14px;color:#fff;background:var(--r);text-align:center}
+#ch .crgoalnode{background:#26a641}
+#ch .crarrow{width:2px;height:26px;background:var(--b);position:relative;margin:0 auto}
+#ch .crarrow:after{content:"";position:absolute;bottom:-1px;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top:8px solid var(--m);border-bottom:0}
+#ch .crflow .crstage{width:100%;padding:0;border:2px solid var(--b);border-radius:14px;overflow:hidden;background:var(--p)}
+#ch .crflow .crstage.open{border-color:var(--r)}
+#ch .crflow .crstage.done{border-color:#26a641}
+#ch .crflow .crhead{width:100%;display:flex;align-items:center;gap:10px;padding:14px;background:none;border:0;color:inherit;font:inherit;cursor:pointer;text-align:start}
+#ch .crflow .crhead b{flex:1 1 auto;min-width:0}#ch .crflow .crchev{font-size:11px;color:var(--m);flex:none}
+#ch .crflow .crhead:hover{background:#e11d2e0d}
+#ch .crflow .crbody{padding:4px 14px 14px;border-top:1px dashed var(--b)}
+#ch .crflow .crck{margin:12px 0 0;display:flex}
+#ch .crflow .crck input{width:20px;height:20px;padding:0;flex:none;margin:0}
+#ch .crflow .crck{align-items:center;gap:8px}
+@media (max-width:640px){#ch .crflow .crhead{flex-wrap:wrap}#ch .crflow .crhead b{flex:1 1 60%}#ch .crflow .crhead small{order:3;flex:1 0 100%;margin-inline-start:38px}#ch .crflow .crchev{order:2}}
