@@ -305,3 +305,34 @@ html[data-theme=light] #ch .ptitle{color:hsl(var(--ph,210) 80% 34%)}
 #ch .fnames li:before{content:"\2022  ";color:hsl(var(--sh,0) 60% 50%)}
 #ch .fnames .more:before{content:""}
 @media(max-width:560px){#ch .folders{grid-template-columns:1fr}}
+#ch .daily .dchips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+#ch .daily .dchip{flex:0 1 auto}
+#ch .daily .dconfirm{margin-top:10px;padding:10px;border:1px solid #26a641;border-radius:10px}
+#ch .daily .dconfirm .btn2{margin-inline-end:8px}
+#ch .daily .muted{opacity:.7;font-size:.85em;margin-top:8px}
+/* career roadmaps */
+#ch .crgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin:12px 0}
+#ch .crcard{display:flex;flex-direction:column;gap:6px;text-align:start;padding:14px;border:1px solid var(--b);border-radius:12px;background:var(--p);color:var(--t);cursor:pointer;font:inherit}
+#ch .crcard b{color:var(--r2);font-size:16px}#ch .crcard span{color:var(--m);font-size:13.5px;line-height:1.5}#ch .crcard small{color:var(--m);font-size:12px;margin-top:auto}
+#ch .crcard:hover,#ch .crcard.on{border-color:var(--r);box-shadow:0 6px 24px #e11d2e22}
+#ch .crdetail{margin-top:18px;padding-top:16px;border-top:1px solid var(--b)}
+#ch .crtl{list-style:none;margin:16px 0;padding:0;display:flex;flex-direction:column;gap:14px;position:relative}
+#ch .crstage{border:1px solid var(--b);border-radius:12px;padding:14px;background:var(--p)}
+#ch .crstage.done{border-color:#26a641}
+#ch .crhead{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+#ch .crhead b{font-size:16px}#ch .crhead small{color:var(--m)}
+#ch .crn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--r);color:#fff;font-size:13px;font-weight:700;flex:none}
+#ch .crstage.done .crn{background:#26a641}
+#ch .crck{margin-inline-start:auto;display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--m);cursor:pointer}
+#ch .crcols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:10px}
+#ch .crcols h4,#ch .crdetail>h4{margin:0 0 6px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--m)}
+#ch .crcols ul{margin:0;padding-inline-start:18px;display:flex;flex-direction:column;gap:4px;font-size:14.5px}
+#ch .crgoal{margin:10px 0 0;font-size:14px;color:var(--t)}
+#ch .crpaths{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 12px}
+@media (max-width:640px){#ch .crcols{grid-template-columns:1fr}#ch .crck{margin-inline-start:0}}
+#ch .crhead b{flex:1 1 150px;min-width:0}#ch .crhead small,#ch .crck{white-space:nowrap;flex:none}#ch .crck span{white-space:nowrap}
+@media (max-width:640px){#ch .crck{flex:1 0 100%;margin-inline-start:38px}}
+#ch .crtag{font-style:normal;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;align-self:flex-start;padding:2px 9px;border-radius:20px;color:#fff}
+#ch .crtag.blue{background:#1f6feb}#ch .crtag.red{background:var(--r)}
+#ch .crtools{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0 10px}
+#ch .crtools b{font-size:13px;color:var(--m);font-weight:600}
