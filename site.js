@@ -1,3 +1,4 @@
+(function(){var m=document.querySelector('meta[name=viewport]');if(m&&!/viewport-fit/.test(m.content))m.content+=',viewport-fit=cover'})();
 
 ;(function(){var m=location.pathname.match(/tool-(scar[a-z]+)\.html$/);if(m)location.replace('tool.html?t='+m[1])})();
 
