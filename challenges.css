@@ -161,3 +161,5 @@ html[data-theme=light] #ch .ndev{background:#fff}
 #ch .pbody h3{margin:0;font-size:18px}#ch .pbody p{margin:0;color:var(--m);font-size:13.5px;line-height:1.5}
 #ch .pbody .meta{display:flex;gap:10px;flex-wrap:wrap;font-size:12.5px;color:var(--m);align-items:center}
 #ch .certp .cqr{background:#fff;padding:6px;border:1px solid #d8c9a0;border-radius:6px;line-height:0;margin-top:8px}
+
+#ch .rg.solo{grid-template-columns:minmax(0,1fr)}#ch .rg.solo>div:first-child{display:none}#ch .rg.solo>div:last-child{max-width:none;width:100%}
