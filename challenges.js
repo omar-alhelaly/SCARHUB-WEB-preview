@@ -73,6 +73,46 @@
       h("div", { "class": "legend" }, h("span", { text: tr("Less", "أقل") }), h("i"), h("i", { "class": "l1" }), h("i", { "class": "l2" }), h("i", { "class": "l3" }), h("i", { "class": "l4" }), h("span", { text: tr("More", "أكتر") })));
     return { node: wrap, total: total };
   }
+  /* ---------- daily streak and badges (computed from the server's own solve times, nothing is stored client side) ---------- */
+  function streaks(times) {
+    var days = {}; (times || []).forEach(function (t) { days[dkey(new Date(t))] = 1; });
+    var d = new Date(); d.setHours(12, 0, 0, 0);
+    var cur = 0; if (!days[dkey(d)]) d.setDate(d.getDate() - 1);
+    while (days[dkey(d)]) { cur++; d.setDate(d.getDate() - 1); }
+    var keys = Object.keys(days).sort(), best = 0, run = 0, prev = null;
+    keys.forEach(function (k) { var p = k.split("-"), dt = new Date(+p[0], +p[1] - 1, +p[2], 12); if (prev && Math.round((dt - prev) / 864e5) === 1) run++; else run = 1; if (run > best) best = run; prev = dt; });
+    var today = !!days[dkey(new Date())];
+    return { cur: cur, best: best, today: today };
+  }
+  var BADGES = [
+    ["first", "★", "First solve", "أول حل", "Solve your first task", "حل أول مهمة", function (c) { return c.solves >= 1; }],
+    ["s10", "10", "Getting going", "بدأت تسخن", "Solve 10 tasks", "حل 10 مهام", function (c) { return c.solves >= 10; }],
+    ["s50", "50", "Steady solver", "حلّال ثابت", "Solve 50 tasks", "حل 50 مهمة", function (c) { return c.solves >= 50; }],
+    ["s100", "100", "Century", "المية", "Solve 100 tasks", "حل 100 مهمة", function (c) { return c.solves >= 100; }],
+    ["p100", "P", "100 points", "100 نقطة", "Earn 100 points", "اكسب 100 نقطة", function (c) { return c.points >= 100; }],
+    ["p500", "P", "500 points", "500 نقطة", "Earn 500 points", "اكسب 500 نقطة", function (c) { return c.points >= 500; }],
+    ["p1000", "P", "1000 points", "1000 نقطة", "Earn 1000 points", "اكسب 1000 نقطة", function (c) { return c.points >= 1000; }],
+    ["st3", "3d", "3-day streak", "3 أيام ورا بعض", "Solve something 3 days in a row", "حل حاجة 3 أيام ورا بعض", function (c) { return c.best >= 3; }],
+    ["st7", "7d", "Week streak", "أسبوع ورا بعض", "Solve something 7 days in a row", "حل حاجة 7 أيام ورا بعض", function (c) { return c.best >= 7; }],
+    ["st30", "30d", "Month streak", "شهر ورا بعض", "Solve something 30 days in a row", "حل حاجة 30 يوم ورا بعض", function (c) { return c.best >= 30; }],
+    ["explore", "3", "Explorer", "مستكشف", "Earn points in 3 different sections", "اكسب نقط في 3 أقسام مختلفة", function (c) { return c.secs >= 3; }]
+  ];
+  function streakBox(stats) {
+    var st = streaks(stats.times);
+    var c = { solves: stats.solves || 0, points: stats.points || 0, best: st.best, secs: (stats.sections || []).filter(function (x) { return x.points > 0; }).length };
+    var got = 0, grid = h("div", { "class": "bdg" });
+    BADGES.forEach(function (b) {
+      var ok = b[6](c); if (ok) got++;
+      grid.appendChild(h("div", { "class": "bd" + (ok ? " on" : ""), title: tr(b[4], b[5]) }, h("span", { "class": "bi", text: b[1] }), h("b", { text: tr(b[2], b[3]) }), h("small", { text: tr(b[4], b[5]) })));
+    });
+    return h("div", { "class": "box" }, h("h3", { text: tr("Daily streak and badges", "الاستمرارية اليومية والشارات") }),
+      h("div", { "class": "stk" },
+        h("div", null, h("b", { text: String(st.cur) }), h("span", { text: tr("day streak", "يوم ورا بعض") })),
+        h("div", null, h("b", { text: String(st.best) }), h("span", { text: tr("best streak", "أطول سلسلة") })),
+        h("div", null, h("b", { text: got + "/" + BADGES.length }), h("span", { text: tr("badges", "شارة") }))),
+      h("div", { "class": "cnt", text: st.today ? tr("You already solved something today. Come back tomorrow to keep the streak.", "حليت حاجة النهارده. ارجع بكرة عشان السلسلة تكمل.") : (st.cur ? tr("Solve one task today to keep your streak alive.", "حل مهمة النهارده عشان السلسلة متقطعش.") : tr("Solve one task today to start a streak.", "حل مهمة النهارده عشان تبدأ سلسلة.")) }),
+      grid);
+  }
   function heatBox(stats) {
     var hm = heatmap(stats.times);
     return h("div", { "class": "box" }, h("h3", { text: tr("Challenge activity", "نشاط التحديات") }),
@@ -743,7 +783,7 @@
     if (!me) { root.appendChild(h("div", { "class": "strip" }, h("div", null, tr("Sign in to see your progress.", "سجّل دخول عشان تشوف تقدمك."), h("br"), h("a", { href: "login.html", text: tr("Sign in", "تسجيل الدخول") })))); return; }
     var s = await rpc("ch_my_stats"), cat = await rpc("ch_catalog");
     root.appendChild(h("div", { "class": "strip" }, h("div", null, tr("Points", "النقاط"), h("b", { text: String(s.points) })), h("div", null, tr("Solved tasks", "مهام محلولة"), h("b", { text: String(s.solves) })), h("div", null, tr("Overall rank", "الترتيب العام"), h("b", { text: s.rank ? "#" + s.rank : "-" }))));
-    root.appendChild(heatBox(s));
+    root.appendChild(heatBox(s)); root.appendChild(streakBox(s));
     var by = {}; (s.sections || []).forEach(function (x) { by[x.section] = x; });
     var t = h("table", { "class": "lb" }, h("tr", null, h("th", { text: tr("Section", "القسم") }), h("th", { text: tr("Points", "النقاط") }), h("th", { text: tr("Rank", "الترتيب") })));
     cat.sections.forEach(function (c) { var x = by[c.slug]; t.appendChild(h("tr", null, h("td", { text: pick(c, "title") }), h("td", { text: x ? String(x.points) : "0" }), h("td", { text: x ? "#" + x.rank : "-" }))); });
@@ -978,7 +1018,7 @@
         var t = token(); if (!t || !CFG.url) return;
         var r = await fetch(CFG.url + "/rest/v1/rpc/ch_my_stats", { method: "POST", headers: { "Content-Type": "application/json", apikey: CFG.anonKey, Authorization: "Bearer " + t }, body: "{}" });
         if (!r.ok) return; var s = await r.json(); if (!s) return;
-        var paint = function () { clear(hb); hb.appendChild(heatBox(s)); hb.appendChild(h("a", { "class": "btn2", href: "challenges.html#/me", text: tr("Open challenges", "افتح التحديات") })); };
+        var paint = function () { clear(hb); hb.appendChild(heatBox(s)); hb.appendChild(streakBox(s)); hb.appendChild(h("a", { "class": "btn2", href: "challenges.html#/me", text: tr("Open challenges", "افتح التحديات") })); };
         paint(); try { new MutationObserver(paint).observe(document.documentElement, { attributes: true, attributeFilter: ["lang"] }); } catch (e) {}
       } catch (e) {}
     })();
