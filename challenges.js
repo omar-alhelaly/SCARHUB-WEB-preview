@@ -555,6 +555,29 @@
       var inp = win.el.querySelector(".ntin"); if (inp && window.innerWidth > 700) inp.focus();
     }
     function pt(d) { return { x: d.x + 40, y: d.y + 33 }; }
+    function devIp(d) { if (d.type === "pc") return d.ip || ""; if (d.type === "rt") { var f = d.ifs.filter(function (x) { return x.up && x.ip; })[0]; return f ? f.ip : ""; } return ""; }
+    function pathIds(a, b) { var prev = {}, q = [a], seen = {}; seen[a] = 1; while (q.length) { var c = q.shift(); if (c === b) break; neighbors(dev(c)).forEach(function (n) { if (!seen[n]) { seen[n] = 1; prev[n] = c; q.push(n); } }); } if (!seen[b]) return null; var r = [b]; while (r[0] !== a) r.unshift(prev[r[0]]); return r; }
+    var animBusy = false;
+    function sendPacket(aId, bId) { /* simulation mode: animate one echo request along the cables, then show the outcome. The drop point is approximate. */
+      var A = dev(aId), B = dev(bId); if (!A || !B || animBusy) return;
+      if (A.type !== "pc") { msg.textContent = tr("Pick a PC as the sender first.", "اختار كمبيوتر كمرسل الأول."); return; }
+      var tip = devIp(B), path = pathIds(aId, bId);
+      if (!A.ip) { msg.textContent = tr("The sender has no IP address yet. Set one in its Config tab.", "المرسل لسه معاه IP. حطه من تبويب الإعدادات."); return; }
+      if (!tip) { msg.textContent = tr("The target needs an IP address (a switch has none). Pick a PC or a configured router.", "الهدف لازم يبقى له IP (السويتش مالوش). اختار كمبيوتر أو راوتر متظبط."); return; }
+      var ok = false; if (path) { var lines = pingSim(A, tip, A.ip, A.mask, A.gw); ok = /Received = [1-9]/.test(lines.join(" ")); }
+      var route = path || [aId], stop = route.length - 1;
+      if (path && !ok) { for (var i = 1; i < route.length - 1; i++) { if (dev(route[i]).type === "rt") { stop = i; break; } } }
+      if (!path) stop = 0;
+      var dot = h("div", { "class": "npk" }); dl.appendChild(dot); function put(x, y) { dot.style.left = (x - 9) + "px"; dot.style.top = (y - 9) + "px"; } var p0 = pt(A); put(p0.x, p0.y);
+      var names = route.map(function (id) { return dev(id).name; }).join(" > "), hop = 0, t0 = null; animBusy = true;
+      msg.textContent = tr("Sending an echo request: ", "بيبعت طلب إيكو: ") + names;
+      function fin() { animBusy = false; var last = pt(dev(route[stop])); if (!ok) { dot.className = "npk bad"; put(last.x, last.y); } else if (dot.parentNode) dot.parentNode.removeChild(dot);
+        msg.textContent = ok ? tr("Reply received. Path: " + names + ". Both directions worked.", "الرد وصل. المسار: " + names + ". الاتجاهين اشتغلوا.") : (path ? tr("The packet was dropped near " + dev(route[stop]).name + " (the drop point is approximate). Check addresses, routes, ACLs and NAT, or the ping output in the CLI.", "الباكت اتسقط جنب " + dev(route[stop]).name + " (مكان السقوط تقريبي). راجع العناوين والراوتات والـ ACL والـ NAT أو ناتج ping في الـ CLI.") : tr("No cable path joins these two devices.", "مفيش مسار كابلات بين الجهازين دول.")); }
+      if (stop === 0) { fin(); return; }
+      function step(ts) { if (!dot.parentNode) { animBusy = false; return; } if (t0 == null) t0 = ts; var f = (ts - t0) / 550; if (f >= 1) { hop++; t0 = ts; f = 0; if (hop >= stop) { fin(); return; } }
+        var p = pt(dev(route[hop])), q = pt(dev(route[hop + 1])); put(p.x + (q.x - p.x) * f, p.y + (q.y - p.y) * f); requestAnimationFrame(step); }
+      requestAnimationFrame(step);
+    }
     function draw() {
       while (svg.firstChild) svg.removeChild(svg.firstChild); clear(dl);
       var NS = "http://www.w3.org/2000/svg";
@@ -579,6 +602,7 @@
         el.addEventListener("pointerup", function () { var was = drag; drag = null; if (moved) { draw(); return; }
           if (tool === "cable") { if (pend == null) { pend = d.id; msg.textContent = tr("Now click the second device.", "دوس على الجهاز التاني."); draw(); } else { var r = connect2(pend, d.id); pend = null; msg.textContent = r; draw(); } }
           else if (tool === "del") { delDev(d.id); draw(); }
+          else if (tool === "pkt") { if (pend == null) { pend = d.id; msg.textContent = tr("Now click the target device.", "دوس على الجهاز الهدف."); draw(); } else { var fa = pend; pend = null; draw(); sendPacket(fa, d.id); } }
           else { sel = d.id; selL = null; draw(); openWin(d); } });
         el.addEventListener("keydown", function (e) { if (e.key === "Enter") { sel = d.id; openWin(d); } });
         dl.appendChild(el);
@@ -637,6 +661,7 @@
     }
     var tools = h("div", { "class": "ntools" }); var bar0 = bar;
     tools.appendChild(tb(tr("Select / move", "اختيار / تحريك"), function () { tool = "move"; pend = null; msg.textContent = tr("Drag devices from the bottom palette onto the canvas. Click one to open it.", "اضغط على جهاز لفتحه. اسحبه لتحريكه."); draw(); }, "move"));
+    tools.appendChild(tb(tr("Send packet", "ابعت باكت"), function () { tool = "pkt"; pend = null; msg.textContent = tr("Simulation mode: click a PC (sender), then the target device. Watch the packet travel along the cables.", "وضع المحاكاة: دوس على كمبيوتر (المرسل) وبعدين الجهاز الهدف. شوف الباكت ماشي على الكابلات."); draw(); }, "pkt"));
     tools.appendChild(tb(tr("Delete tool", "أداة المسح"), function () { tool = "del"; pend = null; msg.textContent = tr("Click a device or a cable to delete it.", "دوس على جهاز أو كابل عشان تمسحه."); draw(); }, "del"));
     tools.appendChild(tb(tr("Delete selected", "امسح المحدد"), function () { if (sel != null) { var d = dev(sel); if (d && confirm(tr("Delete " + d.name + " and its cables?", "تمسح " + d.name + " وكابلاته؟"))) { delDev(sel); draw(); } } else if (selL) { links = links.filter(function (z) { return z !== selL; }); selL = null; draw(); } else msg.textContent = tr("Select a device or a cable first.", "حدد جهاز أو كابل الأول."); }, null, "tbx"));
     tools.appendChild(tb(tr("Clear lab", "امسح اللاب"), function () { if (!devs.length || confirm(tr("Delete every device and cable in this lab?", "تمسح كل الأجهزة والكابلات في اللاب ده؟"))) { devs = []; links = []; sel = null; selL = null; pend = null; seq = { pc: 0, sw: 0, rt: 0 }; Object.keys(wins).forEach(closeWin); draw(); } }, null, "tbx"));
