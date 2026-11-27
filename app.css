@@ -80,3 +80,8 @@ body[data-page=admin] .panel label{display:block;font-size:13px;color:var(--m);m
 .ag-danger{border-color:#e11d2e66}.ag-danger .agl{color:#ff6b78}
 .ag-perm input{width:110px}
 @media (max-width:900px){body[data-page=admin] .panel{padding:14px}body[data-page=admin] .panel table{display:block;overflow-x:auto}.ags{min-width:0}}
+.ags{grid-template-columns:repeat(2,minmax(150px,1fr));min-width:330px;max-width:420px}
+.ag select,.ag input{max-width:100%;width:100%;box-sizing:border-box}.ag-perm input{width:100%}
+.ag .btn{flex:1 1 auto}
+body[data-page=admin] .panel table{table-layout:auto}
+@media (max-width:900px){.ags{grid-template-columns:1fr;min-width:0;max-width:none}}
