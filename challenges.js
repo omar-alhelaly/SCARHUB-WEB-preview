@@ -639,7 +639,7 @@
   var root, state = { stats: null };
   function setTabs(active) {
     var t = h("div", { "class": "chtabs" });
-    [["rooms", "#/", tr("Rooms", "الغرف")], ["paths", "#/paths", tr("Learning paths", "مسارات التعلم")], ["board", "#/board", tr("Leaderboard", "المتصدرين")], ["me", "#/me", tr("My progress", "تقدمي")]].concat(isStaff() ? [["admin", "#/admin", tr("Manage", "الإدارة")]] : []).forEach(function (x) {
+    [["roadmap", "#/roadmap", tr("Roadmap", "خريطة الطريق")], ["rooms", "#/", tr("Rooms", "الغرف")], ["paths", "#/paths", tr("Learning paths", "مسارات التعلم")], ["board", "#/board", tr("Leaderboard", "المتصدرين")], ["me", "#/me", tr("My progress", "تقدمي")]].concat(isStaff() ? [["admin", "#/admin", tr("Manage", "الإدارة")]] : []).forEach(function (x) {
       t.appendChild(h("button", { "class": "tab" + (active === x[0] ? " on" : ""), type: "button", onclick: function () { location.hash = x[1]; } , text: x[2] }));
     });
     return t;
@@ -1036,6 +1036,42 @@
     cert.setAttribute("dir", "ltr"); root.appendChild(cert);
     root.appendChild(h("div", { "class": "rowb noprint" }, h("button", { "class": "btn2 f", type: "button", text: tr("Print / save as PDF", "اطبع / احفظ PDF"), onclick: function () { window.print(); } }), h("button", { "class": "btn2", type: "button", text: tr("Copy verify link", "انسخ لينك التحقق"), onclick: function () { try { navigator.clipboard.writeText(vurl); toast(tr("Copied", "اتنسخ")); } catch (e) {} } })));
   }
+  /* ---------- roadmap: stages from the path list, own design ---------- */
+  var RM_STAGES = [
+    { en: "Stage 1: Start here", ar: "المرحلة 1: ابدأ من هنا", d: ["Learn the language of security and how networks talk. No experience needed.", "اتعلم لغة الأمن وازاي الشبكات بتتكلم. مش محتاج خبرة."], paths: ["cyber-foundations", "networking-basics"] },
+    { en: "Stage 2: Pick a direction", ar: "المرحلة 2: اختار اتجاهك", d: ["Defence, offence or infrastructure. Each path has theory, then practice that eases in.", "دفاع أو هجوم أو بنية تحتية. كل مسار فيه نظرية وبعدين تطبيق بالتدريج."], paths: ["soc-analyst-start", "junior-pentester", "network-access-ip-connectivity"] },
+    { en: "Stage 3: Go deeper", ar: "المرحلة 3: ادخل أعمق", d: ["Services, security and a mock exam on the networking topic outline. Finish for a certificate.", "الخدمات والأمان وامتحان تجريبي على محاور الشبكات. خلّص واخد شهادة."], paths: ["network-services-security"] }
+  ];
+  async function pageRoadmap() {
+    var ps = await rpc("ch_paths_list");
+    clear(root); root.appendChild(setTabs("roadmap"));
+    root.appendChild(h("div", { "class": "roomh" }, h("h2", { text: tr("Your roadmap", "خريطة طريقك") }), h("p", { text: tr("A suggested order from zero to confident. Follow the stages, or jump to any path. Your progress shows on every step. Networking paths follow the public CCNA topic outline in our own words; we are not affiliated with Cisco.", "ترتيب مقترح من الصفر لحد الثقة. امشي على المراحل أو روح لأي مسار. تقدمك ظاهر في كل خطوة. مسارات الشبكات متماشية مع محاور CCNA المنشورة بصياغتنا، ومش تابعين لسيسكو.") })));
+    var seen = {};
+    RM_STAGES.forEach(function (sg) {
+      var box = h("div", { "class": "box" }, h("h3", { text: tr(sg.en, sg.ar) }), h("p", { "class": "note", text: tr(sg.d[0], sg.d[1]) }));
+      sg.paths.forEach(function (slug) {
+        var p = ps.filter(function (x) { return x.slug === slug; })[0]; if (!p) return; seen[slug] = 1;
+        var st = pathStats(p), m = PMETA[slug] || { lv: "easy" }, nextSet = false;
+        box.appendChild(h("div", { "class": "sec" }, h("h2", { text: pick(p, "title") }), h("small", { text: st.solved + " / " + st.tasks + " " + tr("tasks", "مهمة") })));
+        box.appendChild(h("div", { "class": "meta" }, diffPill(m.lv), m.tp ? h("span", { "class": "ptopic", text: tr(m.tp[0], m.tp[1]) }) : null, st.done ? h("span", { "class": "pill", text: tr("Completed", "مكتمل") }) : null));
+        box.appendChild(progress(st.solved, st.tasks));
+        var list = h("div", { "class": "plist" });
+        p.rooms.forEach(function (r, i) {
+          var done = r.tasks > 0 && r.solved >= r.tasks, isNext = !done && !nextSet; if (isNext) nextSet = true;
+          list.appendChild(h("button", { "class": "prow ppr" + (done ? " done" : "") + (isNext ? " next" : ""), type: "button", onclick: function () { location.hash = "#/room/" + r.slug; } },
+            h("span", { "class": "pn", text: done ? "\u2713" : String(i + 1) }),
+            h("span", { "class": "pt" }, h("b", { text: pick(r, "title") }), h("small", { text: r.solved + " / " + r.tasks + " " + tr("tasks", "مهمة") })),
+            diffPill(r.difficulty), isNext ? h("span", { "class": "pill", text: tr("Next", "التالي") }) : null));
+        });
+        box.appendChild(list);
+        box.appendChild(h("button", { "class": "btn2", type: "button", text: tr("Open path", "افتح المسار"), onclick: function () { location.hash = "#/path/" + slug; } }));
+      });
+      root.appendChild(box);
+    });
+    var extra = ps.filter(function (x) { return !seen[x.slug]; });
+    if (extra.length) { var eb = h("div", { "class": "box" }, h("h3", { text: tr("More paths", "مسارات تانية") })); extra.forEach(function (p) { eb.appendChild(h("button", { "class": "btn2", type: "button", text: pick(p, "title"), onclick: function () { location.hash = "#/path/" + p.slug; } })); }); root.appendChild(eb); }
+    root.appendChild(h("div", { "class": "box" }, h("h3", { text: tr("Keep up with new threats", "خليك مواكب للتهديدات الجديدة") }), h("p", { text: tr("Short Arabic write-ups of newly exploited vulnerabilities, from official public data.", "ملخصات عربي قصيرة للثغرات اللي بتتستغل حديثًا، من بيانات رسمية عامة.") }), h("a", { "class": "btn2 f", href: "blog.html", text: tr("Recent threats", "تهديدات حديثة") })));
+  }
   /* ---------- router ---------- */
   var busy = 0;
   async function render() {
@@ -1047,6 +1083,7 @@
       if ((m = hs.match(/^#\/room\/([a-z0-9-]+)/))) await pageRoom(m[1]);
       else if ((m = hs.match(/^#\/path\/([a-z0-9-]+)/))) await pagePath(m[1]);
       else if ((m = hs.match(/^#\/cert\/([A-Za-z0-9-]+)/))) await pageCert(decodeURIComponent(m[1]));
+      else if (hs.indexOf("#/roadmap") === 0) await pageRoadmap();
       else if (hs.indexOf("#/paths") === 0) await pagePaths();
       else if (hs.indexOf("#/board") === 0) await pageBoard(BSEC);
       else if (hs.indexOf("#/me") === 0) await pageMe();
