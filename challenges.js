@@ -796,15 +796,21 @@
     root.appendChild(h("div", { "class": "rg" + (left.childNodes.length ? "" : " solo") }, left, right));
   }
 
-  var BSEC = null;
+  var BSEC = null; var BPER = "all";
   async function pageBoard(sec) {
-    var cat = await rpc("ch_catalog"), d = await rpc("ch_leaderboard", { p_section: sec || null });
+    var wk = BPER === "week";
+    var cat = await rpc("ch_catalog"), d = await rpc(wk ? "ch_weekly_leaderboard" : "ch_leaderboard", { p_section: sec || null });
     clear(root); root.appendChild(setTabs("board"));
+    var per = h("div", { "class": "chtabs perb" });
+    per.appendChild(h("button", { "class": "tab" + (!wk ? " on" : ""), type: "button", text: tr("All time", "طول الوقت"), onclick: function () { BPER = "all"; pageBoard(sec); } }));
+    per.appendChild(h("button", { "class": "tab" + (wk ? " on" : ""), type: "button", text: tr("This week", "الأسبوع ده"), onclick: function () { BPER = "week"; pageBoard(sec); } }));
+    root.appendChild(per);
+    if (wk && d.ends_at) { var ms = new Date(d.ends_at) - Date.now(), dd = Math.max(0, Math.floor(ms / 864e5)), hh = Math.max(0, Math.floor(ms % 864e5 / 36e5)); root.appendChild(h("p", { "class": "cnt", text: tr("Weekly board resets Monday 00:00 (Cairo time). Resets in ", "الترتيب الأسبوعي بيتصفّر الاتنين 12 بالليل (بتوقيت القاهرة). فاضل ") + dd + tr(" d ", " يوم ") + hh + tr(" h", " ساعة") })); }
     var tabs = h("div", { "class": "chtabs" });
     tabs.appendChild(h("button", { "class": "tab" + (!sec ? " on" : ""), type: "button", text: tr("Overall", "الكل"), onclick: function () { BSEC = null; pageBoard(null); } }));
     cat.sections.forEach(function (s) { tabs.appendChild(h("button", { "class": "tab" + (sec === s.slug ? " on" : ""), type: "button", text: pick(s, "title"), onclick: function () { BSEC = s.slug; pageBoard(s.slug); } })); });
     root.appendChild(tabs);
-    if (!d.top.length) { root.appendChild(h("div", { "class": "empty", text: tr("No solves yet. Be the first.", "مفيش حد حل لسه. كن أول واحد.") })); return; }
+    if (!d.top.length) { root.appendChild(h("div", { "class": "empty", text: (wk ? tr("No solves this week yet. Be the first.", "مفيش حد حل الأسبوع ده لسه. كن أول واحد.") : tr("No solves yet. Be the first.", "مفيش حد حل لسه. كن أول واحد.")) })); return; }
     function pavatar(x, size) {
       var av = h("span", { "class": "av", style: "width:" + size + "px;height:" + size + "px" });
       if (typeof window.scarAvatar === "function") { try { av.appendChild(window.scarAvatar(x.avatar || "b1", x.uid)); } catch (e) { } }
