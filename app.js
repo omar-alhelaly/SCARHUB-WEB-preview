@@ -792,7 +792,7 @@
   /* ---------- community ---------- */
   async function communityPage() {
     var app = $("app"); if (!me) return go("login.html"); clear(app);
-    var chans = [["general", tr("General chat", "الشات العام"), true], ["admins", tr("Admins only", "للإدارة فقط"), isStaff()], ["dmlist", tr("Private", "خاص"), true]].filter(function (c) { return c[2]; });
+    var chans = [["general", tr("General chat", "الشات العام"), true], ["help", tr("Help", "مساعدة"), true], ["labs", tr("Lab talk", "كلام اللابز"), true], ["admins", tr("Admins only", "للإدارة فقط"), isStaff()], ["dmlist", tr("Private", "خاص"), true]].filter(function (c) { return c[2]; });
     var box = h("div", { "class": "wide" }), tabs = h("div", { "class": "tabs" }), log = h("div", { "class": "chatbox", role: "log", "aria-live": "polite" });
     var input = h("input", { type: "text", maxlength: "1000", "aria-label": tr("Message", "رسالة"), style: "flex:1;padding:11px;border-radius:10px;border:1px solid var(--b);background:var(--bg);color:var(--t)" });
     var err = h("div", { "class": "msg" }), cur = "general", names = {}, urls = {}, urlsAt = Date.now(), sub = null, lastSig = "", lastRsig = "", rx = {}, pop = null, rxBusy = 0, myBlk = ((await sb.rpc("my_blocks")).data || [])[0] || null;
