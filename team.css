@@ -1,0 +1,47 @@
+/* SCAR Group team page and member pages. Uses the site colours (--r red, --p panel, --b line, --t text, --m muted). */
+@view-transition{navigation:auto}
+@keyframes tmFade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes tmLine{from{opacity:0;transform:translateY(40px);clip-path:inset(0 0 100% 0)}to{opacity:1;transform:none;clip-path:inset(0 0 0 0)}}
+@keyframes tmScale{from{opacity:0;transform:scale(1.04)}to{opacity:1;transform:none}}
+::view-transition-old(root){animation:.25s ease both tmOut}::view-transition-new(root){animation:.35s ease both tmFade}
+@keyframes tmOut{to{opacity:0}}
+main.tm-main{animation:tmFade .45s ease both}
+.tm-back{display:inline-block;margin:6px 0 0;color:var(--m);font-size:14px;text-decoration:none}.tm-back:hover{color:var(--r)}
+.tm-mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--m)}
+/* team grid */
+.tm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:18px;margin:26px 0 10px}
+.tm-card{display:block;text-decoration:none;color:var(--t);background:var(--p);border:1px solid var(--b);border-radius:14px;overflow:hidden;transition:transform .25s,border-color .25s,box-shadow .25s;opacity:0;animation:tmFade .5s ease both;animation-delay:calc(var(--i,0)*60ms)}
+.tm-card:hover,.tm-card:focus-visible{transform:translateY(-4px);border-color:var(--r);box-shadow:0 10px 30px #0003}
+.tm-card .ph{aspect-ratio:1/1;overflow:hidden;background:#0002}.tm-card img{display:block;width:100%;height:100%;object-fit:cover;filter:grayscale(1);transition:filter .35s,transform .5s}
+.tm-card:hover img,.tm-card:focus-visible img{filter:none;transform:scale(1.04)}
+.tm-card .tx{padding:14px 16px 16px}.tm-card h3{margin:6px 0 4px;font-size:17px;line-height:1.25}.tm-card p{margin:0;color:var(--m);font-size:13.5px;line-height:1.4}
+.tm-card .go{display:inline-block;margin-top:10px;color:var(--r);font-size:13px;font-weight:600}
+/* member page */
+.mb{max-width:1120px;margin:0 auto;padding:0 20px 40px}
+.mb-top{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:18px 0 14px;border-bottom:1px solid var(--b)}
+.mb-top b{color:var(--r);font-weight:700}
+.mb-hero{display:grid;grid-template-columns:1fr minmax(240px,340px);gap:36px;align-items:center;padding:44px 0 50px}
+.mb-hero h1{margin:0;font-size:clamp(40px,7vw,84px);line-height:1;letter-spacing:-.02em}
+.mb-hero h1 span{display:block;animation:tmLine .8s cubic-bezier(.2,.7,.2,1) both}.mb-hero h1 span:nth-child(2){animation-delay:.12s}
+.mb-hero .sum{margin:22px 0 0;color:var(--m);font-size:clamp(16px,2vw,19px);line-height:1.55;max-width:34em;animation:tmFade .8s .3s ease both}
+.mb-hero .aka{margin:14px 0 0;color:var(--r);font-weight:600;animation:tmFade .8s .4s ease both}
+.mb-hero figure{position:relative;margin:0;animation:tmScale .9s .1s ease both}.mb-hero figure img{display:block;width:100%;aspect-ratio:1/1;object-fit:cover;border:1px solid var(--b)}
+.mb-hero figure:after{content:"";position:absolute;top:12px;inset-inline-end:12px;border:7px solid transparent;border-bottom:12px solid var(--r);border-top:0}
+.mb-sec{display:grid;grid-template-columns:200px 1fr;gap:20px;padding:44px 0;border-top:1px solid var(--b)}
+.mb-sec>h2{margin:0;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--m);font-family:"IBM Plex Mono",ui-monospace,monospace;font-weight:500}
+.mb-tags{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none}.mb-tags li{border:1px solid var(--t);padding:6px 12px;font-size:15px;transition:background .2s,color .2s,border-color .2s}.mb-tags li:hover{background:var(--r);border-color:var(--r);color:#fff}
+.mb-bg{display:grid;grid-template-columns:1fr 220px;gap:28px;align-items:start}.mb-bg p{margin:0;font-size:clamp(17px,2vw,20px);line-height:1.6}.mb-bg img{width:100%;aspect-ratio:1/1;object-fit:cover;filter:grayscale(1);border:1px solid var(--b)}
+.mb-big{margin:0;font-size:clamp(20px,2.8vw,30px);line-height:1.35;font-weight:700;max-width:26em}
+.mb-tools{display:grid;grid-template-columns:repeat(3,1fr);gap:0 24px;margin:0;padding:0;list-style:none}.mb-tools li{padding:10px 0;border-bottom:1px solid var(--b);font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:13px;letter-spacing:.08em;text-transform:uppercase}
+.mb-hl{margin:0;padding:0;list-style:none}.mb-hl li{padding:18px 0;border-bottom:1px solid var(--b)}.mb-hl h3{margin:0 0 6px;font-size:22px}.mb-hl p{margin:0;color:var(--m)}.mb-hl a{display:inline-block;margin-top:8px;color:var(--r)}
+.mb-links{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:0;padding:0;list-style:none}.mb-links a{display:flex;justify-content:space-between;padding:14px 16px;border:1px solid var(--b);border-radius:10px;color:var(--t);text-decoration:none;background:var(--p);transition:border-color .2s,transform .2s}.mb-links a:hover{border-color:var(--r);transform:translateY(-2px)}
+.mb-next{display:flex;align-items:center;gap:22px;justify-content:space-between;flex-wrap:wrap;padding:34px 0;border-top:1px solid var(--b)}
+.mb-next a.nx{display:flex;align-items:center;gap:20px;color:var(--t);text-decoration:none;flex:1;min-width:260px}.mb-next img{width:96px;height:96px;object-fit:cover;filter:grayscale(1);transition:filter .3s;border:1px solid var(--b)}.mb-next a.nx:hover img{filter:none}
+.mb-next h2{margin:4px 0 0;font-size:clamp(24px,4vw,44px);line-height:1.1}.mb-next .ar{color:var(--r);font-size:28px}
+.mb-all{color:var(--m);text-decoration:none;font-size:14px}.mb-all:hover{color:var(--r)}
+.mb-rv{opacity:0;transform:translateY(22px);transition:opacity .7s ease,transform .7s ease}.mb-rv.in{opacity:1;transform:none}
+.tm-empty{padding:60px 0;color:var(--m)}
+[dir=rtl] .mb-next .ar,[dir=rtl] .tm-card .go{display:inline-block;transform:scaleX(-1)}
+@media(max-width:860px){.mb-hero{grid-template-columns:1fr;padding:30px 0 36px}.mb-hero figure{max-width:340px;order:-1}.mb-sec{grid-template-columns:1fr;gap:14px;padding:32px 0}.mb-bg{grid-template-columns:1fr}.mb-bg img{max-width:220px}.mb-tools{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){.mb-links{grid-template-columns:1fr}.mb-next img{width:72px;height:72px}.tm-grid{grid-template-columns:repeat(2,1fr);gap:12px}.tm-card .tx{padding:10px 12px 12px}.tm-card h3{font-size:15px}}
+@media(prefers-reduced-motion:reduce){.tm-card,.mb-hero *,main.tm-main,.mb-rv{animation:none!important;transition:none!important;opacity:1!important;transform:none!important;clip-path:none!important}}
