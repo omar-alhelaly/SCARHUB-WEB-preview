@@ -1060,38 +1060,38 @@
         var staff = u.role !== "user", name = staff ? (u.alias + (owner && u.username ? " (" + u.username + ")" : "")) : u.username;
         var act = h("td");
         if (owner && u.role !== "owner" && u.status === "active") {
-          var sel = h("select", { "aria-label": "role" }); ["user", "admin"].forEach(function (r2) { var o = h("option", { value: r2, text: r2 }); if (r2 === u.role) o.selected = true; sel.appendChild(o); });
-          var al = h("input", { type: "text", placeholder: "alias", maxlength: "25", value: u.alias || "", style: "width:100px" });
+          var sel = h("select", { "aria-label": "role", "data-g": "perm" }); ["user", "admin"].forEach(function (r2) { var o = h("option", { value: r2, text: r2 }); if (r2 === u.role) o.selected = true; sel.appendChild(o); });
+          var al = h("input", { type: "text", placeholder: "alias", maxlength: "25", value: u.alias || "", "data-g": "perm" });
           act.appendChild(sel); act.appendChild(al);
-          act.appendChild(h("button", { "class": "btn", type: "button", text: tr("Apply", "تطبيق"), on: { click: async function () {
+          act.appendChild(h("button", { "class": "btn f", type: "button", "data-g": "perm", text: tr("Apply", "تطبيق"), on: { click: async function () {
             if (sel.value === "admin" && !ALIAS_RE.test(al.value)) return alert(tr("Admin needs an alias (3-25 chars).", "الأدمن محتاج اسم مستعار (3-25)."));
             var x = await sb.rpc("set_role", { target: u.id, new_role: sel.value, new_alias: sel.value === "admin" ? al.value : null }); if (x.error) alert(x.error.message); users();
           } } }));
         }
         if (owner && u.role !== "owner" && u.status !== "deleted") {
           var banned = u.status === "banned", dn = u.username || u.alias || "";
-          act.appendChild(h("button", { "class": "btn", type: "button", text: banned ? tr("Unblock", "فك الحظر") : tr("Block...", "حظر..."), on: { click: async function () {
+          act.appendChild(h("button", { "class": "btn", type: "button", "data-g": "mod", text: banned ? tr("Unblock", "فك الحظر") : tr("Block...", "حظر..."), on: { click: async function () {
             if (!banned) return openProfile(u.id);
             var x = await sb.rpc("admin_set_ban", { target: u.id, ban: !banned }); if (x.error) alert(x.error.message); users();
           } } }));
-          act.appendChild(h("button", { "class": "btn", type: "button", style: "color:#e11d2e", text: tr("Delete", "حذف"), on: { click: async function () {
+          act.appendChild(h("button", { "class": "btn dng", type: "button", "data-g": "danger", text: tr("Delete", "حذف"), on: { click: async function () {
             var o = await askRemoval(tr("Delete this user permanently? This cannot be undone.", "تحذف المستخدم ده نهائي؟ مش هتقدر ترجعه."), dn); if (!o) return;
             var x = await sb.rpc("admin_delete_user", { target: u.id, p_reason: o.reason, p_notify: o.notify }); if (x.error) alert(x.error.message); else if (o.notify && !(await sendNotices())) alert(noticeNote(false).trim()); users();
           } } }));
         }
-        if (u.role !== "owner" && u.status !== "deleted") act.appendChild(h("button", { "class": "btn", type: "button", text: tr("Clear chat", "امسح الشات"), on: { click: async function () {
+        if (u.role !== "owner" && u.status !== "deleted") act.appendChild(h("button", { "class": "btn", type: "button", "data-g": "mod", text: tr("Clear chat", "امسح الشات"), on: { click: async function () {
           var o = await askRemoval(tr("Clear this user's chat messages?", "تمسح رسايل المستخدم ده في الشات؟"), name); if (!o) return;
           var x = await sb.rpc("admin_clear_user_chat", { target: u.id, p_reason: o.reason, p_notify: o.notify }); if (x.error) alert(x.error.message); else if (o.notify && !(await sendNotices())) alert(noticeNote(false).trim()); users();
         } } }));
-        if (!owner && u.status === "active" && u.role === "user") act.appendChild(h("button", { "class": "btn", type: "button", text: tr("Profile / block", "البروفايل / حظر"), on: { click: function () { openProfile(u.id); } } }));
-        if (owner && u.status === "active") act.appendChild(h("button", { "class": "btn", type: "button", text: tr("Profile", "البروفايل"), on: { click: function () { openProfile(u.id); } } }));
+        if (!owner && u.status === "active" && u.role === "user") act.appendChild(h("button", { "class": "btn", type: "button", "data-g": "mod", text: tr("Profile / block", "البروفايل / حظر"), on: { click: function () { openProfile(u.id); } } }));
+        if (owner && u.status === "active") act.appendChild(h("button", { "class": "btn", type: "button", "data-g": "mod", text: tr("Profile", "البروفايل"), on: { click: function () { openProfile(u.id); } } }));
         var mine = gm[u.id] || [], subCell = h("td", { text: u.subscribed ? "yes" : "-" });
         if (mine.length) { clear(subCell); subCell.appendChild(h("span", { "class": "tag", text: tr("Free (owner)", "مجاني (من المالك)") })); mine.forEach(function (g) { subCell.appendChild(h("div", { "class": "hint", text: (g.plan_name || tr("All tools", "كل الأدوات")) + " " + endTxt(g.ends) })); }); }
         if (owner && u.role !== "owner" && u.status === "active") {
           var gs = h("select", { "aria-label": "plan" }); gs.appendChild(h("option", { value: "", text: tr("All tools", "كل الأدوات") }));
           plansL.forEach(function (p) { gs.appendChild(h("option", { value: p.id, text: p.name + (p.scope === "tools" ? "" : " (all)") })); });
           var gd = h("input", { type: "date", "aria-label": tr("Expiry (optional)", "الانتهاء (اختياري)"), title: tr("Expiry (optional)", "الانتهاء (اختياري)") });
-          var gact = h("div", { "class": "hint" }, gs, gd, h("button", { "class": "btn", type: "button", text: tr("Give free plan", "اديله اشتراك مجاني"), on: { click: async function () {
+          var gact = h("div", { "class": "hint", "data-g": "plan" }, gs, gd, h("button", { "class": "btn", type: "button", text: tr("Give free plan", "اديله اشتراك مجاني"), on: { click: async function () {
             var until = gd.value ? new Date(gd.value + "T23:59:59").toISOString() : null;
             if (!confirm(tr("Give this user free access (", "تدي المستخدم ده وصول مجاني (") + gs.options[gs.selectedIndex].text + ", " + (until ? tr("until ", "لحد ") + gd.value : tr("no expiry", "من غير انتهاء")) + ")?")) return;
             var x = await sb.rpc("admin_grant_plan", { target: u.id, p_plan: gs.value || null, p_until: until }); if (x.error) alert(x.error.message); users();
@@ -1102,6 +1102,13 @@
           } } })); });
           act.appendChild(gact);
         }
+        (function () {
+          var kids = [].slice.call(act.children), G = { perm: [tr("Permissions", "الصلاحيات"), []], plan: [tr("Plan", "الاشتراك"), []], mod: [tr("Moderation", "الإشراف"), []], danger: [tr("Danger", "خطر"), []] };
+          kids.forEach(function (k) { var g = G[k.getAttribute("data-g")]; if (g) g[1].push(k); }); clear(act);
+          var wrap = h("div", { "class": "ags" });
+          ["perm", "plan", "mod", "danger"].forEach(function (key) { var g = G[key]; if (!g[1].length) return; var box = h("div", { "class": "ag ag-" + key }, h("div", { "class": "agl", text: g[0] })), row = h("div", { "class": "agr" }); g[1].forEach(function (k) { row.appendChild(k); }); box.appendChild(row); wrap.appendChild(box); });
+          act.appendChild(wrap);
+        })();
         tb.appendChild(h("tr", null, h("td", null, h("span", { "class": "av", style: "display:inline-block;width:28px;vertical-align:middle;margin-inline-end:6px;cursor:default" }, avatarSvg(u.avatar, u.id)), name || "-"), h("td", { text: u.email || "" }),
           h("td", null, h("span", { "class": "tag " + (u.role === "owner" ? "owner" : ""), text: u.role })), h("td", null, h("span", { "class": "tag " + (u.status === "deleted" || u.status === "banned" ? "del" : ""), text: u.status })), subCell, act));
       });
