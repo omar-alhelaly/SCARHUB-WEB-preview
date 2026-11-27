@@ -1542,7 +1542,7 @@
     var pn = h("div", { "class": "panel" }, h("h1", { text: t.name }), h("p", { text: EN() || !t.description_ar ? t.description_en : t.description_ar }));
     if (t.third_party && t.orig_repo) pn.appendChild(creditEl(t));
     var tOpen = await canOpen(t);
-    if (t.coming_soon) { pn.appendChild(h("p", { "class": "hint", text: soonText() })); if (me && (me.role === "owner" || (me.role === "admin" && t.created_by === me.id))) pn.appendChild(h("p", null, h("a", { "class": "btn", href: "admin.html#edit-" + encodeURIComponent(slug), text: tr("Edit this tool", "عدّل الأداة دي") }))); box.appendChild(pn); return; }
+    if (t.coming_soon) { pn.appendChild(h("p", { "class": "hint", text: soonText() })); if (me && (me.role === "owner" || (me.role === "admin" && t.created_by === me.id))) pn.appendChild(h("span", { style: "display:inline-block;margin-inline-start:10px;margin-top:8px" }, h("a", { "class": "btn", href: "admin.html#edit-" + encodeURIComponent(slug), text: tr("Edit this tool", "عدّل الأداة دي") }))); box.appendChild(pn); return; }
     if (!tOpen) { pn.appendChild(h("p", { "class": "hint", text: lockText() })); pn.appendChild(h("p", null, h("a", { "class": "btn f", href: me ? "account.html" : "login.html", text: me ? tr("Upgrade to unlock the docs", "رقّي حسابك عشان تفتح الدوكس") : tr("Sign in to unlock", "سجّل دخول عشان تفتح") }))); }
     else if (!t.coming_soon) {
       var dsec = function (en, ar) { return h("h2", { text: tr(en, ar), style: "font-size:20px;margin:22px 0 6px" }); };
@@ -1560,7 +1560,7 @@
       if (a.repo_url) pn.appendChild(h("p", null, h("a", { "class": "btn", href: a.repo_url, target: "_blank", rel: "noopener noreferrer", text: "GitHub" })));
       if (a.file_path) pn.appendChild(h("button", { "class": "btn f", type: "button", text: tr("Download", "تحميل"), on: { click: async function () { var u = await sb.storage.from("tool-files").createSignedUrl(a.file_path, 60); if (u.data) location.href = u.data.signedUrl; } } }));
     }
-    if (me && (me.role === "owner" || (me.role === "admin" && t.created_by === me.id))) pn.appendChild(h("p", null, h("a", { "class": "btn", href: "admin.html#edit-" + encodeURIComponent(slug), text: tr("Edit this tool", "عدّل الأداة دي") })));
+    if (me && (me.role === "owner" || (me.role === "admin" && t.created_by === me.id))) pn.appendChild(h("span", { style: "display:inline-block;margin-inline-start:10px;margin-top:8px" }, h("a", { "class": "btn", href: "admin.html#edit-" + encodeURIComponent(slug), text: tr("Edit this tool", "عدّل الأداة دي") })));
     box.appendChild(pn);
   }
   (async function () {
