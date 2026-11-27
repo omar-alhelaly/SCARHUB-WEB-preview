@@ -16,7 +16,7 @@ window.addEventListener('DOMContentLoaded',function(){
  try{var ll=document.getElementById('loginlink');if(ll){for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(/^sb-.+-auth-token$/.test(k)&&/access_token/.test(localStorage.getItem(k)||'')){ll.href='account.html';ll.dataset.en='Account';ll.dataset.ar='\u062d\u0633\u0627\u0628\u064a';break}}}}catch(e){}
  try{var pn=location.pathname.split('/').pop()||'index.html',nv=document.getElementById('nav'),an=document.getElementById('loginlink')||document.getElementById('lang');
   if(nv&&an&&pn!=='index.html'&&!document.getElementById('backbtn')){
-   var bb=document.createElement('button');bb.type='button';bb.id='backbtn';bb.className='lang';bb.dataset.en='\u2190 Back';bb.dataset.ar='\u0631\u062c\u0648\u0639 \u2192';bb.textContent=bb.dataset.en;
+   var bb=document.createElement('button');bb.type='button';bb.id='backbtn';bb.className='lang';bb.dataset.en='Back';bb.dataset.ar='\u0631\u062c\u0648\u0639';bb.textContent=bb.dataset.en;
    bb.onclick=function(){var same=false;try{same=document.referrer&&new URL(document.referrer).host===location.host}catch(e){}if(same&&history.length>1)history.back();else location.href='index.html'};
    an.parentNode.insertBefore(bb,an)}}catch(e){}
 
