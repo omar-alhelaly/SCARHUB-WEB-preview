@@ -231,3 +231,5 @@ html[data-theme=light] #ch .ptitle{color:hsl(var(--ph,210) 80% 34%)}
 #ch .tg{display:flex;align-items:center;gap:8px;font-size:13px}
 #ch .rtl{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}#ch .rte{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 10px;border:1px solid var(--b);border-radius:8px;font-size:12.5px}#ch .rte .tab{padding:2px 10px;font-size:12px}
 #ch .rte code:before,#ch .rte code:after{content:none!important}#ch .rte code{background:transparent;padding:0}#ch .rte select{max-width:55%}
+#ch .ndev{width:80px}#ch .ndev .nic svg{width:76px;height:66px;display:block;filter:drop-shadow(0 2px 3px #0006)}#ch .tbi svg{width:46px;height:40px}
+@media(max-width:600px){#ch .ndev .nic svg{width:64px;height:56px}}
