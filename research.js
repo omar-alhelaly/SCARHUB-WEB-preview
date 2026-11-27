@@ -6,7 +6,7 @@ function bi(t,en,ar,a){var e=el(t,a,en);e.dataset.en=en;e.dataset.ar=ar;return e
 if(!I){ih.appendChild(bi('h1','Research not found','البحث مش موجود'));ib.appendChild(bi('p','Pick an item from the list.','اختار حاجة من القائمة.'));return}
 var L=localStorage.l||'en',i=L=='ar'?1:0;
 D.title=I.t[0]+' | SCARHUB';D.documentElement.dataset.ten=D.title;D.documentElement.dataset.tar=I.t[1]+' | SCARHUB';
-var eb=el('span',{'class':'eyebrow'});eb.appendChild(el('span',null,I.tag+' \u00B7 '+I.year));ih.appendChild(eb);
+var eb=el('span',{'class':'eyebrow'});eb.appendChild(el('span',null,I.tag));ih.appendChild(eb);
 ih.appendChild(bi('h1',I.t[0],I.t[1]));
 ih.appendChild(bi('p',I.sum[0],I.sum[1]));
 if(I.meta){var m=el('div',{'class':'box',style:'margin:18px 0;display:flex;gap:22px;flex-wrap:wrap;font:13px ui-monospace,Menlo,Consolas,monospace'});
