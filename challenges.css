@@ -233,3 +233,21 @@ html[data-theme=light] #ch .ptitle{color:hsl(var(--ph,210) 80% 34%)}
 #ch .rte code:before,#ch .rte code:after{content:none!important}#ch .rte code{background:transparent;padding:0}#ch .rte select{max-width:55%}
 #ch .ndev{width:80px}#ch .ndev .nic svg{width:76px;height:66px;display:block;filter:drop-shadow(0 2px 3px #0006)}#ch .tbi svg{width:46px;height:40px}
 @media(max-width:600px){#ch .ndev .nic svg{width:64px;height:56px}}
+/* palette at the bottom (drag and drop) */
+#ch .npal{border:1px solid var(--b);border-radius:10px;background:var(--p);overflow:hidden}
+#ch .npal .nbar{border:0;border-bottom:1px solid var(--b);border-radius:0;display:flex;flex-wrap:wrap;gap:6px;justify-content:space-between;align-items:center;padding:6px 8px}
+#ch .npt{display:flex;gap:4px;flex-wrap:wrap}
+#ch .npc{display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 6px;border:1px solid var(--b);border-radius:999px;background:transparent;color:var(--t);cursor:pointer;font:600 12px inherit}
+#ch .npc em{font-style:normal}#ch .npc svg{width:34px;height:30px}#ch .npc.on{background:var(--r);border-color:var(--r);color:#fff}
+#ch .ntools{display:flex;gap:6px;flex-wrap:wrap}
+#ch .nps{display:flex;gap:8px;overflow-x:auto;padding:10px;min-height:96px;align-items:stretch;-webkit-overflow-scrolling:touch}
+#ch .nmod{flex:0 0 auto;width:104px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px;border:1px solid var(--b);border-radius:10px;cursor:grab;touch-action:pan-x;user-select:none;-webkit-user-select:none;background:var(--bg,transparent)}
+#ch .nmod:hover{border-color:var(--r)}#ch .nmod .tbi svg{width:72px;height:62px;display:block}
+#ch .nmod em{font-style:normal;font-size:11.5px;font-weight:700;text-align:center;line-height:1.15}#ch .nmod small{font-size:10px;color:var(--m)}
+#ch .nps .tab.tbc{flex:0 0 auto;align-self:center}
+#ch .nps .tab.tbc em{display:inline!important}
+#ch .ncv.drop{outline:2px dashed var(--r);outline-offset:-4px}
+.nghost{position:fixed;z-index:99999;pointer-events:none;opacity:.9;filter:drop-shadow(0 6px 8px #0008)}.nghost svg{width:76px;height:66px;display:block}
+@media(max-width:700px){#ch .npc em{display:none}#ch .npc{padding:3px 6px}#ch .nmod{width:92px}#ch .npal .nbar{padding:6px}#ch .ntools .tab{padding:3px 8px;font-size:12px}}
+#ch .nps .tab.tbc em{font-style:normal}
+@media(max-width:700px){#ch .ncv{height:330px}}
