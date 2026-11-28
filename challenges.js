@@ -780,7 +780,7 @@
     function hueOf(s) { return HUES[cat.sections.indexOf(s) % HUES.length]; }
     function roomCard(s, r) {
       return h("button", { "class": "room", type: "button", style: "--sh:" + hueOf(s), onclick: function () { location.hash = "#/room/" + r.slug; } },
-        h("div", { "class": "meta" }, h("span", { "class": "stag", text: pick(s, "title") }), diffPill(r.difficulty), r.published ? null : h("span", { "class": "pill", text: tr("Draft", "مسودة") })),
+        h("div", { "class": "meta" }, h("span", { "class": "stag", text: pick(s, "title") }), diffPill(r.difficulty), r.locked ? h("span", { "class": "pill lock", text: tr("Locked", "مقفولة") }) : (r.paid ? h("span", { "class": "pill lock", text: tr("Paid", "مدفوعة") }) : null), r.published ? null : h("span", { "class": "pill", text: tr("Draft", "مسودة") })),
         h("h3", { text: pick(r, "title") }), h("p", { text: pick(r, "summary") }), progress(r.solved, r.tasks),
         h("div", { "class": "meta", text: r.solved + " / " + r.tasks + " " + tr("solved", "اتحل") + " · " + r.points + " " + tr("pts", "نقطة") }));
     }
@@ -806,13 +806,51 @@
     root.appendChild(g);
   }
 
+  function roomDone(r) { return r.tasks > 0 && r.solved >= r.tasks; }
+  function pathProgress(p) { var d = 0, e = 0; p.rooms.forEach(function (r) { if (roomDone(r)) d++; e += (r.earned || 0); }); var n = p.rooms.length; return { done: d, total: n, earned: e, pct: n ? Math.round(100 * d / n) : 0 }; }
+  function progBox(p) { var pr = pathProgress(p);
+    return h("div", { "class": "pprog" }, h("div", { "class": "pph" }, h("b", { text: tr("Your progress", "تقدمك") + " " + pr.pct + "%" }), h("span", { text: pr.done + " " + tr("of", "من") + " " + pr.total + " " + tr("rooms done", "غرف اتخلصت") + " · " + pr.earned + " " + tr("pts earned", "نقطة اتكسبت") })), progress(pr.done, pr.total)); }
+  function money(u) { return "\u2066" + (u.price_minor / 100).toFixed(2).replace(/\.00$/, "") + " " + u.currency + "\u2069"; }
+  function paywall(p) {
+    var locked = p.rooms.filter(function (r) { return r.locked; }), u = p.unlock, box = h("div", { "class": "box paywall" });
+    box.appendChild(h("h3", { text: tr("Continue the path: ", "كمّل المسار: ") + pick(p, "title") }));
+    box.appendChild(progBox(p));
+    box.appendChild(h("h4", { text: tr("What the next rooms teach", "الغرف الجاية بتعلّمك إيه") }));
+    var ul = h("ul", { "class": "tease" });
+    locked.forEach(function (r) { ul.appendChild(h("li", null, h("b", { text: pick(r, "title") }), h("span", { text: " - " + pick(r, "summary") }), h("small", { text: " (" + r.tasks + " " + tr("tasks", "مهام") + " · " + r.points + " " + tr("pts", "نقطة") + ")" }))); });
+    box.appendChild(ul);
+    box.appendChild(h("p", { "class": "note", text: tr("Finish all " + p.rooms.length + " rooms to earn the SCAR completion certificate for this path.", "خلّص كل الـ " + p.rooms.length + " غرف عشان تاخد شهادة إتمام SCAR للمسار ده.") }));
+    if (!u) { box.appendChild(h("p", { "class": "note", text: tr("These rooms are not on sale right now.", "الغرف دي مش للبيع دلوقتي.") })); return box; }
+    var per = u.period === "year" ? tr("1 year", "سنة") : tr("1 month", "شهر");
+    var terms = h("div", { "class": "terms" }, h("div", { "class": "price" }, h("b", { text: money(u) }), h("span", { text: " · " + tr("one payment", "دفعة واحدة") + " · " + per })),
+      h("ul", null,
+        h("li", { text: tr("Opens the " + locked.length + " locked rooms above for " + per + " from the day the owner confirms your payment. It does not renew by itself.", "بيفتح الـ " + locked.length + " غرف المقفولة فوق لمدة " + per + " من يوم ما المالك يأكد دفعتك. مبيتجددش لوحده.") }),
+        h("li", { text: tr("The other rooms in this path stay free.", "باقي غرف المسار فاضلة مجانية.") }),
+        h("li", { text: tr("You pay by Vodafone Cash transfer, then send the reference and a screenshot on your account page. The owner checks it and opens your access.", "بتدفع بتحويل فودافون كاش، وبعدين تبعت رقم العملية وسكرينشوت من صفحة حسابك. المالك بيراجعها ويفتحلك.") })));
+    box.appendChild(terms);
+    box.appendChild(me ? h("a", { "class": "btn2 f", href: "account.html#plans", text: tr("Unlock for " + money(u), "افتح بـ " + money(u)) }) : h("a", { "class": "btn2 f", href: "login.html", text: tr("Sign in to unlock", "سجّل دخول عشان تفتح") }));
+    return box;
+  }
+  async function lockedRoom(r) {
+    root.appendChild(h("button", { "class": "back", type: "button", onclick: function () { location.hash = "#/"; }, text: tr("< All rooms", "< كل الغرف") }));
+    root.appendChild(h("div", { "class": "roomh" }, h("div", { "class": "meta" }, diffPill(r.difficulty), h("span", { "class": "pill lock", text: tr("Locked", "مقفولة") })), h("h2", { text: pick(r, "title") }), h("p", { text: pick(r, "summary") })));
+    var p = null; try { var ps = await rpc("ch_paths_list"); p = ps.filter(function (x) { return x.rooms.some(function (y) { return y.slug === r.slug; }); })[0]; } catch (e) {}
+    if (p) { root.appendChild(paywall(p)); return; }
+    var u = r.unlock, box = h("div", { "class": "box paywall" });
+    box.appendChild(h("h3", { text: tr("This room is part of a paid path", "الغرفة دي جزء من مسار مدفوع") }));
+    box.appendChild(h("p", { "class": "note", text: u ? money(u) + " · " + (u.period === "year" ? tr("1 year", "سنة") : tr("1 month", "شهر")) : tr("Not on sale right now.", "مش للبيع دلوقتي.") }));
+    if (u) box.appendChild(me ? h("a", { "class": "btn2 f", href: "account.html#plans", text: tr("Unlock for " + money(u), "افتح بـ " + money(u)) }) : h("a", { "class": "btn2 f", href: "login.html", text: tr("Sign in to unlock", "سجّل دخول عشان تفتح") }));
+    root.appendChild(box);
+  }
+
   async function pageRoom(slug) {
     var r = await rpc("ch_room", { p_slug: slug });
     clear(root);
     if (!r) { root.appendChild(h("button", { "class": "back", onclick: function () { location.hash = "#/"; }, text: tr("< All rooms", "< كل الغرف") })); root.appendChild(h("div", { "class": "empty", text: tr("Room not found.", "الغرفة مش موجودة.") })); return; }
+    if (r.locked) { await lockedRoom(r); return; }
     var solved = r.tasks.filter(function (t) { return t.solved; }).length;
     root.appendChild(h("button", { "class": "back", type: "button", onclick: function () { location.hash = "#/"; }, text: tr("< All rooms", "< كل الغرف") }));
-    root.appendChild(h("div", { "class": "roomh" }, h("div", { "class": "meta" }, diffPill(r.difficulty), r.published ? null : h("span", { "class": "pill", text: tr("Draft (only staff see it)", "مسودة (الإدارة بس تشوفها)") })), h("h2", { text: pick(r, "title") }), h("p", { text: pick(r, "summary") })));
+    root.appendChild(h("div", { "class": "roomh" }, h("div", { "class": "meta" }, diffPill(r.difficulty), r.paid ? h("span", { "class": "pill lock", text: tr("Paid room", "غرفة مدفوعة") }) : null, r.published ? null : h("span", { "class": "pill", text: tr("Draft (only staff see it)", "مسودة (الإدارة بس تشوفها)") })), h("h2", { text: pick(r, "title") }), h("p", { text: pick(r, "summary") })));
     var left = h("div"), right = h("div");
     var body = r.body || {};
     var read = h("div", { "class": "box read" });
@@ -848,11 +886,12 @@
         if (!inp.value.trim()) return; btn.disabled = true;
         try {
           var res = await rpc("ch_check", { p_task: t.id, p_answer: inp.value });
-          if (res.status === "correct") { t.solved = true; solved++; got += t.points; setCnt(); lockSolved(); toast("+" + res.points + " " + tr("points", "نقطة") + " · " + res.total); }
+          if (res.status === "correct") { t.solved = true; solved++; got += t.points; setCnt(); lockSolved(); toast("+" + res.points + " " + tr("points", "نقطة") + " · " + res.total); if (solved === r.tasks.length) nextLock(); }
           else if (res.status === "already") { t.solved = true; lockSolved(); }
           else if (res.status === "wrong") { st.className = "st bad"; st.textContent = tr("Not correct. Try again.", "مش صح. جرّب تاني."); }
           else if (res.status === "rate") { st.className = "st warn"; st.textContent = tr("Too many attempts. Wait a minute.", "محاولات كتير. استنى دقيقة."); }
           else if (res.status === "login") { st.className = "st warn"; st.textContent = tr("Sign in first.", "سجّل دخول الأول."); }
+          else if (res.status === "locked") { st.className = "st warn"; st.textContent = tr("This room is locked. Unlock it from the path page.", "الغرفة دي مقفولة. افتحها من صفحة المسار."); }
           else { st.className = "st warn"; st.textContent = tr("Cannot check this task now.", "مش قادر أتحقق من المهمة دلوقتي."); }
         } catch (e) { st.className = "st warn"; st.textContent = tr("Connection problem. Try again.", "مشكلة اتصال. جرّب تاني."); }
         if (!t.solved) btn.disabled = false;
@@ -880,9 +919,41 @@
     cards.forEach(function (c, i) { if (!used[i]) tb.appendChild(c); });
     right.appendChild(tb);
     root.appendChild(h("div", { "class": "rg" + (left.childNodes.length ? "" : " solo") }, left, right));
+    var tail = h("div"); root.appendChild(tail);
+    async function nextLock() {
+      if (!me || !r.tasks.length || solved < r.tasks.length) return;
+      try {
+        var ps = await rpc("ch_paths_list");
+        ps.forEach(function (p) { var i = p.rooms.map(function (x) { return x.slug; }).indexOf(r.slug); if (i > -1 && p.rooms[i + 1] && p.rooms[i + 1].locked && !tail.firstChild) { tail.appendChild(h("div", { "class": "tipb", text: tr("Room complete. Your path continues:", "الغرفة خلصت. المسار بيكمّل:") })); tail.appendChild(paywall(p)); tail.scrollIntoView({ block: "nearest" }); } });
+      } catch (e) {}
+    }
+    nextLock();
   }
 
   var BSEC = null; var BPER = "all";
+  async function guestProfile(uid) {
+    var old = document.getElementById("gprof"); if (old) old.remove();
+    var ov = h("div", { id: "gprof", role: "dialog", "aria-modal": "true", "class": "gprof" }), card = h("div", { "class": "box gcard" });
+    function close() { ov.remove(); }
+    ov.addEventListener("click", function (e) { if (e.target === ov) close(); });
+    card.appendChild(h("button", { "class": "gx", type: "button", "aria-label": "close", text: "\u00d7", onclick: close }));
+    card.appendChild(h("p", { "class": "note", text: "..." })); ov.appendChild(card); document.body.appendChild(ov);
+    var d = null; try { d = await rpc("public_profile", { target: uid }); } catch (e) {}
+    clear(card); card.appendChild(h("button", { "class": "gx", type: "button", "aria-label": "close", text: "\u00d7", onclick: close }));
+    if (!d) { card.appendChild(h("p", { text: tr("Profile not available.", "البروفايل مش متاح.") })); return; }
+    var av = h("span", { "class": "av", style: "width:64px;height:64px;flex:none" });
+    if (typeof window.scarAvatar === "function") { try { av.appendChild(window.scarAvatar(d.avatar || "b1", d.id)); } catch (e) { } }
+    if (!av.firstChild) { av.classList.add("avl"); av.textContent = (d.name || "?").charAt(0).toUpperCase(); }
+    var bd = h("span", { "class": "bdgs" });
+    if (d.title) bd.appendChild(h("span", { "class": "bdg ttl", text: d.title }));
+    if (d.role === "owner") bd.appendChild(h("span", { "class": "bdg owner", text: tr("Owner", "المالك") })); else if (d.role === "admin") bd.appendChild(h("span", { "class": "bdg admin", text: tr("Admin", "أدمن") }));
+    card.appendChild(h("div", { "class": "ghead" }, av, h("div", null, h("h2", { text: d.name }), bd)));
+    card.appendChild(h("p", { "class": "note" }, h("b", { text: tr("Joined", "انضم") + ": " }), document.createTextNode(new Date(d.joined).toLocaleDateString(EN() ? "en-GB" : "ar-EG"))));
+    card.appendChild(h("h3", { text: tr("Completed learning paths", "مسارات متخلصة") }));
+    if (!(d.paths || []).length) card.appendChild(h("p", { "class": "note", text: tr("No completed paths yet.", "لسه مخلصش مسارات.") }));
+    (d.paths || []).forEach(function (x) { card.appendChild(h("p", { "class": "pathdone" }, h("span", { "class": "bdg ttl", text: "\u2713 " + tr(x.title_en, x.title_ar) }), document.createTextNode(" " + new Date(x.issued_at).toLocaleDateString(EN() ? "en-GB" : "ar-EG") + " "), h("a", { href: "#/cert/" + encodeURIComponent(x.cert), onclick: close, text: tr("Verify certificate", "اتأكد من الشهادة") }))); });
+    if (!me) card.appendChild(h("div", { "class": "gcta" }, h("b", { text: tr("Want your own profile and certificates?", "عايز بروفايل وشهادات بإسمك؟") }), h("p", { "class": "note", text: tr("Create a free account, solve labs, finish paths and show your progress here.", "اعمل حساب مجاني، حل معامل، خلّص مسارات وورّي تقدمك هنا.") }), h("a", { "class": "btn2 f", href: "login.html", text: tr("Sign up free", "سجّل مجانًا") })));
+  }
   async function pageBoard(sec) {
     var wk = BPER === "week";
     var cat = await rpc("ch_catalog"), d = await rpc(wk ? "ch_weekly_leaderboard" : "ch_leaderboard", { p_section: sec || null });
@@ -902,7 +973,7 @@
       if (typeof window.scarAvatar === "function") { try { av.appendChild(window.scarAvatar(x.avatar || "b1", x.uid)); } catch (e) { } }
       return av;
     }
-    function popen(x, el) { if (typeof window.scarOpenProfile === "function" && x.uid && me) { el.classList.add("clk"); el.title = tr("View profile", "شوف البروفايل"); el.addEventListener("click", function () { window.scarOpenProfile(x.uid); }); } return el; }
+    function popen(x, el) { if (x.uid && me && typeof window.scarOpenProfile === "function") { el.classList.add("clk"); el.title = tr("View profile", "شوف البروفايل"); el.addEventListener("click", function () { window.scarOpenProfile(x.uid); }); } else if (x.uid) { el.classList.add("clk"); el.title = tr("View profile", "شوف البروفايل"); el.addEventListener("click", function () { guestProfile(x.uid); }); } return el; }
     var medals = ["\ud83d\udc51", "\ud83e\udd48", "\ud83e\udd49"], pod = h("div", { "class": "podium" });
     [1, 0, 2].forEach(function (k) {
       var x = d.top[k]; if (!x) return;
@@ -1035,7 +1106,7 @@
   var MINS = 5;
   function pathStats(p) { var t = 0, s = 0, pts = 0; p.rooms.forEach(function (r) { t += r.tasks; s += r.solved; pts += r.points; }); return { tasks: t, solved: s, pts: pts, mins: t * MINS, done: p.rooms.length > 0 && p.rooms.every(function (r) { return r.tasks > 0 && r.solved >= r.tasks; }) }; }
   function fmtMins(m) { return m >= 60 ? Math.floor(m / 60) + tr(" h ", " س ") + (m % 60 ? (m % 60) + tr(" min", " د") : "") : m + tr(" min", " د"); }
-  var PMETA = { "cyber-foundations": { lv: "easy", hue: 160, ic: "shield", tp: ["Foundations","الأساسيات"] }, "networking-basics": { lv: "easy", hue: 205, ic: "net", tp: ["Networking","الشبكات"] }, "soc-analyst-start": { lv: "medium", hue: 35, ic: "eye", tp: ["SOC","مركز العمليات"] }, "junior-pentester": { lv: "medium", hue: 350, ic: "bug", tp: ["Pentest","اختبار الاختراق"] }, "network-access-ip-connectivity": { lv: "medium", hue: 228, ic: "route", tp: ["Networking","الشبكات"] }, "network-services-security": { lv: "hard", hue: 268, ic: "lock", tp: ["Networking","الشبكات"] },
+  var PMETA = { "ai-security-basics": { lv: "easy", hue: 275, ic: "shield", tp: ["AI","الذكاء الاصطناعي"] }, "cyber-foundations": { lv: "easy", hue: 160, ic: "shield", tp: ["Foundations","الأساسيات"] }, "networking-basics": { lv: "easy", hue: 205, ic: "net", tp: ["Networking","الشبكات"] }, "soc-analyst-start": { lv: "medium", hue: 35, ic: "eye", tp: ["SOC","مركز العمليات"] }, "junior-pentester": { lv: "medium", hue: 350, ic: "bug", tp: ["Pentest","اختبار الاختراق"] }, "network-access-ip-connectivity": { lv: "medium", hue: 228, ic: "route", tp: ["Networking","الشبكات"] }, "network-services-security": { lv: "hard", hue: 268, ic: "lock", tp: ["Networking","الشبكات"] },
     "web-basics": { lv: "easy", hue: 190, ic: "net", tp: ["Web","الويب"] }, "web-app-security": { lv: "medium", hue: 190, ic: "bug", tp: ["Web","الويب"] }, "web-secure-review": { lv: "hard", hue: 190, ic: "lock", tp: ["Web","الويب"] },
     "forensics-basics": { lv: "easy", hue: 45, ic: "eye", tp: ["Forensics","التحليل الجنائي"] }, "forensics-timeline-analysis": { lv: "medium", hue: 45, ic: "route", tp: ["Forensics","التحليل الجنائي"] }, "forensics-casework": { lv: "hard", hue: 45, ic: "shield", tp: ["Forensics","التحليل الجنائي"] },
     "crypto-basics": { lv: "easy", hue: 290, ic: "lock", tp: ["Crypto","التشفير"] }, "crypto-in-practice": { lv: "medium", hue: 290, ic: "shield", tp: ["Crypto","التشفير"] }, "crypto-applied-security": { lv: "hard", hue: 290, ic: "bug", tp: ["Crypto","التشفير"] } };
@@ -1072,19 +1143,26 @@
     var pm = PMETA[p.slug] || {};
     root.appendChild(h("div", { "class": "roomh", style: "--ph:" + (pm.hue || 210) }, h("div", { "class": "meta" }, diffPill(pm.lv || "easy"), pm.tp ? h("span", { "class": "ptopic", text: tr(pm.tp[0], pm.tp[1]) }) : null, h("span", { "class": "pill easy", text: p.rooms.length + " " + tr("rooms", "غرف") }), h("span", { "class": "pill medium", text: "~" + fmtMins(st.mins) }), h("span", { "class": "pill", text: st.pts + " " + tr("pts", "نقطة") })), h("h2", { "class": "ptitle", text: pick(p, "title") }), h("p", { text: pick(p, "summary") }), progress(st.solved, st.tasks), h("div", { "class": "meta", text: st.solved + " / " + st.tasks + " " + tr("tasks done", "مهمة اتحلت") })));
     root.appendChild(h("div", { "class": "box" }, h("h3", { text: tr("What this path prepares you for", "المسار ده بيجهزك لإيه") }), h("p", { text: pick(p, "prepares") })));
+    root.appendChild(h("div", { "class": "box" }, progBox(p)));
     var list = h("div", { "class": "plist" }), nextSet = false;
     p.rooms.forEach(function (r, i) {
       var done = r.tasks > 0 && r.solved >= r.tasks, isNext = !done && !nextSet; if (isNext) nextSet = true;
       list.appendChild(h("button", { "class": "prow ppr" + (done ? " done" : "") + (isNext ? " next" : ""), type: "button", onclick: function () { location.hash = "#/room/" + r.slug; } },
         h("span", { "class": "pn", text: done ? "\u2713" : String(i + 1) }),
         h("span", { "class": "pt" }, h("b", { text: pick(r, "title") }), h("small", { text: r.solved + " / " + r.tasks + " " + tr("tasks", "مهمة") + " · ~" + fmtMins(r.tasks * MINS) }), progress(r.solved, r.tasks)),
-        diffPill(r.difficulty), isNext ? h("span", { "class": "pill", text: tr("Next", "التالي") }) : null));
+        diffPill(r.difficulty), r.locked ? h("span", { "class": "pill lock", text: tr("Locked", "مقفولة") }) : (r.paid ? h("span", { "class": "pill lock", text: tr("Paid", "مدفوعة") }) : null), isNext ? h("span", { "class": "pill", text: tr("Next", "التالي") }) : null));
     });
     root.appendChild(list);
+    if (p.rooms.some(function (r) { return r.locked; })) root.appendChild(paywall(p));
     var cb = h("div", { "class": "box certbox" });
     if (p.cert) {
       cb.appendChild(h("h3", { text: tr("You completed this path", "خلّصت المسار ده") }));
       cb.appendChild(h("button", { "class": "btn2 f", type: "button", text: tr("View your certificate", "اعرض شهادتك"), onclick: function () { location.hash = "#/cert/" + p.cert; } }));
+      var hid = h("input", { type: "checkbox", id: "hidecert" }); hid.checked = !!p.cert_hidden;
+      var hst = h("span", { "class": "note" });
+      hid.addEventListener("change", async function () { try { await rpc("ch_set_cert_hidden", { p_path: p.slug, p_hidden: hid.checked }); hst.textContent = hid.checked ? tr("Hidden from your profile.", "مخفية من بروفايلك.") : tr("Shown on your profile.", "ظاهرة على بروفايلك."); } catch (e) { hid.checked = !hid.checked; hst.textContent = tr("Could not save. Try again.", "معرفتش أحفظ. جرب تاني."); } });
+      cb.appendChild(h("p", { "class": "note" }, h("label", { "for": "hidecert" }, hid, document.createTextNode(" " + tr("Hide this path on my public profile", "اخفي المسار ده من بروفايلي العام"))), document.createTextNode(" "), hst));
+      cb.appendChild(h("p", { "class": "note", text: tr("Your profile shows the path name, the date and a link to the verify page, which shows the name printed on the certificate.", "بروفايلك بيظهر اسم المسار والتاريخ ولينك صفحة التحقق، وهي بتظهر الاسم المطبوع على الشهادة.") }));
     } else if (st.done && me) {
       var nm = ltr(h("input", { type: "text", maxlength: "60", placeholder: tr("Full real name in English letters", "اسمك الكامل الحقيقي بحروف إنجليزي"), "class": "cinp", autocomplete: "name" })), er = h("div", { "class": "st warn" });
       cb.appendChild(h("h3", { text: tr("Path complete. Get your certificate", "خلّصت المسار. خد شهادتك") }));
