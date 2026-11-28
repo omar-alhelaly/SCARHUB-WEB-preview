@@ -97,3 +97,6 @@ body[data-page=admin] .panel .row.lrp>input[type=date]{width:165px}
 body[data-page=admin] .panel .row.lrp>span:not(:first-child){color:var(--m);font-size:14px}
 body[data-page=admin] .panel .row.lrp>.btn{margin-inline-start:auto}
 @media(max-width:640px){body[data-page=admin] .panel .row.lr{padding:14px;gap:10px}body[data-page=admin] .panel .row.lr>span:first-child,body[data-page=admin] .panel .row.lr>b:first-child{flex-basis:100%}body[data-page=admin] .panel .row.lr>.btn,body[data-page=admin] .panel .row.lr>button{flex:1 1 40%}body[data-page=admin] .panel .row.lrp>.btn{margin-inline-start:0;flex-basis:100%}}
+
+.bdg.ttl{background:#6b4fd022;color:#8b6ff0;border:1px solid #6b4fd0}
+.pathdone{margin:4px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center}.pathdone a{color:var(--r2);text-decoration:underline}
