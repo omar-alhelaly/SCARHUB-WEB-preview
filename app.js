@@ -213,6 +213,8 @@
     var m = n.meta || {}, plan = m.plan ? " (" + m.plan + ")" : "", until = m.until ? new Date(m.until).toLocaleDateString(EN() ? "en-GB" : "ar-EG") : "";
     if (n.kind === "free_plan_granted") return tr("You received a free subscription from the owner" + plan + "." + (until ? " Valid until " + until + "." : ""), "حصلت على اشتراك مجاني من المالك" + plan + "." + (until ? " صالح لحد " + until + "." : ""));
     if (n.kind === "free_plan_revoked") return tr("The owner ended your free subscription" + plan + ".", "المالك أنهى اشتراكك المجاني" + plan + ".");
+    if (n.kind === "title_set") return tr("The owner gave you the title: " + (m.title || ""), "المالك اداك لقب: " + (m.title || ""));
+    if (n.kind === "title_cleared") return tr("The owner removed your title.", "المالك شال لقبك.");
     if (n.kind === "new_user") return tr("New user registered: " + (m.user || ""), "مستخدم جديد سجل: " + (m.user || ""));
     if (n.kind === "payment_pending") return tr("Your payment" + plan + " was received. Waiting for confirmation from the team.", "دفعتك" + plan + " اتسلمت. مستنية تأكيد الفريق.");
     if (n.kind === "payment_approved") return tr("Your payment" + plan + " was approved. Your subscription is active.", "دفعتك" + plan + " اتقبلت. اشتراكك اتفعّل.");
@@ -575,12 +577,12 @@
     sb.rpc("my_account").then(function (r) { if (r && r.data) { acc = r.data; paintDetails(); } });
     box.appendChild(h("div", { "class": "panel", id: "edit" }, h("h2", { text: tr("My profile", "بروفايلي") }), h("p", { text: me.email }),
       h("p", { text: tr("Role: ", "الدور: ") + me.role }), h("label", { text: tr("Username", "اسم المستخدم") }), uname, isStaff() ? h("label", { text: tr("Display name (shown to others)", "الاسم الظاهر للناس") }) : null, isStaff() ? alias : null, avBox, isStaff() ? upBox : null, h("div", { "class": "row" }, save), msg));
-    var plansBox = h("div", { "class": "panel" }, h("h2", { text: tr("Subscription", "الاشتراك") })); box.appendChild(plansBox);
+    var plansBox = h("div", { "class": "panel", id: "plans" }, h("h2", { text: tr("Subscription", "الاشتراك") })); box.appendChild(plansBox);
     var subR = await sb.from("subscriptions").select("status,current_period_end").eq("user_id", me.id).maybeSingle();
     var active = subR.data && /^(active|trialing)$/.test(subR.data.status) && new Date(subR.data.current_period_end) > new Date();
     plansBox.appendChild(h("p", { text: active ? tr("Active until ", "نشط لحد ") + new Date(subR.data.current_period_end).toLocaleDateString() : tr("No active subscription. Private tools need one.", "مفيش اشتراك فعال. الأدوات الخاصة محتاجة اشتراك.") }));
     var pl = await sb.from("plans").select("id,name,price_minor,currency,period,scope,description").eq("active", true);
-    var ptA = (await sb.from("plan_tools").select("plan_id,tool_id")).data || [], tnA = {}; ((await sb.from("tools").select("id,name")).data || []).forEach(function (x) { tnA[x.id] = x.name; });
+    var ptA = (await sb.from("plan_tools").select("plan_id,tool_id")).data || [], ppA = (await sb.from("plan_paths").select("plan_id,path_slug")).data || [], pathT = {}, tnA = {}; if (ppA.length) { var pls = await sb.rpc("ch_paths_list"); (pls.data || []).forEach(function (x) { pathT[x.slug] = EN() ? x.title_en : x.title_ar; }); } ((await sb.from("tools").select("id,name")).data || []).forEach(function (x) { tnA[x.id] = x.name; });
     var upa = (await sb.from("user_plan_access").select("plan_id,current_period_end").eq("user_id", me.id)).data || [];
     upa.filter(function (a) { return new Date(a.current_period_end) > new Date(); }).forEach(function (a) { var pn_ = (pl.data || []).filter(function (q) { return q.id === a.plan_id; })[0]; plansBox.appendChild(h("p", { text: (pn_ ? pn_.name : tr("Plan", "خطة")) + tr(" active until ", " نشطة لحد ") + new Date(a.current_period_end).toLocaleDateString() })); });
     var planBits = []; if (active) planBits.push(tr("Subscription until ", "اشتراك لحد ") + fmtDate(subR.data.current_period_end));
@@ -593,7 +595,7 @@
     if (methods.length) plansBox.appendChild(h("p", { "class": "hint", text: tr("Choose how to pay:", "اختار طريقة الدفع:") }));
     (pl.data || []).forEach(function (p) {
       if (!methods.length) return;
-      var covA = p.scope === "tools" ? tr("Covers only: ", "بتشمل بس: ") + ptA.filter(function (q) { return q.plan_id === p.id; }).map(function (q) { return tnA[q.tool_id] || "?"; }).join(", ") : tr("Covers all tools", "بتشمل كل الأدوات");
+      var pathsOf = ppA.filter(function (q) { return q.plan_id === p.id; }), covA = pathsOf.length ? tr("Unlocks the paid rooms of the path: ", "بتفتح الغرف المدفوعة في المسار: ") + pathsOf.map(function (q) { return pathT[q.path_slug] || q.path_slug; }).join(", ") : p.scope === "tools" ? tr("Covers only: ", "بتشمل بس: ") + ptA.filter(function (q) { return q.plan_id === p.id; }).map(function (q) { return tnA[q.tool_id] || "?"; }).join(", ") : tr("Covers all tools", "بتشمل كل الأدوات");
       plansBox.appendChild(h("p", { "class": "hint", text: p.name + ": " + covA + (p.description ? ". " + p.description : "") }));
       var row = h("div", { "class": "row" }, h("span", { text: p.name + " - " + (p.price_minor / 100).toFixed(2) + " " + p.currency + " / " + p.period + "  " }));
       if (methods.indexOf("paymob") > -1 && p.currency === "EGP") row.appendChild(h("button", { "class": "btn", type: "button", text: tr("Pay by card / wallet (Paymob)", "ادفع بكارت / محفظة (Paymob)"), on: { click: async function () {
@@ -622,8 +624,9 @@
   }
 
   /* ---------- badges, public profile, moderation, voice ---------- */
-  function badgesEl(role, sub, plan) {
+  function badgesEl(role, sub, plan, title) {
     var w = h("span", { "class": "bdgs" });
+    if (title) w.appendChild(h("span", { "class": "bdg ttl", text: title }));
     if (role === "owner") w.appendChild(h("span", { "class": "bdg owner", text: tr("Owner", "المالك") }));
     else if (role === "admin") w.appendChild(h("span", { "class": "bdg admin", text: tr("Admin", "أدمن") }));
     if (sub) w.appendChild(h("span", { "class": "bdg sub", text: "\u2605 " + (plan || tr("Subscriber", "مشترك")) }));
@@ -631,7 +634,7 @@
   }
   function fmtDate(v) { return v ? new Date(v).toLocaleDateString(EN() ? "en-GB" : "ar-EG") : "-"; }
   function fmtTime(v) { return v ? new Date(v).toLocaleString(EN() ? "en-GB" : "ar-EG", { hour12: true }) : "-"; }
-  var ACT_LBL = { signup: ["Sign up", "تسجيل جديد"], block_user: ["Blocked", "حظر"], unblock_user: ["Unblocked", "فك حظر"], ban_user: ["Banned", "حظر"], unban_user: ["Unbanned", "فك حظر"], grant_plan: ["Free plan granted", "اشتراك مجاني اتمنح"], revoke_plan: ["Free plan revoked", "اشتراك مجاني اتسحب"], review_manual_payment: ["Payment reviewed", "مراجعة دفعة"], set_role: ["Role changed", "تغيير صلاحية"] };
+  var ACT_LBL = { signup: ["Sign up", "تسجيل جديد"], block_user: ["Blocked", "حظر"], unblock_user: ["Unblocked", "فك حظر"], ban_user: ["Banned", "حظر"], unban_user: ["Unbanned", "فك حظر"], grant_plan: ["Free plan granted", "اشتراك مجاني اتمنح"], revoke_plan: ["Free plan revoked", "اشتراك مجاني اتسحب"], review_manual_payment: ["Payment reviewed", "مراجعة دفعة"], set_role: ["Role changed", "تغيير صلاحية"], set_title: ["Title changed", "تغيير لقب"] };
   window.scarOpenProfile = function (id) { return openProfile(id); };
   async function openProfile(id) {
     var old = $("profmodal"); if (old) old.remove();
@@ -646,9 +649,13 @@
     var d = r.data;
     function row(k, v) { return h("p", { style: "margin:4px 0" }, h("b", { text: k + ": " }), typeof v === "string" ? document.createTextNode(v) : v); }
     var av = h("div", { "class": "av", style: "width:64px;height:64px;flex:none" }, avatarSvg(d.avatar, d.id));
-    card.appendChild(h("div", { style: "display:flex;gap:14px;align-items:center;margin-bottom:10px;padding-inline-end:40px" }, av, h("div", null, h("h2", { text: d.name, style: "margin:0" }), badgesEl(d.role, d.subscribed, d.plans && d.plans.length ? d.plans.join(", ") : (d.all_access ? tr("All tools", "كل الأدوات") : null)))));
+    card.appendChild(h("div", { style: "display:flex;gap:14px;align-items:center;margin-bottom:10px;padding-inline-end:40px" }, av, h("div", null, h("h2", { text: d.name, style: "margin:0" }), badgesEl(d.role, d.subscribed, d.plans && d.plans.length ? d.plans.join(", ") : (d.all_access ? tr("All tools", "كل الأدوات") : null), d.title))));
     if (d.id !== me.id) card.appendChild(h("p", { style: "margin:4px 0 8px" }, h("button", { "class": "btn f", type: "button", text: tr("Message privately", "ابعتله رسالة خاصة"), on: { click: function () { startDm(d.id); } } })));
     card.appendChild(row(tr("Joined", "انضم"), fmtDate(d.joined)));
+    if ((d.paths || []).length) {
+      card.appendChild(h("h3", { text: tr("Completed learning paths", "مسارات متخلصة"), style: "margin:12px 0 4px" }));
+      d.paths.forEach(function (x) { card.appendChild(h("p", { "class": "pathdone" }, h("span", { "class": "bdg ttl", text: "\u2713 " + tr(x.title_en, x.title_ar) }), document.createTextNode(" " + fmtDate(x.issued_at) + " "), h("a", { href: "challenges.html#/cert/" + encodeURIComponent(x.cert), text: tr("Verify certificate", "اتأكد من الشهادة") }))); });
+    }
     var pl = (d.plans || []).slice(); if (d.all_access) pl.unshift(tr("All tools", "كل الأدوات"));
     card.appendChild(row(tr("Plan", "الاشتراك"), pl.length ? pl.join(", ") : tr("None", "مفيش")));
     if (d.staff) {
@@ -838,7 +845,7 @@
     setInterval(function () { if (!document.hidden) load(); }, 2000);
     async function who(ids) {
       var need = ids.filter(function (i) { return !names[i]; }); if (!need.length) return;
-      var r = await sb.from("public_profiles").select("id,display_name,avatar,subscribed,role,joined,plan_name").in("id", need);
+      var r = await sb.from("public_profiles").select("id,display_name,avatar,subscribed,role,joined,plan_name,title").in("id", need);
       (r.data || []).forEach(function (p) { names[p.id] = p; });
     }
     rxStyle();
@@ -999,7 +1006,7 @@
       if (deleted) {
         body = h("p", { "class": "hint cdel", style: "font-style:italic;margin:4px 0", text: m.deleted_by === m.user_id ? tr("Deleted by the author", "اتمسحت بواسطة صاحبها") : tr("Deleted by admin ", "اتمسحت بواسطة الأدمن ") + dby });
       } else body = m.audio_path ? (urls[m.audio_path] ? voicePlayer(urls[m.audio_path], m.audio_secs) : h("p", { "class": "hint", text: tr("Voice message (loading)", "رسالة صوتية (بتحمّل)") })) : h("p", { text: m.body });
-      var hd = h("div", { style: "flex:1;min-width:0" }, nm, badgesEl(p.role, p.subscribed, p.plan_name), aCA ? h("span", { "class": "bdg", style: "background:#6b4fd0;color:#fff", text: tr("Chat admin", "أدمن الشات") }) : null), acts = null, el;
+      var hd = h("div", { style: "flex:1;min-width:0" }, nm, badgesEl(p.role, p.subscribed, p.plan_name, p.title), aCA ? h("span", { "class": "bdg", style: "background:#6b4fd0;color:#fff", text: tr("Chat admin", "أدمن الشات") }) : null), acts = null, el;
       if (amCA() && (ban || del)) { acts = h("div", { "class": "cact", style: "display:flex;flex-direction:column;gap:6px;align-self:flex-start;flex:0 0 auto" }, ban, del); [ban, del].forEach(function (b) { if (b) { b.style.padding = "4px 12px"; b.style.fontSize = "12px"; b.style.height = "auto"; b.style.alignSelf = "stretch"; } }); }
       el = h("div", { "class": "cm" + (deleted ? " cmdel" : "") }, av, hd, acts ? acts : ban, acts ? null : del);
       if (deleted && isStaff()) {
@@ -1029,7 +1036,7 @@
       if (sg === lastSig) { if (changed) paintAll(); return; } lastSig = sg;
       var atEnd = log.scrollHeight - log.scrollTop - log.clientHeight < 80; await who(rows.map(function (x) { return x.sender; }));
       clear(log); log.appendChild(h("button", { "class": "btn", type: "button", text: tr("\u2190 All private chats", "\u2190 كل الشاتات الخاصة"), on: { click: function () { select("dmlist"); } } })); log.appendChild(dmNotice());
-      rows.forEach(function (m) { var p = names[m.sender] || { display_name: "?", avatar: "b1" }, hd = h("div", { style: "flex:1" }, h("b", { text: p.display_name }), badgesEl(p.role, p.subscribed, p.plan_name)), row = h("div", { "class": "cm" }, h("div", { "class": "av", style: "cursor:pointer", on: { click: function () { openProfile(m.sender); } } }, avatarSvg(p.avatar, p.id)), hd, m.sender === me.id ? h("button", { "class": "btn", type: "button", text: tr("Delete", "احذف"), "aria-label": tr("Delete message", "احذف الرسالة"), on: { click: function () { delMsg("dm", m.id); } } }) : null); var pl = reactUi("dm", m.id, hd, row, m.sender === me.id, m.created_at); hd.appendChild(h("p", { text: m.body })); hd.appendChild(pl); log.appendChild(row); });
+      rows.forEach(function (m) { var p = names[m.sender] || { display_name: "?", avatar: "b1" }, hd = h("div", { style: "flex:1" }, h("b", { text: p.display_name }), badgesEl(p.role, p.subscribed, p.plan_name, p.title)), row = h("div", { "class": "cm" }, h("div", { "class": "av", style: "cursor:pointer", on: { click: function () { openProfile(m.sender); } } }, avatarSvg(p.avatar, p.id)), hd, m.sender === me.id ? h("button", { "class": "btn", type: "button", text: tr("Delete", "احذف"), "aria-label": tr("Delete message", "احذف الرسالة"), on: { click: function () { delMsg("dm", m.id); } } }) : null); var pl = reactUi("dm", m.id, hd, row, m.sender === me.id, m.created_at); hd.appendChild(h("p", { text: m.body })); hd.appendChild(pl); log.appendChild(row); });
       if (atEnd || !log.getAttribute("data-dm")) { log.scrollTop = log.scrollHeight; log.setAttribute("data-dm", "1"); }
     }
     async function load() {
@@ -1130,11 +1137,12 @@
       tabA.setAttribute("aria-pressed", view === "active" ? "true" : "false"); tabD.setAttribute("aria-pressed", view === "deleted" ? "true" : "false");
       tabA.style.opacity = view === "active" ? "1" : ".6"; tabD.style.opacity = view === "deleted" ? "1" : ".6";
       r.data = r.data.filter(function (u) { return view === "deleted" ? u.status === "deleted" : u.status !== "deleted"; });
-      var gm = {}, plansL = [], cam = {};
+      var gm = {}, plansL = [], cam = {}, ttlM = {};
       if (owner) {
         var cq = await sb.rpc("chat_admin_ids"); (cq.data || []).forEach(function (x) { cam[x] = 1; });
         var gr = await sb.rpc("admin_list_grants"); (gr.data || []).forEach(function (g) { (gm[g.user_id] = gm[g.user_id] || []).push(g); });
         var pr = await sb.from("plans").select("id,name,scope,active"); plansL = pr.data || [];
+        var tq = await sb.from("public_profiles").select("id,title"); (tq.data || []).forEach(function (x) { if (x.title) ttlM[x.id] = x.title; });
       }
       function endTxt(v) { return /^infinity/.test(String(v)) ? tr("no expiry", "من غير انتهاء") : tr("until ", "لحد ") + new Date(v).toLocaleDateString(); }
       r.data.forEach(function (u) {
@@ -1189,6 +1197,19 @@
             var x = await sb.rpc("admin_revoke_plan", { target: u.id, p_plan: g.plan_id || null }); if (x.error) alert(x.error.message); users();
           } } })); });
           act.appendChild(gact);
+        }
+        if (owner && u.status === "active") {
+          var ti = h("input", { type: "text", maxlength: "30", value: ttlM[u.id] || "", placeholder: tr("Title (2-30 characters)", "اللقب (٢ لـ ٣٠ حرف)"), "aria-label": tr("Title", "اللقب"), style: "min-width:150px" });
+          var tact = h("div", { "class": "hint", "data-g": "perm" }, ti, h("button", { "class": "btn", type: "button", text: tr("Set title", "حط اللقب"), on: { click: async function () {
+            var v = ti.value.trim(); if (v.length < 2) return alert(tr("Write a title of 2 to 30 characters, or use Remove title.", "اكتب لقب من ٢ لـ ٣٠ حرف، أو استخدم شيل اللقب."));
+            if (!confirm(tr("Give this user the title \"" + v + "\"? It shows next to their name.", "تدي المستخدم ده اللقب \"" + v + "\"؟ بيظهر جنب اسمه."))) return;
+            var x = await sb.rpc("set_user_title", { target: u.id, p_title: v }); if (x.error) alert(x.error.message); users();
+          } } }));
+          if (ttlM[u.id]) tact.appendChild(h("button", { "class": "btn", type: "button", style: "color:#e11d2e", text: tr("Remove title", "شيل اللقب"), on: { click: async function () {
+            if (!confirm(tr("Remove this user's title?", "تشيل لقب المستخدم ده؟"))) return;
+            var x = await sb.rpc("set_user_title", { target: u.id, p_title: "" }); if (x.error) alert(x.error.message); users();
+          } } }));
+          act.appendChild(tact);
         }
         (function () {
           var kids = [].slice.call(act.children), G = { perm: [tr("Permissions", "الصلاحيات"), []], plan: [tr("Plan", "الاشتراك"), []], mod: [tr("Moderation", "الإشراف"), []], danger: [tr("Danger", "خطر"), []] };
@@ -1393,7 +1414,7 @@
       swCb.addEventListener("change", async function () { swCb.disabled = true; var want = swCb.checked, r = await sb.rpc("set_admin_notices", { p_on: want }); if (r.error) { swCb.checked = !want; say(swMsg, tr("Could not save.", "ماتحفظش."), "err"); } else say(swMsg, want ? tr("Admins can email users.", "الأدمن يقدر يبعت إيميل.") : tr("Admin emails are off.", "إيميلات الأدمن مقفولة."), "ok"); swCb.disabled = false; });
     }
     box.appendChild(lp);
-    var LBL = { signup: ["Sign up", "تسجيل جديد"], login: ["Login", "دخول"], view_dm: ["Owner viewed a private chat", "المالك فتح شات خاص"], block_user: ["Block", "حظر"], unblock_user: ["Unblock", "فك حظر"], ban_user: ["Ban", "حظر"], unban_user: ["Unban", "فك حظر"], admin_delete_user: ["Account deleted by admin", "حذف حساب بواسطة أدمن"], delete_account: ["Account deleted by user", "المستخدم حذف حسابه"], grant_plan: ["Free plan granted", "اشتراك مجاني اتمنح"], revoke_plan: ["Free plan revoked", "اشتراك مجاني اتسحب"], review_manual_payment: ["Payment reviewed", "مراجعة دفعة"], set_role: ["Role changed", "تغيير صلاحية"], set_chat_admin: ["Chat admin changed", "تغيير أدمن الشات"], claim_owner: ["Owner claimed", "استلام الأونر"], tool_price: ["Tool price", "سعر أداة"], set_manual_instructions: ["Wallet details changed", "تغيير بيانات المحفظة"], delete_message: ["Message deleted", "رسالة اتمسحت"], contact_change: ["Contact details changed", "تعديل بيانات التواصل"], tool_added: ["Tool added", "أداة اتضافت"], tool_change: ["Tool changed", "أداة اتعدلت"], tool_deleted: ["Tool deleted", "أداة اتمسحت"], clear_user_chat: ["User chat cleared", "شات مستخدم اتمسح"], notice_sent: ["Notice emailed", "إيميل اتبعت"], notice_failed: ["Notice email failed", "الإيميل فشل"], notice_skipped: ["Notice skipped", "الإيميل اتخطى"], set_alias: ["Alias changed", "تغيير اسم الظهور"], notice_setting: ["Admin email setting", "إعداد إيميلات الأدمن"], paymob_paid: ["Card payment confirmed", "دفع بالكارت اتأكد"] };
+    var LBL = { signup: ["Sign up", "تسجيل جديد"], login: ["Login", "دخول"], view_dm: ["Owner viewed a private chat", "المالك فتح شات خاص"], set_title: ["Title changed", "تغيير لقب"], block_user: ["Block", "حظر"], unblock_user: ["Unblock", "فك حظر"], ban_user: ["Ban", "حظر"], unban_user: ["Unban", "فك حظر"], admin_delete_user: ["Account deleted by admin", "حذف حساب بواسطة أدمن"], delete_account: ["Account deleted by user", "المستخدم حذف حسابه"], grant_plan: ["Free plan granted", "اشتراك مجاني اتمنح"], revoke_plan: ["Free plan revoked", "اشتراك مجاني اتسحب"], review_manual_payment: ["Payment reviewed", "مراجعة دفعة"], set_role: ["Role changed", "تغيير صلاحية"], set_chat_admin: ["Chat admin changed", "تغيير أدمن الشات"], claim_owner: ["Owner claimed", "استلام الأونر"], tool_price: ["Tool price", "سعر أداة"], set_manual_instructions: ["Wallet details changed", "تغيير بيانات المحفظة"], delete_message: ["Message deleted", "رسالة اتمسحت"], contact_change: ["Contact details changed", "تعديل بيانات التواصل"], tool_added: ["Tool added", "أداة اتضافت"], tool_change: ["Tool changed", "أداة اتعدلت"], tool_deleted: ["Tool deleted", "أداة اتمسحت"], clear_user_chat: ["User chat cleared", "شات مستخدم اتمسح"], notice_sent: ["Notice emailed", "إيميل اتبعت"], notice_failed: ["Notice email failed", "الإيميل فشل"], notice_skipped: ["Notice skipped", "الإيميل اتخطى"], set_alias: ["Alias changed", "تغيير اسم الظهور"], notice_setting: ["Admin email setting", "إعداد إيميلات الأدمن"], paymob_paid: ["Card payment confirmed", "دفع بالكارت اتأكد"] };
     lsel.appendChild(h("option", { value: "", text: tr("All", "الكل") })); Object.keys(LBL).forEach(function (k) { lsel.appendChild(h("option", { value: k, text: tr(LBL[k][0], LBL[k][1]) })); });
     var llive = h("span", { "class": "hint", style: "margin-inline-start:10px" }); lp.appendChild(h("div", { "class": "row" }, lsel, llive)); lp.appendChild(h("div", { style: "overflow-x:auto" }, h("table", { "class": "t" }, h("thead", null, h("tr", null, h("th", { text: tr("When", "الوقت") }), h("th", { text: tr("Action", "الإجراء") }), h("th", { text: tr("By", "بواسطة") }), h("th", { text: tr("Target", "الهدف") }), h("th", { text: tr("Details", "التفاصيل") }))), ltb))); lp.appendChild(lmsg);
     var allLogs = [];
@@ -1505,15 +1526,15 @@
       pp.appendChild(h("label", { style: "display:inline-block;margin-inline-end:14px" }, c, " " + NAMES[p.provider] + (p.provider === "paymob" ? " (not tested yet)" : " (not tested yet)")));
     });
     var pl = await sb.from("plans").select("id,name,price_minor,currency,period,active,scope,description");
-    var allT0 = (await TSQ("id,name,third_party", function (q) { return q.order("name"); })).data || [], allT = allT0.filter(function (x) { return !x.third_party; }), ptR = (await sb.from("plan_tools").select("plan_id,tool_id")).data || [], tName = {}; allT0.forEach(function (x) { tName[x.id] = x.name; });
+    var allT0 = (await TSQ("id,name,third_party", function (q) { return q.order("name"); })).data || [], allT = allT0.filter(function (x) { return !x.third_party; }), ptR = (await sb.from("plan_tools").select("plan_id,tool_id")).data || [], ppR = (await sb.from("plan_paths").select("plan_id,path_slug")).data || [], tName = {}; allT0.forEach(function (x) { tName[x.id] = x.name; });
     (pl.data || []).forEach(function (p) {
-      var cov = p.scope === "tools" ? tr("only: ", "بس: ") + ptR.filter(function (q) { return q.plan_id === p.id; }).map(function (q) { return tName[q.tool_id] || "?"; }).join(", ") : tr("all tools", "كل الأدوات");
+      var isPP = ppR.some(function (q) { return q.plan_id === p.id; }), cov = isPP ? tr("path rooms: ", "غرف مسار: ") + ppR.filter(function (q) { return q.plan_id === p.id; }).map(function (q) { return q.path_slug; }).join(", ") : p.scope === "tools" ? tr("only: ", "بس: ") + ptR.filter(function (q) { return q.plan_id === p.id; }).map(function (q) { return tName[q.tool_id] || "?"; }).join(", ") : tr("all tools", "كل الأدوات");
       var planLbl = h("span", { text: p.name + ": " + (p.price_minor / 100).toFixed(2) + " " + p.currency + "/" + p.period + " (" + cov + ")" + (p.description ? " - " + p.description : "") + (p.active ? "" : tr(" (DISABLED, not for sale)", " (معطلة، مش للبيع)")) + "  " });
       var planRow = h("div", { "class": "row lr" }, planLbl); pp.appendChild(planRow);
       if (owner) {
         var editPlanBox = h("div", { style: "display:none;padding:6px 0 12px" });
         var en = h("input", { type: "text", maxlength: "40", value: p.name }), epr = h("input", { type: "text", inputmode: "decimal", value: (p.price_minor / 100).toFixed(2) }), edsc = h("input", { type: "text", maxlength: "300", value: p.description || "", placeholder: tr("Plan details", "تفاصيل الخطة"), style: "min-width:260px" });
-        var esc = h("select", null, h("option", { value: "all", text: tr("All tools", "كل الأدوات") }), h("option", { value: "tools", text: tr("Only selected tools", "أدوات محددة بس") })); esc.value = p.scope;
+        var esc = h("select", null, h("option", { value: "all", text: tr("All tools", "كل الأدوات") }), h("option", { value: "tools", text: tr("Only selected tools", "أدوات محددة بس") })); esc.value = p.scope; if (isPP) esc.style.display = "none";
         var epicks = {}, epBox = h("div", { style: "max-height:200px;overflow:auto;padding:6px 0;display:" + (p.scope === "tools" ? "block" : "none") });
         var mine = ptR.filter(function (q) { return q.plan_id === p.id; }).map(function (q) { return q.tool_id; });
         allT.forEach(function (x) { var cb = h("input", { type: "checkbox" }); cb.checked = mine.indexOf(x.id) > -1; epicks[x.id] = cb; epBox.appendChild(h("label", { style: "display:inline-block;margin:2px 10px 2px 0" }, cb, " " + x.name)); });
@@ -1521,9 +1542,11 @@
         var saveP = h("button", { "class": "btn f", type: "button", text: tr("Save plan", "احفظ الخطة"), on: { click: async function () {
           var mn = Math.round(parseFloat(epr.value) * 100); if (!(mn >= 0 && mn <= 100000000) || en.value.trim().length < 2) return say(pmsg, tr("Name or price?", "الاسم أو السعر؟"), "err");
           var ch = Object.keys(epicks).filter(function (k) { return epicks[k].checked; });
-          if (esc.value === "tools" && !ch.length) return say(pmsg, tr("Pick at least one tool.", "اختار أداة واحدة على الأقل."), "err");
-          var u = await sb.from("plans").update({ name: en.value.trim(), price_minor: mn, description: edsc.value.trim() || null, scope: esc.value }).eq("id", p.id).select("id");
+          if (!isPP && esc.value === "tools" && !ch.length) return say(pmsg, tr("Pick at least one tool.", "اختار أداة واحدة على الأقل."), "err");
+          var upd = { name: en.value.trim(), price_minor: mn, description: edsc.value.trim() || null }; if (!isPP) upd.scope = esc.value;
+          var u = await sb.from("plans").update(upd).eq("id", p.id).select("id");
           if (u.error || !u.data || !u.data.length) return say(pmsg, u.error ? u.error.message : tr("Not saved.", "ماتحفظش."), "err");
+          if (isPP) return say(pmsg, tr("Plan saved. Reload to see it.", "الخطة اتحفظت. حدّث الصفحة."), "ok");
           var d = await sb.from("plan_tools").delete().eq("plan_id", p.id); if (d.error) return say(pmsg, d.error.message, "err");
           if (esc.value === "tools") { var ins2 = await sb.from("plan_tools").insert(ch.map(function (k) { return { plan_id: p.id, tool_id: k }; })); if (ins2.error) return say(pmsg, ins2.error.message, "err"); }
           say(pmsg, tr("Plan saved. Reload to see it.", "الخطة اتحفظت. حدّث الصفحة."), "ok");
